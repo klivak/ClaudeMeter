@@ -1,5 +1,6 @@
 #![windows_subsystem = "windows"]
 #![allow(static_mut_refs)]
+#![allow(clippy::too_many_arguments)]
 
 mod autostart;
 mod config;
