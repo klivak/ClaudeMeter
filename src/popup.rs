@@ -27,6 +27,7 @@ pub struct PopupWindow {
     pub chatgpt_link_rect: RECT,
 }
 
+#[allow(dead_code)]
 impl PopupWindow {
     pub fn invalidate(&self) {
         unsafe {
@@ -68,6 +69,7 @@ impl PopupWindow {
 }
 
 /// Get position for the popup window — above the taskbar, near the bottom-right.
+#[allow(dead_code)]
 fn get_popup_position(w: i32, h: i32) -> (i32, i32) {
     unsafe {
         let mut work_area = RECT::default();
