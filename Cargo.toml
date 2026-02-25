@@ -1,0 +1,52 @@
+[package]
+name = "claudemeter"
+version = "1.0.0"
+edition = "2021"
+authors = ["klivak"]
+description = "Ultra-lightweight Windows tray app for monitoring Claude AI subscription usage limits. Built in Rust for minimal memory footprint (under 10 MB RAM)."
+license = "MIT"
+repository = "https://github.com/klivak/claudemeter"
+homepage = "https://github.com/klivak/claudemeter"
+readme = "README.md"
+keywords = ["claude", "anthropic", "usage", "monitor", "tray"]
+categories = ["command-line-utilities"]
+rust-version = "1.75"
+
+[[bin]]
+name = "claudemeter"
+path = "src/main.rs"
+
+[dependencies]
+tokio = { version = "1", features = ["rt", "macros", "time", "sync", "net", "io-util"] }
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+chrono = { version = "0.4", features = ["serde"] }
+rusqlite = { version = "0.31", features = ["bundled"] }
+open = "5"
+log = "0.4"
+env_logger = "0.11"
+
+[dependencies.windows]
+version = "0.58"
+features = [
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_UI_Shell",
+    "Win32_Graphics_Gdi",
+    "Win32_System_LibraryLoader",
+    "Win32_Foundation",
+    "Win32_Security_Credentials",
+    "Win32_System_Registry",
+    "Win32_System_Threading",
+    "Win32_Globalization",
+]
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[build-dependencies]
+winres = "0.1"

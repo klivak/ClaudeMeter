@@ -1,0 +1,14 @@
+/target
+*.exe
+*.pdb
+*.db
+config.json
+*.log
+.env
+.vs/
+.vscode/
+*.swp
+*.swo
+*~
+Thumbs.db
+Desktop.ini
