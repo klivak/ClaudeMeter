@@ -65,6 +65,7 @@ struct AppState {
     install_rect: RECT,
     chatgpt_link_rect: RECT,
     back_rect: RECT,
+    setting_rects: [RECT; 5],
     notification_tracker: NotificationTracker,
     exe_dir: std::path::PathBuf,
     chart_data: Vec<f64>,
@@ -164,6 +165,7 @@ unsafe fn run_message_loop(exe_dir: std::path::PathBuf, config_mgr: ConfigManage
         install_rect: RECT::default(),
         chatgpt_link_rect: RECT::default(),
         back_rect: RECT::default(),
+        setting_rects: [RECT::default(); 5],
         notification_tracker: NotificationTracker::new(),
         exe_dir,
         chart_data: Vec::new(),
@@ -171,7 +173,7 @@ unsafe fn run_message_loop(exe_dir: std::path::PathBuf, config_mgr: ConfigManage
 
     // Create tray icon
     if let Some(state) = APP_STATE.as_mut() {
-        match TrayIcon::new(main_hwnd) {
+        match TrayIcon::new(main_hwnd, &state.exe_dir) {
             Ok(tray) => state.tray = Some(tray),
             Err(e) => log::error!("Failed to create tray icon: {e}"),
         }
@@ -319,6 +321,7 @@ unsafe extern "system" fn popup_wnd_proc(
                         &state.i18n,
                         &state.config_mgr.config,
                         &mut state.back_rect,
+                        &mut state.setting_rects,
                     );
                 } else {
                     renderer.draw(
@@ -331,6 +334,7 @@ unsafe extern "system" fn popup_wnd_proc(
                         &colors,
                         &state.i18n,
                         &state.chart_data,
+                        &state.last_error,
                         &mut state.settings_rect,
                         &mut state.close_rect,
                         &mut state.refresh_rect,
@@ -359,6 +363,68 @@ unsafe extern "system" fn popup_wnd_proc(
                     && crate::popup::point_in_rect(pt, state.back_rect)
                 {
                     state.popup_in_settings = false;
+                    let _ = windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, true);
+                } else if state.popup_in_settings
+                    && crate::popup::point_in_rect(pt, state.setting_rects[0])
+                {
+                    // Theme: cycle auto → dark → light → auto
+                    let next = match state.config_mgr.config.theme.as_str() {
+                        "auto" => "dark",
+                        "dark" => "light",
+                        _ => "auto",
+                    };
+                    state.config_mgr.config.theme = next.to_string();
+                    state.config_mgr.save();
+                    let _ = windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, true);
+                } else if state.popup_in_settings
+                    && crate::popup::point_in_rect(pt, state.setting_rects[1])
+                {
+                    // Language: cycle auto → en → uk → es → de → fr → auto
+                    let next = match state.config_mgr.config.language.as_str() {
+                        "auto" => "en",
+                        "en" => "uk",
+                        "uk" => "es",
+                        "es" => "de",
+                        "de" => "fr",
+                        _ => "auto",
+                    };
+                    state.config_mgr.config.language = next.to_string();
+                    state.i18n =
+                        I18n::from_config(&state.config_mgr.config.language);
+                    state.config_mgr.save();
+                    let _ = windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, true);
+                } else if state.popup_in_settings
+                    && crate::popup::point_in_rect(pt, state.setting_rects[2])
+                {
+                    // Compact mode: toggle
+                    state.config_mgr.config.compact_mode =
+                        !state.config_mgr.config.compact_mode;
+                    state.config_mgr.save();
+                    let _ = windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, true);
+                } else if state.popup_in_settings
+                    && crate::popup::point_in_rect(pt, state.setting_rects[3])
+                {
+                    // Show ChatGPT section: toggle
+                    state.config_mgr.config.show_chatgpt_section =
+                        !state.config_mgr.config.show_chatgpt_section;
+                    state.config_mgr.save();
+                    let _ = windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, true);
+                } else if state.popup_in_settings
+                    && crate::popup::point_in_rect(pt, state.setting_rects[4])
+                {
+                    // Autostart: toggle + apply
+                    state.config_mgr.config.autostart =
+                        !state.config_mgr.config.autostart;
+                    let exe_path = state
+                        .exe_dir
+                        .join("claudemeter.exe")
+                        .to_string_lossy()
+                        .to_string();
+                    let _ = autostart::set_autostart(
+                        state.config_mgr.config.autostart,
+                        &exe_path,
+                    );
+                    state.config_mgr.save();
                     let _ = windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, true);
                 } else if crate::popup::point_in_rect(pt, state.settings_rect) {
                     state.popup_in_settings = !state.popup_in_settings;
@@ -401,6 +467,7 @@ unsafe fn draw_settings_panel(
     i18n: &I18n,
     config: &crate::config::Config,
     back_rect: &mut RECT,
+    setting_rects: &mut [RECT; 5],
 ) {
     use windows::Win32::Graphics::Gdi::{
         CreateSolidBrush, DeleteObject, DrawTextW, FillRect, SelectObject, SetBkMode, SetTextColor,
@@ -512,7 +579,7 @@ unsafe fn draw_settings_panel(
         ),
     ];
 
-    for (_, row_text) in rows {
+    for (i, (_, row_text)) in rows.iter().enumerate() {
         let f = create_font_helper(hdc, 11, false);
         let old2 = SelectObject(hdc, f);
         SetBkMode(hdc, TRANSPARENT);
@@ -522,6 +589,12 @@ unsafe fn draw_settings_panel(
             top: y,
             right: w - pad,
             bottom: y + 22,
+        };
+        setting_rects[i] = RECT {
+            left: 0,
+            top: y,
+            right: w,
+            bottom: y + 26,
         };
         let mut rw = wide(row_text);
         DrawTextW(

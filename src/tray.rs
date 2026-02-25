@@ -1,10 +1,13 @@
 use crate::providers::claude::UsageResponse;
+use std::path::Path;
 use windows::Win32::Foundation::HWND;
 use windows::Win32::UI::Shell::{
     Shell_NotifyIconW, NIF_ICON, NIF_MESSAGE, NIF_TIP, NIM_ADD, NIM_DELETE, NIM_MODIFY,
     NOTIFYICONDATAW,
 };
-use windows::Win32::UI::WindowsAndMessaging::{LoadIconW, HICON, IDI_APPLICATION, WM_USER};
+use windows::Win32::UI::WindowsAndMessaging::{
+    LoadIconW, LoadImageW, HICON, IDI_APPLICATION, IMAGE_ICON, LR_LOADFROMFILE, WM_USER,
+};
 
 // Tray callback message
 pub const WM_TRAY_ICON: u32 = WM_USER + 1;
@@ -48,19 +51,47 @@ pub struct TrayIcon {
     icon_gray: HICON,
 }
 
+fn load_icon_from_file(path: &Path) -> Result<HICON, String> {
+    let path_wide: Vec<u16> = path
+        .to_string_lossy()
+        .encode_utf16()
+        .chain(std::iter::once(0))
+        .collect();
+    unsafe {
+        let handle = LoadImageW(
+            None,
+            windows::core::PCWSTR(path_wide.as_ptr()),
+            IMAGE_ICON,
+            0,
+            0,
+            LR_LOADFROMFILE,
+        )
+        .map_err(|e| format!("Failed to load icon {}: {e}", path.display()))?;
+        Ok(HICON(handle.0))
+    }
+}
+
 impl TrayIcon {
-    pub fn new(hwnd: HWND) -> Result<Self, String> {
-        // For now, use default application icon as placeholder
-        // In a full build, these would be loaded from embedded resources
-        let default_icon = unsafe { LoadIconW(None, IDI_APPLICATION).map_err(|e| e.to_string())? };
+    pub fn new(hwnd: HWND, exe_dir: &Path) -> Result<Self, String> {
+        let fallback =
+            unsafe { LoadIconW(None, IDI_APPLICATION).map_err(|e| e.to_string())? };
+
+        let icon_green = load_icon_from_file(&exe_dir.join("assets/icon_green.ico"))
+            .unwrap_or(fallback);
+        let icon_yellow = load_icon_from_file(&exe_dir.join("assets/icon_yellow.ico"))
+            .unwrap_or(fallback);
+        let icon_red = load_icon_from_file(&exe_dir.join("assets/icon_red.ico"))
+            .unwrap_or(fallback);
+        let icon_gray = load_icon_from_file(&exe_dir.join("assets/icon_gray.ico"))
+            .unwrap_or(fallback);
 
         let tray = Self {
             hwnd,
             current_color: TrayIconColor::Gray,
-            icon_green: default_icon,
-            icon_yellow: default_icon,
-            icon_red: default_icon,
-            icon_gray: default_icon,
+            icon_green,
+            icon_yellow,
+            icon_red,
+            icon_gray,
         };
 
         tray.add_to_tray()?;
@@ -113,11 +144,12 @@ impl TrayIcon {
     }
 
     fn make_nid(&self) -> NOTIFYICONDATAW {
-        let mut nid = NOTIFYICONDATAW::default();
-        nid.cbSize = std::mem::size_of::<NOTIFYICONDATAW>() as u32;
-        nid.hWnd = self.hwnd;
-        nid.uID = TRAY_ID;
-        nid
+        NOTIFYICONDATAW {
+            cbSize: std::mem::size_of::<NOTIFYICONDATAW>() as u32,
+            hWnd: self.hwnd,
+            uID: TRAY_ID,
+            ..Default::default()
+        }
     }
 }
 
@@ -148,7 +180,7 @@ pub fn build_tooltip(usage: &Option<UsageResponse>, show_chatgpt: bool) -> Strin
                 let reset_str = metric
                     .resets_at
                     .as_deref()
-                    .and_then(|r| crate::i18n::seconds_until(r))
+                    .and_then(crate::i18n::seconds_until)
                     .map(|s| format!(" | {}", format_duration(s)))
                     .unwrap_or_default();
                 lines.push(format!("{}: {:.0}%{}", name, metric.utilization, reset_str));

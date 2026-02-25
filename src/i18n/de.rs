@@ -12,6 +12,11 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Pro", "Pro");
     m.insert("Max", "Max");
     m.insert("Claude Code not detected", "Claude Code nicht erkannt");
+    m.insert("credentials_not_found", "Anmeldedaten nicht gefunden");
+    m.insert(
+        "run_claude_login_desc",
+        "Claude Code ist installiert, aber nicht angemeldet. Führen Sie `claude login` im Terminal aus, um Ihr Konto zu verbinden.",
+    );
     m.insert(
         "install_claude_desc",
         "Installieren Sie Claude Code und führen Sie `claude login` aus, um die automatische Nutzungsverfolgung zu aktivieren.",

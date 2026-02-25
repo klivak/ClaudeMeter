@@ -107,6 +107,7 @@ impl PopupRenderer {
         colors: &ThemeColors,
         i18n: &I18n,
         chart_data: &[f64],
+        last_error: &Option<String>,
         // Button hit areas (output)
         settings_rect: &mut RECT,
         close_rect: &mut RECT,
@@ -137,7 +138,9 @@ impl PopupRenderer {
             } else {
                 match usage {
                     None => {
-                        y = self.draw_not_detected(hdc, w, y, colors, i18n, install_rect);
+                        y = self.draw_not_detected(
+                            hdc, w, y, colors, i18n, last_error, install_rect,
+                        );
                     }
                     Some(u) => {
                         y = self.draw_claude_section(hdc, w, y, u, colors, i18n);
@@ -539,9 +542,29 @@ impl PopupRenderer {
         mut y: i32,
         colors: &ThemeColors,
         i18n: &I18n,
+        last_error: &Option<String>,
         install_rect: &mut RECT,
     ) -> i32 {
         let pad = self.scale(PADDING);
+
+        // Determine what to show based on the error
+        let is_cred_error = last_error
+            .as_ref()
+            .is_some_and(|e| e.contains("credentials not found"));
+
+        let (title, desc, btn_label) = if is_cred_error {
+            (
+                i18n.t("credentials_not_found"),
+                i18n.t("run_claude_login_desc"),
+                i18n.t("Open Claude.ai \u{2192}"),
+            )
+        } else {
+            (
+                i18n.t("Claude Code not detected"),
+                i18n.t("install_claude_desc"),
+                i18n.t("Install Claude Code \u{2192}"),
+            )
+        };
 
         let font = self.create_font(12, true);
         let old_font = SelectObject(hdc, font);
@@ -553,7 +576,7 @@ impl PopupRenderer {
             right: w - pad,
             bottom: y + self.scale(24),
         };
-        let mut warn_wide = wide(&format!("\u{26A0} {}", i18n.t("Claude Code not detected")));
+        let mut warn_wide = wide(&format!("\u{26A0} {}", title));
         DrawTextW(
             hdc,
             &mut warn_wide,
@@ -567,7 +590,6 @@ impl PopupRenderer {
         let font2 = self.create_font(11, false);
         let old2 = SelectObject(hdc, font2);
         SetTextColor(hdc, colors.text_secondary);
-        let desc = i18n.t("install_claude_desc");
         let mut r2 = RECT {
             left: pad,
             top: y,
@@ -585,7 +607,7 @@ impl PopupRenderer {
         let _ = DeleteObject(font2);
         y += self.scale(70);
 
-        // Install link button
+        // Action button
         let btn_h = self.scale(28);
         *install_rect = RECT {
             left: pad,
@@ -601,7 +623,7 @@ impl PopupRenderer {
         SetBkMode(hdc, TRANSPARENT);
         SetTextColor(hdc, COLORREF(0x00FFFFFF)); // white
         let mut btn_text = *install_rect;
-        let mut btn_wide = wide(i18n.t("Install Claude Code \u{2192}"));
+        let mut btn_wide = wide(btn_label);
         DrawTextW(
             hdc,
             &mut btn_wide,

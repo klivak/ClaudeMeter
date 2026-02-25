@@ -12,6 +12,11 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Pro", "Pro");
     m.insert("Max", "Max");
     m.insert("Claude Code not detected", "Claude Code не знайдено");
+    m.insert("credentials_not_found", "Облікові дані не знайдено");
+    m.insert(
+        "run_claude_login_desc",
+        "Claude Code встановлено, але вхід не виконано. Запустіть `claude login` у терміналі, щоб підключити обліковий запис.",
+    );
     m.insert(
         "install_claude_desc",
         "Встановіть Claude Code та виконайте `claude login` для автоматичного відстеження використання.",
