@@ -86,7 +86,7 @@ impl I18n {
     }
 
     /// Translate a key. Falls back to English, then returns the key itself.
-    pub fn t(&self, key: &str) -> &str {
+    pub fn t<'a>(&'a self, key: &'a str) -> &'a str {
         self.strings
             .get(key)
             .copied()

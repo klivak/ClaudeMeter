@@ -192,10 +192,10 @@ mod tests {
             "seven_day_opus": {"utilization": 8.0, "resets_at": null}
         });
         let resp = parse_response(json).unwrap();
-        assert_eq!(resp.five_hour.unwrap().utilization, 62.0);
-        assert_eq!(resp.seven_day.unwrap().utilization, 28.0);
+        assert_eq!(resp.five_hour.as_ref().unwrap().utilization, 62.0);
+        assert_eq!(resp.seven_day.as_ref().unwrap().utilization, 28.0);
         assert!(resp.seven_day_sonnet.is_none());
-        assert_eq!(resp.seven_day_opus.unwrap().utilization, 8.0);
+        assert_eq!(resp.seven_day_opus.as_ref().unwrap().utilization, 8.0);
         assert_eq!(resp.detected_plan(), "Max");
     }
 

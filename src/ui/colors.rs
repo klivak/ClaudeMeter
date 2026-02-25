@@ -1,10 +1,10 @@
 use crate::theme::ResolvedTheme;
+use windows::Win32::Foundation::COLORREF;
 
-/// A Windows COLORREF is 0x00BBGGRR
-pub type ColorRef = u32;
+pub type ColorRef = COLORREF;
 
 pub fn rgb(r: u8, g: u8, b: u8) -> ColorRef {
-    (b as u32) << 16 | (g as u32) << 8 | r as u32
+    COLORREF((b as u32) << 16 | (g as u32) << 8 | r as u32)
 }
 
 fn hex_to_rgb(hex: &str) -> (u8, u8, u8) {
@@ -72,7 +72,6 @@ impl ThemeColors {
         }
     }
 
-    /// Returns the appropriate progress bar fill color for a given utilization percentage.
     pub fn progress_color(&self, utilization: f64) -> ColorRef {
         if utilization >= 80.0 {
             self.red

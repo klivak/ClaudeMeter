@@ -35,7 +35,8 @@ fn enable_autostart(exe_path: &str) -> Result<(), String> {
             KEY_SET_VALUE,
             &mut hkey,
         )
-        .map_err(|e| e.to_string())?;
+        .ok()
+        .map_err(|e: windows::core::Error| e.to_string())?;
 
         let result = RegSetValueExW(
             hkey,
@@ -46,7 +47,7 @@ fn enable_autostart(exe_path: &str) -> Result<(), String> {
         );
 
         RegCloseKey(hkey).ok();
-        result.map_err(|e| e.to_string())?;
+        result.ok().map_err(|e: windows::core::Error| e.to_string())?;
     }
     Ok(())
 }

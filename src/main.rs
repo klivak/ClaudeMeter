@@ -14,7 +14,7 @@ mod ui;
 
 use crate::config::ConfigManager;
 use crate::db::Database;
-use crate::i18n::{format_duration, seconds_until, I18n};
+use crate::i18n::{format_duration, I18n};
 use crate::notifications::{send_toast, NotificationTracker};
 use crate::providers::claude::{ClaudeClient, UsageResponse};
 use crate::theme::{resolve_theme, ThemeMode};
@@ -25,19 +25,19 @@ use crate::tray::{
 };
 use crate::ui::render::PopupRenderer;
 use chrono::Local;
-use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, POINT, RECT, WPARAM};
+use windows::Win32::Foundation::{GetLastError, HWND, LPARAM, LRESULT, POINT, RECT, WPARAM};
 use windows::Win32::Graphics::Gdi::{BeginPaint, EndPaint, PAINTSTRUCT};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
-use windows::Win32::System::Threading::{CreateMutexW, GetLastError};
+use windows::Win32::System::Threading::CreateMutexW;
 use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyMenu,
     DispatchMessageW, GetCursorPos, LoadIconW, PostMessageW, PostQuitMessage,
     RegisterClassExW, SetForegroundWindow, TrackPopupMenu, TranslateMessage,
     CS_HREDRAW, CS_VREDRAW, HMENU, IDI_APPLICATION, MF_CHECKED, MF_SEPARATOR,
     MF_STRING, MF_UNCHECKED, MSG, PM_REMOVE, PeekMessageW, TPM_BOTTOMALIGN,
-    TPM_LEFTALIGN, TPM_RETURNCMD, WM_COMMAND, WM_DESTROY, WM_LBUTTONUP,
-    WM_RBUTTONUP, WM_TIMER, WM_USER, WNDCLASSEXW, WS_EX_TOOLWINDOW,
-    WS_EX_TOPMOST, WS_POPUP,
+    TPM_LEFTALIGN, TPM_RETURNCMD, WM_COMMAND, WM_DESTROY, WM_KILLFOCUS,
+    WM_LBUTTONUP, WM_PAINT, WM_RBUTTONUP, WM_TIMER, WNDCLASSEXW,
+    WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
 };
 use windows::core::PCWSTR;
 
@@ -45,6 +45,7 @@ const WINDOW_CLASS: &str = "ClaudeMeterMain";
 const POPUP_CLASS: &str = "ClaudeMeterPopup";
 const TIMER_POLL: usize = 1;
 const TIMER_POLL_INTERVAL_MS: u32 = 120_000; // 2 minutes
+const WM_POLL_RESULT: u32 = 0x0400 + 20; // WM_USER + 20
 
 /// Shared application state accessible from the window proc.
 struct AppState {
@@ -191,7 +192,7 @@ unsafe fn run_message_loop(
     }
 }
 
-unsafe fn register_main_class(hinstance: windows::Win32::System::LibraryLoader::HMODULE) {
+unsafe fn register_main_class(hinstance: windows::Win32::Foundation::HMODULE) {
     let class_name = wide(WINDOW_CLASS);
     let mut wc = WNDCLASSEXW::default();
     wc.cbSize = std::mem::size_of::<WNDCLASSEXW>() as u32;
@@ -203,7 +204,7 @@ unsafe fn register_main_class(hinstance: windows::Win32::System::LibraryLoader::
     RegisterClassExW(&wc);
 }
 
-unsafe fn register_popup_class(hinstance: windows::Win32::System::LibraryLoader::HMODULE) {
+unsafe fn register_popup_class(hinstance: windows::Win32::Foundation::HMODULE) {
     let class_name = wide(POPUP_CLASS);
     let mut wc = WNDCLASSEXW::default();
     wc.cbSize = std::mem::size_of::<WNDCLASSEXW>() as u32;
@@ -212,9 +213,8 @@ unsafe fn register_popup_class(hinstance: windows::Win32::System::LibraryLoader:
     wc.hInstance = hinstance.into();
     wc.hIcon = LoadIconW(None, IDI_APPLICATION).unwrap_or_default();
     wc.lpszClassName = PCWSTR(class_name.as_ptr());
-    wc.hbrBackground = windows::Win32::Graphics::Gdi::HBRUSH(
-        (windows::Win32::UI::WindowsAndMessaging::COLOR_WINDOW.0 + 1) as isize,
-    );
+    // COLOR_WINDOW = 5, so (COLOR_WINDOW + 1) = 6 as background brush
+    wc.hbrBackground = windows::Win32::Graphics::Gdi::HBRUSH(6usize as *mut _);
     RegisterClassExW(&wc);
 }
 
@@ -249,7 +249,7 @@ unsafe extern "system" fn main_wnd_proc(
             }
             LRESULT(0)
         }
-        WM_USER + 20 => {
+        WM_POLL_RESULT => {
             // Poll result received (usage data posted back to main thread)
             // wparam = pointer to Box<Option<UsageResponse>>
             // lparam = pointer to Box<Option<String>> (error)
@@ -346,7 +346,7 @@ unsafe extern "system" fn popup_wnd_proc(
             LRESULT(0)
         }
         // Close popup when clicking outside (WM_KILLFOCUS)
-        windows::Win32::UI::WindowsAndMessaging::WM_KILLFOCUS => {
+        WM_KILLFOCUS => {
             if let Some(state) = APP_STATE.as_mut() {
                 if state.popup_visible {
                     state.popup_visible = false;
@@ -391,18 +391,18 @@ unsafe fn draw_settings_panel(
     let old = SelectObject(hdc, font);
     SetBkMode(hdc, TRANSPARENT);
     SetTextColor(hdc, colors.text_primary);
-    let back_text = wide(i18n.t("Back"));
+    let mut back_text = wide(i18n.t("Back"));
     let mut back_rect = RECT { left: pad, top: 0, right: w - 40, bottom: 36 };
-    DrawTextW(hdc, &back_text, &mut back_rect,
+    DrawTextW(hdc, &mut back_text, &mut back_rect,
         windows::Win32::Graphics::Gdi::DT_LEFT |
         windows::Win32::Graphics::Gdi::DT_SINGLELINE |
         windows::Win32::Graphics::Gdi::DT_VCENTER);
 
     // Close button
     SetTextColor(hdc, colors.text_secondary);
-    let close_text = wide("\u{00D7}");
+    let mut close_text = wide("\u{00D7}");
     let mut cr = RECT { left: w - 32, top: 0, right: w - 4, bottom: 36 };
-    DrawTextW(hdc, &close_text, &mut cr,
+    DrawTextW(hdc, &mut close_text, &mut cr,
         windows::Win32::Graphics::Gdi::DT_CENTER |
         windows::Win32::Graphics::Gdi::DT_SINGLELINE |
         windows::Win32::Graphics::Gdi::DT_VCENTER);
@@ -427,8 +427,8 @@ unsafe fn draw_settings_panel(
         SetBkMode(hdc, TRANSPARENT);
         SetTextColor(hdc, colors.text_primary);
         let mut r = RECT { left: pad, top: y, right: w - pad, bottom: y + 22 };
-        let rw = wide(row_text);
-        DrawTextW(hdc, &rw, &mut r, windows::Win32::Graphics::Gdi::DT_LEFT | windows::Win32::Graphics::Gdi::DT_SINGLELINE | windows::Win32::Graphics::Gdi::DT_VCENTER);
+        let mut rw = wide(row_text);
+        DrawTextW(hdc, &mut rw, &mut r, windows::Win32::Graphics::Gdi::DT_LEFT | windows::Win32::Graphics::Gdi::DT_SINGLELINE | windows::Win32::Graphics::Gdi::DT_VCENTER);
         SelectObject(hdc, old2);
         DeleteObject(f);
         y += 26;
@@ -440,9 +440,9 @@ unsafe fn draw_settings_panel(
     let old3 = SelectObject(hdc, f3);
     SetBkMode(hdc, TRANSPARENT);
     SetTextColor(hdc, colors.text_secondary);
-    let footer = wide("ClaudeMeter v1.0.0 by klivak\ngithub.com/klivak/claudemeter");
+    let mut footer = wide("ClaudeMeter v1.0.0 by klivak\ngithub.com/klivak/claudemeter");
     let mut fr = RECT { left: pad, top: y, right: w - pad, bottom: rect.bottom };
-    DrawTextW(hdc, &footer, &mut fr, windows::Win32::Graphics::Gdi::DT_LEFT | windows::Win32::Graphics::Gdi::DT_WORDBREAK);
+    DrawTextW(hdc, &mut footer, &mut fr, windows::Win32::Graphics::Gdi::DT_LEFT | windows::Win32::Graphics::Gdi::DT_WORDBREAK);
     SelectObject(hdc, old3);
     DeleteObject(f3);
 }
@@ -674,7 +674,7 @@ unsafe fn trigger_poll(hwnd: HWND) {
 
             let _ = PostMessageW(
                 hwnd,
-                WM_USER + 20,
+                WM_POLL_RESULT,
                 WPARAM(usage_ptr as usize),
                 LPARAM(err_ptr),
             );

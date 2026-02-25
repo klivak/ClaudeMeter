@@ -11,11 +11,11 @@
 use crate::i18n::{format_duration, seconds_until, I18n};
 use crate::providers::claude::{format_metric_name, UsageResponse};
 use crate::ui::colors::{ColorRef, ThemeColors};
-use windows::Win32::Foundation::{HWND, RECT};
+use windows::Win32::Foundation::{COLORREF, HWND, RECT};
 use windows::Win32::Graphics::Gdi::{
     CreateFontW, CreatePen, CreateSolidBrush, DeleteObject, DrawTextW, FillRect,
     GetDC, GetDeviceCaps, LineTo, MoveToEx, ReleaseDC, SelectObject, SetBkMode,
-    SetTextColor, HBRUSH, HDC, LOGPIXELSX, PS_SOLID, TRANSPARENT, DT_LEFT,
+    SetTextColor, HDC, LOGPIXELSX, PS_SOLID, TRANSPARENT, DT_LEFT,
     DT_SINGLELINE, DT_VCENTER, DT_END_ELLIPSIS,
 };
 
@@ -182,14 +182,14 @@ impl PopupRenderer {
         let old_font = SelectObject(hdc, font);
         SetBkMode(hdc, TRANSPARENT);
         SetTextColor(hdc, colors.text_primary);
-        let title = wide(i18n.t("ClaudeMeter"));
+        let mut title = wide(i18n.t("ClaudeMeter"));
         let mut text_rect = RECT {
             left: self.scale(PADDING),
             top: y,
             right: w - self.scale(80),
             bottom: y + h,
         };
-        DrawTextW(hdc, &title, &mut text_rect, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+        DrawTextW(hdc, &mut title, &mut text_rect, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
         SelectObject(hdc, old_font);
         DeleteObject(font);
 
@@ -237,7 +237,7 @@ impl PopupRenderer {
     ) -> i32 {
         // Section header: "☁ CLAUDE · Pro plan"
         let plan = i18n.t(usage.detected_plan());
-        let header = format!("\u{2601} {} \u{00B7} {} {}", i18n.t("CLAUDE"), i18n.t("Plan"), plan);
+        let header_str = format!("\u{2601} {} \u{00B7} {} {}", i18n.t("CLAUDE"), i18n.t("Plan"), plan);
         let font = self.create_font(12, true);
         let old_font = SelectObject(hdc, font);
         SetBkMode(hdc, TRANSPARENT);
@@ -248,7 +248,8 @@ impl PopupRenderer {
             right: w - self.scale(PADDING),
             bottom: y + self.scale(20),
         };
-        DrawTextW(hdc, &wide(&header), &mut r, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+        let mut header_wide = wide(&header_str);
+        DrawTextW(hdc, &mut header_wide, &mut r, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
         SelectObject(hdc, old_font);
         DeleteObject(font);
         y += self.scale(24);
@@ -276,7 +277,8 @@ impl PopupRenderer {
         let content_w = w - pad * 2;
 
         // Label + percentage on same line
-        let display_name = i18n.t(&format_metric_name(key));
+        let metric_name_str = format_metric_name(key);
+        let display_name = i18n.t(&metric_name_str);
         let pct_str = format!("{:.0}%", utilization);
 
         let font_label = self.create_font(12, false);
@@ -290,7 +292,8 @@ impl PopupRenderer {
             right: w - pad - self.scale(40),
             bottom: y + self.scale(METRIC_LABEL_H),
         };
-        DrawTextW(hdc, &wide(display_name), &mut label_rect, DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS);
+        let mut label_wide = wide(display_name);
+        DrawTextW(hdc, &mut label_wide, &mut label_rect, DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS);
 
         // Percentage right-aligned
         SetTextColor(hdc, colors.progress_color(utilization));
@@ -300,7 +303,8 @@ impl PopupRenderer {
             right: w - pad,
             bottom: y + self.scale(METRIC_LABEL_H),
         };
-        DrawTextW(hdc, &wide(&pct_str), &mut pct_rect, windows::Win32::Graphics::Gdi::DT_RIGHT | DT_SINGLELINE | DT_VCENTER);
+        let mut pct_wide = wide(&pct_str);
+        DrawTextW(hdc, &mut pct_wide, &mut pct_rect, windows::Win32::Graphics::Gdi::DT_RIGHT | DT_SINGLELINE | DT_VCENTER);
 
         SelectObject(hdc, old_font);
         DeleteObject(font_label);
@@ -357,7 +361,8 @@ impl PopupRenderer {
                     right: w - pad,
                     bottom: y + self.scale(RESET_LABEL_H),
                 };
-                DrawTextW(hdc, &wide(&reset_text), &mut reset_rect, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+                let mut reset_wide = wide(&reset_text);
+                DrawTextW(hdc, &mut reset_wide, &mut reset_rect, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
                 SelectObject(hdc, old_font2);
                 DeleteObject(font_small);
                 y += self.scale(RESET_LABEL_H);
@@ -400,7 +405,8 @@ impl PopupRenderer {
                 right: w - pad - self.scale(35),
                 bottom: y + self.scale(16),
             };
-            DrawTextW(hdc, &wide(name), &mut label_rect, DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS);
+            let mut label_wide = wide(name);
+            DrawTextW(hdc, &mut label_wide, &mut label_rect, DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS);
 
             SetTextColor(hdc, colors.progress_color(*utilization));
             let pct = format!("{:.0}%", utilization);
@@ -410,7 +416,8 @@ impl PopupRenderer {
                 right: w - pad,
                 bottom: y + self.scale(16),
             };
-            DrawTextW(hdc, &wide(&pct), &mut pct_rect, windows::Win32::Graphics::Gdi::DT_RIGHT | DT_SINGLELINE | DT_VCENTER);
+            let mut pct_wide = wide(&pct);
+            DrawTextW(hdc, &mut pct_wide, &mut pct_rect, windows::Win32::Graphics::Gdi::DT_RIGHT | DT_SINGLELINE | DT_VCENTER);
             SelectObject(hdc, old_font);
             DeleteObject(font);
             y += self.scale(16);
@@ -449,7 +456,8 @@ impl PopupRenderer {
         SetBkMode(hdc, TRANSPARENT);
         SetTextColor(hdc, colors.yellow);
         let mut r = RECT { left: pad, top: y, right: w - pad, bottom: y + self.scale(24) };
-        DrawTextW(hdc, &wide(&format!("\u{26A0} {}", i18n.t("Claude Code not detected"))), &mut r, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+        let mut warn_wide = wide(&format!("\u{26A0} {}", i18n.t("Claude Code not detected")));
+        DrawTextW(hdc, &mut warn_wide, &mut r, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
         SelectObject(hdc, old_font);
         DeleteObject(font);
         y += self.scale(28);
@@ -459,7 +467,8 @@ impl PopupRenderer {
         SetTextColor(hdc, colors.text_secondary);
         let desc = i18n.t("install_claude_desc");
         let mut r2 = RECT { left: pad, top: y, right: w - pad, bottom: y + self.scale(60) };
-        DrawTextW(hdc, &wide(desc), &mut r2, DT_LEFT | windows::Win32::Graphics::Gdi::DT_WORDBREAK);
+        let mut desc_wide = wide(desc);
+        DrawTextW(hdc, &mut desc_wide, &mut r2, DT_LEFT | windows::Win32::Graphics::Gdi::DT_WORDBREAK);
         SelectObject(hdc, old2);
         DeleteObject(font2);
         y += self.scale(70);
@@ -473,9 +482,10 @@ impl PopupRenderer {
         let font3 = self.create_font(12, false);
         let old3 = SelectObject(hdc, font3);
         SetBkMode(hdc, TRANSPARENT);
-        SetTextColor(hdc, 0x00FFFFFF); // white
+        SetTextColor(hdc, COLORREF(0x00FFFFFF)); // white
         let mut btn_text = *install_rect;
-        DrawTextW(hdc, &wide(i18n.t("Install Claude Code \u{2192}")), &mut btn_text, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+        let mut btn_wide = wide(i18n.t("Install Claude Code \u{2192}"));
+        DrawTextW(hdc, &mut btn_wide, &mut btn_text, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
         SelectObject(hdc, old3);
         DeleteObject(font3);
         y += btn_h + self.scale(8);
@@ -499,9 +509,10 @@ impl PopupRenderer {
         let old = SelectObject(hdc, font);
         SetBkMode(hdc, TRANSPARENT);
         SetTextColor(hdc, colors.text_secondary);
-        let header = format!("\u{25CE} {}", i18n.t("CHATGPT / CODEX"));
+        let header_str = format!("\u{25CE} {}", i18n.t("CHATGPT / CODEX"));
         let mut r = RECT { left: pad, top: y, right: w - pad, bottom: y + self.scale(20) };
-        DrawTextW(hdc, &wide(&header), &mut r, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+        let mut header_wide = wide(&header_str);
+        DrawTextW(hdc, &mut header_wide, &mut r, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
         SelectObject(hdc, old);
         DeleteObject(font);
         y += self.scale(24);
@@ -512,7 +523,8 @@ impl PopupRenderer {
         SetTextColor(hdc, colors.text_secondary);
         let info = format!("\u{24D8} {}", i18n.t("openai_no_api"));
         let mut r2 = RECT { left: pad, top: y, right: w - pad, bottom: y + self.scale(50) };
-        DrawTextW(hdc, &wide(&info), &mut r2, DT_LEFT | windows::Win32::Graphics::Gdi::DT_WORDBREAK);
+        let mut info_wide = wide(&info);
+        DrawTextW(hdc, &mut info_wide, &mut r2, DT_LEFT | windows::Win32::Graphics::Gdi::DT_WORDBREAK);
         SelectObject(hdc, old2);
         DeleteObject(font2);
         y += self.scale(55);
@@ -524,7 +536,8 @@ impl PopupRenderer {
         let link_text = format!("\u{1F4CA} {}", i18n.t("Open ChatGPT Usage \u{2192}"));
         *link_rect = RECT { left: pad, top: y, right: w - pad, bottom: y + self.scale(22) };
         let mut lr = *link_rect;
-        DrawTextW(hdc, &wide(&link_text), &mut lr, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+        let mut link_wide = wide(&link_text);
+        DrawTextW(hdc, &mut link_wide, &mut lr, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
         SelectObject(hdc, old3);
         DeleteObject(font3);
         y += self.scale(28);
@@ -550,7 +563,8 @@ impl PopupRenderer {
         SetTextColor(hdc, colors.text_secondary);
         let title = format!("\u{1F4C8} {}", i18n.t("Usage History (24h)"));
         let mut r = RECT { left: pad, top: y, right: w - pad, bottom: y + self.scale(18) };
-        DrawTextW(hdc, &wide(&title), &mut r, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+        let mut title_wide = wide(&title);
+        DrawTextW(hdc, &mut title_wide, &mut r, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
         SelectObject(hdc, old);
         DeleteObject(font);
         y += self.scale(20);
@@ -594,7 +608,8 @@ impl PopupRenderer {
         for (i, label) in labels.iter().enumerate() {
             let lx = pad + (i as i32 * chart_w / 4);
             let mut lr = RECT { left: lx - self.scale(10), top: y, right: lx + self.scale(20), bottom: y + self.scale(14) };
-            DrawTextW(hdc, &wide(label), &mut lr, DT_LEFT | DT_SINGLELINE);
+            let mut label_wide = wide(label);
+            DrawTextW(hdc, &mut label_wide, &mut lr, DT_LEFT | DT_SINGLELINE);
         }
         SelectObject(hdc, old2);
         DeleteObject(font2);
@@ -627,7 +642,8 @@ impl PopupRenderer {
         SetTextColor(hdc, colors.text_secondary);
         let updated_text = format!("{} {}", i18n.t("Last updated:"), last_updated);
         let mut r = RECT { left: pad, top: y, right: w - self.scale(80), bottom: y + h };
-        DrawTextW(hdc, &wide(&updated_text), &mut r, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+        let mut updated_wide = wide(&updated_text);
+        DrawTextW(hdc, &mut updated_wide, &mut r, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
         SelectObject(hdc, old);
         DeleteObject(font);
 
@@ -647,7 +663,8 @@ impl PopupRenderer {
         SetTextColor(hdc, colors.accent);
         let refresh_text = format!("\u{1F504} {}", i18n.t("Refresh"));
         let mut br = *refresh_rect;
-        DrawTextW(hdc, &wide(&refresh_text), &mut br, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+        let mut refresh_wide = wide(&refresh_text);
+        DrawTextW(hdc, &mut refresh_wide, &mut br, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
         SelectObject(hdc, old2);
         DeleteObject(font2);
     }
@@ -658,9 +675,10 @@ impl PopupRenderer {
         SetBkMode(hdc, TRANSPARENT);
         SetTextColor(hdc, color);
         let mut r = rect;
+        let mut text_wide = wide(text);
         DrawTextW(
             hdc,
-            &wide(text),
+            &mut text_wide,
             &mut r,
             windows::Win32::Graphics::Gdi::DT_CENTER | DT_SINGLELINE | DT_VCENTER,
         );
