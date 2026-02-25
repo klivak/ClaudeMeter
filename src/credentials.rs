@@ -24,7 +24,7 @@ impl std::fmt::Display for CredentialError {
 /// Read the Claude OAuth access token from Windows Credential Manager.
 ///
 /// Claude Code stores credentials under the target name "Claude Code-credentials"
-/// as a JSON blob: `{"claudeAiOauth": {"accessToken": "sk-ant-oat01-..."}}`
+/// as a JSON blob: `{"claudeAiOauth": {"accessToken": "<oauth-token>"}}`
 pub fn read_claude_token() -> Result<String, CredentialError> {
     const TARGET: &str = "Claude Code-credentials";
 
@@ -127,14 +127,14 @@ mod tests {
 
     #[test]
     fn test_extract_nested() {
-        let json = r#"{"claudeAiOauth": {"accessToken": "sk-ant-oat01-test"}}"#;
-        assert_eq!(extract_access_token(json).unwrap(), "sk-ant-oat01-test");
+        let json = r#"{"claudeAiOauth": {"accessToken": "test-token-nested"}}"#;
+        assert_eq!(extract_access_token(json).unwrap(), "test-token-nested");
     }
 
     #[test]
     fn test_extract_flat() {
-        let json = r#"{"accessToken": "sk-ant-oat01-flat"}"#;
-        assert_eq!(extract_access_token(json).unwrap(), "sk-ant-oat01-flat");
+        let json = r#"{"accessToken": "test-token-flat"}"#;
+        assert_eq!(extract_access_token(json).unwrap(), "test-token-flat");
     }
 
     #[test]

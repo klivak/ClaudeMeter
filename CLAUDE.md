@@ -90,7 +90,7 @@ Each non-null key has `{utilization: f64, resets_at: Option<String>}`.
 
 ### OAuth Token Location
 Windows Credential Manager → target: `"Claude Code-credentials"`
-Stored as JSON: `{"claudeAiOauth": {"accessToken": "sk-ant-oat01-..."}}`
+Stored as JSON: `{"claudeAiOauth": {"accessToken": "<oauth-token>"}}`
 
 ## Testing Notes
 
