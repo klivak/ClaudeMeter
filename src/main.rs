@@ -598,12 +598,12 @@ unsafe fn toggle_popup(main_hwnd: HWND) {
     }
 }
 
-unsafe fn show_popup(main_hwnd: HWND) {
+unsafe fn show_popup(_main_hwnd: HWND) {
     if let Some(state) = APP_STATE.as_mut() {
         state.config_mgr.reload_if_changed();
 
         let theme_mode = ThemeMode::from_str(&state.config_mgr.config.theme);
-        let resolved = resolve_theme(theme_mode);
+        let _resolved = resolve_theme(theme_mode);
 
         // Calculate height
         let renderer = PopupRenderer::new(state.popup_hwnd);
@@ -833,7 +833,7 @@ async fn do_poll() -> (Option<UsageResponse>, Option<String>) {
     }
 }
 
-unsafe fn on_poll_result(hwnd: HWND, usage: Option<UsageResponse>, error: Option<String>) {
+unsafe fn on_poll_result(_hwnd: HWND, usage: Option<UsageResponse>, error: Option<String>) {
     if let Some(state) = APP_STATE.as_mut() {
         if let Some(u) = &usage {
             state.last_updated = Local::now().format("%H:%M:%S").to_string();

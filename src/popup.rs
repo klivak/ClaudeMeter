@@ -8,10 +8,14 @@ use windows::Win32::UI::WindowsAndMessaging::{
     SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW, SW_HIDE, SW_SHOW,
 };
 
+#[allow(dead_code)]
 pub const WM_UPDATE_DATA: u32 = windows::Win32::UI::WindowsAndMessaging::WM_USER + 10;
+#[allow(dead_code)]
 pub const WM_SHOW_POPUP: u32 = windows::Win32::UI::WindowsAndMessaging::WM_USER + 11;
+#[allow(dead_code)]
 pub const WM_HIDE_POPUP: u32 = windows::Win32::UI::WindowsAndMessaging::WM_USER + 12;
 
+#[allow(dead_code)]
 pub struct PopupWindow {
     pub hwnd: HWND,
     pub visible: bool,

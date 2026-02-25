@@ -449,7 +449,7 @@ impl PopupRenderer {
         mut y: i32,
         usage: &Option<UsageResponse>,
         colors: &ThemeColors,
-        i18n: &I18n,
+        _i18n: &I18n,
     ) -> i32 {
         let pad = self.scale(PADDING);
         let content_w = w - pad * 2;

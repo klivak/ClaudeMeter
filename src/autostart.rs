@@ -78,6 +78,7 @@ fn disable_autostart() -> Result<(), String> {
     Ok(())
 }
 
+#[allow(dead_code)]
 pub fn is_autostart_enabled() -> bool {
     let key_wide: Vec<u16> = RUN_KEY.encode_utf16().chain(std::iter::once(0)).collect();
     let name_wide: Vec<u16> = APP_NAME.encode_utf16().chain(std::iter::once(0)).collect();

@@ -7,6 +7,7 @@ pub struct Database {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct UsageRecord {
     pub timestamp: DateTime<Utc>,
     pub provider: String,
@@ -16,6 +17,7 @@ pub struct UsageRecord {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct ChartPoint {
     /// Hours ago from now (0 = now, 24 = 24h ago)
     pub bucket_hours_ago: f64,

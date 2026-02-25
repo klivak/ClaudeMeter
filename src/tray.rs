@@ -54,7 +54,7 @@ impl TrayIcon {
         // In a full build, these would be loaded from embedded resources
         let default_icon = unsafe { LoadIconW(None, IDI_APPLICATION).map_err(|e| e.to_string())? };
 
-        let mut tray = Self {
+        let tray = Self {
             hwnd,
             current_color: TrayIconColor::Gray,
             icon_green: default_icon,

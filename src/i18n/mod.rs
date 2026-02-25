@@ -27,6 +27,7 @@ impl Locale {
         }
     }
 
+    #[allow(dead_code)]
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::En => "en",
@@ -54,6 +55,7 @@ impl Locale {
 }
 
 pub struct I18n {
+    #[allow(dead_code)]
     locale: Locale,
     strings: HashMap<&'static str, &'static str>,
     fallback: HashMap<&'static str, &'static str>,
@@ -94,6 +96,7 @@ impl I18n {
             .unwrap_or(key)
     }
 
+    #[allow(dead_code)]
     pub fn locale(&self) -> Locale {
         self.locale
     }
