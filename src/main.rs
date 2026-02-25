@@ -311,7 +311,14 @@ unsafe extern "system" fn popup_wnd_proc(
                 let renderer = PopupRenderer::new(hwnd);
 
                 if state.popup_in_settings {
-                    draw_settings_panel(hdc, &rect, &colors, &state.i18n, &state.config_mgr.config, &mut state.back_rect);
+                    draw_settings_panel(
+                        hdc,
+                        &rect,
+                        &colors,
+                        &state.i18n,
+                        &state.config_mgr.config,
+                        &mut state.back_rect,
+                    );
                 } else {
                     renderer.draw(
                         hdc,
