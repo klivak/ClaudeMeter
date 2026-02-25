@@ -1,4 +1,5 @@
 #![windows_subsystem = "windows"]
+#![allow(static_mut_refs)]
 
 mod autostart;
 mod config;
