@@ -47,7 +47,9 @@ fn enable_autostart(exe_path: &str) -> Result<(), String> {
         );
 
         let _ = RegCloseKey(hkey).ok();
-        result.ok().map_err(|e: windows::core::Error| e.to_string())?;
+        result
+            .ok()
+            .map_err(|e: windows::core::Error| e.to_string())?;
     }
     Ok(())
 }

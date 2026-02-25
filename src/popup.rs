@@ -4,8 +4,8 @@ use crate::ui::render::{PopupRenderer, POPUP_WIDTH};
 use windows::Win32::Foundation::{HWND, POINT, RECT};
 use windows::Win32::Graphics::Gdi::InvalidateRect;
 use windows::Win32::UI::WindowsAndMessaging::{
-    MoveWindow, SetWindowPos, ShowWindow, SystemParametersInfoW, HWND_TOPMOST,
-    SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW, SW_HIDE, SW_SHOW, SPI_GETWORKAREA,
+    MoveWindow, SetWindowPos, ShowWindow, SystemParametersInfoW, HWND_TOPMOST, SPI_GETWORKAREA,
+    SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW, SW_HIDE, SW_SHOW,
 };
 
 pub const WM_UPDATE_DATA: u32 = windows::Win32::UI::WindowsAndMessaging::WM_USER + 10;
@@ -36,7 +36,15 @@ impl PopupWindow {
 
         unsafe {
             let _ = MoveWindow(self.hwnd, x, y, POPUP_WIDTH, height, false);
-            let _ = SetWindowPos(self.hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+            let _ = SetWindowPos(
+                self.hwnd,
+                HWND_TOPMOST,
+                0,
+                0,
+                0,
+                0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW,
+            );
             let _ = ShowWindow(self.hwnd, SW_SHOW);
         }
         self.visible = true;

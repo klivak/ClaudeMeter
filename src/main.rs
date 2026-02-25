@@ -19,27 +19,25 @@ use crate::notifications::{send_toast, NotificationTracker};
 use crate::providers::claude::{ClaudeClient, UsageResponse};
 use crate::theme::{resolve_theme, ThemeMode};
 use crate::tray::{
-    build_tooltip, TrayIcon, WM_TRAY_ICON,
-    IDM_ABOUT, IDM_AUTOSTART, IDM_EXIT, IDM_OPEN_CHATGPT, IDM_OPEN_CLAUDE,
-    IDM_OPEN_DASHBOARD, IDM_REFRESH, IDM_SETTINGS,
+    build_tooltip, TrayIcon, IDM_ABOUT, IDM_AUTOSTART, IDM_EXIT, IDM_OPEN_CHATGPT, IDM_OPEN_CLAUDE,
+    IDM_OPEN_DASHBOARD, IDM_REFRESH, IDM_SETTINGS, WM_TRAY_ICON,
 };
 use crate::ui::render::PopupRenderer;
 use chrono::Local;
+use windows::core::PCWSTR;
 use windows::Win32::Foundation::{GetLastError, HWND, LPARAM, LRESULT, POINT, RECT, WPARAM};
 use windows::Win32::Graphics::Gdi::{BeginPaint, EndPaint, PAINTSTRUCT};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::System::Threading::CreateMutexW;
 use windows::Win32::UI::WindowsAndMessaging::{
-    AppendMenuW, CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyMenu,
-    DispatchMessageW, GetCursorPos, LoadIconW, PostMessageW, PostQuitMessage,
-    RegisterClassExW, SetForegroundWindow, TrackPopupMenu, TranslateMessage,
-    CS_HREDRAW, CS_VREDRAW, HMENU, IDI_APPLICATION, MF_CHECKED, MF_SEPARATOR,
-    MF_STRING, MF_UNCHECKED, MSG, PM_REMOVE, PeekMessageW, TPM_BOTTOMALIGN,
-    TPM_LEFTALIGN, TPM_RETURNCMD, WM_COMMAND, WM_DESTROY, WM_KILLFOCUS,
-    WM_LBUTTONUP, WM_PAINT, WM_RBUTTONUP, WM_TIMER, WNDCLASSEXW,
-    WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
+    AppendMenuW, CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyMenu, DispatchMessageW,
+    GetCursorPos, LoadIconW, PeekMessageW, PostMessageW, PostQuitMessage, RegisterClassExW,
+    SetForegroundWindow, TrackPopupMenu, TranslateMessage, CS_HREDRAW, CS_VREDRAW, HMENU,
+    IDI_APPLICATION, MF_CHECKED, MF_SEPARATOR, MF_STRING, MF_UNCHECKED, MSG, PM_REMOVE,
+    TPM_BOTTOMALIGN, TPM_LEFTALIGN, TPM_RETURNCMD, WM_COMMAND, WM_DESTROY, WM_KILLFOCUS,
+    WM_LBUTTONUP, WM_PAINT, WM_RBUTTONUP, WM_TIMER, WNDCLASSEXW, WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
+    WS_POPUP,
 };
-use windows::core::PCWSTR;
 
 const WINDOW_CLASS: &str = "ClaudeMeterMain";
 const POPUP_CLASS: &str = "ClaudeMeterPopup";
@@ -100,11 +98,7 @@ fn main() {
     unsafe { run_message_loop(exe_dir, config_mgr, i18n) };
 }
 
-unsafe fn run_message_loop(
-    exe_dir: std::path::PathBuf,
-    config_mgr: ConfigManager,
-    i18n: I18n,
-) {
+unsafe fn run_message_loop(exe_dir: std::path::PathBuf, config_mgr: ConfigManager, i18n: I18n) {
     let hinstance = GetModuleHandleW(None).unwrap();
 
     // Register window classes
@@ -122,9 +116,16 @@ unsafe fn run_message_loop(
         PCWSTR(main_class_w.as_ptr()),
         PCWSTR(main_title_w.as_ptr()),
         windows::Win32::UI::WindowsAndMessaging::WINDOW_STYLE(0),
-        0, 0, 0, 0,
-        None, None, hinstance, None,
-    ).unwrap();
+        0,
+        0,
+        0,
+        0,
+        None,
+        None,
+        hinstance,
+        None,
+    )
+    .unwrap();
 
     // Create popup window (hidden initially)
     let popup_hwnd = CreateWindowExW(
@@ -132,9 +133,16 @@ unsafe fn run_message_loop(
         PCWSTR(popup_class_w.as_ptr()),
         PCWSTR(popup_title_w.as_ptr()),
         WS_POPUP,
-        0, 0, crate::ui::render::POPUP_WIDTH, 400,
-        None, None, hinstance, None,
-    ).unwrap();
+        0,
+        0,
+        crate::ui::render::POPUP_WIDTH,
+        400,
+        None,
+        None,
+        hinstance,
+        None,
+    )
+    .unwrap();
 
     // Initialize app state
     APP_STATE = Some(AppState {
@@ -328,7 +336,10 @@ unsafe extern "system" fn popup_wnd_proc(
             if let Some(state) = APP_STATE.as_mut() {
                 if crate::popup::point_in_rect(pt, state.close_rect) {
                     state.popup_visible = false;
-                    let _ = windows::Win32::UI::WindowsAndMessaging::ShowWindow(hwnd, windows::Win32::UI::WindowsAndMessaging::SW_HIDE);
+                    let _ = windows::Win32::UI::WindowsAndMessaging::ShowWindow(
+                        hwnd,
+                        windows::Win32::UI::WindowsAndMessaging::SW_HIDE,
+                    );
                 } else if crate::popup::point_in_rect(pt, state.settings_rect) {
                     state.popup_in_settings = !state.popup_in_settings;
                     let _ = windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, true);
@@ -350,14 +361,15 @@ unsafe extern "system" fn popup_wnd_proc(
             if let Some(state) = APP_STATE.as_mut() {
                 if state.popup_visible {
                     state.popup_visible = false;
-                    let _ = windows::Win32::UI::WindowsAndMessaging::ShowWindow(hwnd, windows::Win32::UI::WindowsAndMessaging::SW_HIDE);
+                    let _ = windows::Win32::UI::WindowsAndMessaging::ShowWindow(
+                        hwnd,
+                        windows::Win32::UI::WindowsAndMessaging::SW_HIDE,
+                    );
                 }
             }
             LRESULT(0)
         }
-        WM_DESTROY => {
-            LRESULT(0)
-        }
+        WM_DESTROY => LRESULT(0),
         _ => DefWindowProcW(hwnd, msg, wparam, lparam),
     }
 }
@@ -370,8 +382,8 @@ unsafe fn draw_settings_panel(
     config: &crate::config::Config,
 ) {
     use windows::Win32::Graphics::Gdi::{
-        CreateSolidBrush, DeleteObject, FillRect, SetBkMode, SetTextColor, TRANSPARENT,
-        DrawTextW, SelectObject,
+        CreateSolidBrush, DeleteObject, DrawTextW, FillRect, SelectObject, SetBkMode, SetTextColor,
+        TRANSPARENT,
     };
 
     let bg = CreateSolidBrush(colors.background);
@@ -383,7 +395,12 @@ unsafe fn draw_settings_panel(
 
     // Header
     let surf = CreateSolidBrush(colors.surface);
-    let header = RECT { left: 0, top: 0, right: w, bottom: 36 };
+    let header = RECT {
+        left: 0,
+        top: 0,
+        right: w,
+        bottom: 36,
+    };
     let _ = FillRect(hdc, &header, surf);
     let _ = DeleteObject(surf);
 
@@ -392,20 +409,38 @@ unsafe fn draw_settings_panel(
     SetBkMode(hdc, TRANSPARENT);
     SetTextColor(hdc, colors.text_primary);
     let mut back_text = wide(i18n.t("Back"));
-    let mut back_rect = RECT { left: pad, top: 0, right: w - 40, bottom: 36 };
-    DrawTextW(hdc, &mut back_text, &mut back_rect,
-        windows::Win32::Graphics::Gdi::DT_LEFT |
-        windows::Win32::Graphics::Gdi::DT_SINGLELINE |
-        windows::Win32::Graphics::Gdi::DT_VCENTER);
+    let mut back_rect = RECT {
+        left: pad,
+        top: 0,
+        right: w - 40,
+        bottom: 36,
+    };
+    DrawTextW(
+        hdc,
+        &mut back_text,
+        &mut back_rect,
+        windows::Win32::Graphics::Gdi::DT_LEFT
+            | windows::Win32::Graphics::Gdi::DT_SINGLELINE
+            | windows::Win32::Graphics::Gdi::DT_VCENTER,
+    );
 
     // Close button
     SetTextColor(hdc, colors.text_secondary);
     let mut close_text = wide("\u{00D7}");
-    let mut cr = RECT { left: w - 32, top: 0, right: w - 4, bottom: 36 };
-    DrawTextW(hdc, &mut close_text, &mut cr,
-        windows::Win32::Graphics::Gdi::DT_CENTER |
-        windows::Win32::Graphics::Gdi::DT_SINGLELINE |
-        windows::Win32::Graphics::Gdi::DT_VCENTER);
+    let mut cr = RECT {
+        left: w - 32,
+        top: 0,
+        right: w - 4,
+        bottom: 36,
+    };
+    DrawTextW(
+        hdc,
+        &mut close_text,
+        &mut cr,
+        windows::Win32::Graphics::Gdi::DT_CENTER
+            | windows::Win32::Graphics::Gdi::DT_SINGLELINE
+            | windows::Win32::Graphics::Gdi::DT_VCENTER,
+    );
 
     let _ = SelectObject(hdc, old);
     let _ = DeleteObject(font);
@@ -414,11 +449,46 @@ unsafe fn draw_settings_panel(
 
     // Settings rows
     let rows: &[(&str, &str)] = &[
-        ("Theme", &format!("{}: {}", i18n.t("Theme"), i18n.t(&capitalize(&config.theme)))),
-        ("Language", &format!("{}: {}", i18n.t("Language"), &config.language)),
-        ("Compact mode", &format!("[{}] {}", if config.compact_mode { "x" } else { " " }, i18n.t("Compact mode"))),
-        ("Show ChatGPT section", &format!("[{}] {}", if config.show_chatgpt_section { "x" } else { " " }, i18n.t("Show ChatGPT section"))),
-        ("Start with Windows", &format!("[{}] {}", if config.autostart { "x" } else { " " }, i18n.t("Start with Windows"))),
+        (
+            "Theme",
+            &format!(
+                "{}: {}",
+                i18n.t("Theme"),
+                i18n.t(&capitalize(&config.theme))
+            ),
+        ),
+        (
+            "Language",
+            &format!("{}: {}", i18n.t("Language"), &config.language),
+        ),
+        (
+            "Compact mode",
+            &format!(
+                "[{}] {}",
+                if config.compact_mode { "x" } else { " " },
+                i18n.t("Compact mode")
+            ),
+        ),
+        (
+            "Show ChatGPT section",
+            &format!(
+                "[{}] {}",
+                if config.show_chatgpt_section {
+                    "x"
+                } else {
+                    " "
+                },
+                i18n.t("Show ChatGPT section")
+            ),
+        ),
+        (
+            "Start with Windows",
+            &format!(
+                "[{}] {}",
+                if config.autostart { "x" } else { " " },
+                i18n.t("Start with Windows")
+            ),
+        ),
     ];
 
     for (_, row_text) in rows {
@@ -426,9 +496,21 @@ unsafe fn draw_settings_panel(
         let old2 = SelectObject(hdc, f);
         SetBkMode(hdc, TRANSPARENT);
         SetTextColor(hdc, colors.text_primary);
-        let mut r = RECT { left: pad, top: y, right: w - pad, bottom: y + 22 };
+        let mut r = RECT {
+            left: pad,
+            top: y,
+            right: w - pad,
+            bottom: y + 22,
+        };
         let mut rw = wide(row_text);
-        DrawTextW(hdc, &mut rw, &mut r, windows::Win32::Graphics::Gdi::DT_LEFT | windows::Win32::Graphics::Gdi::DT_SINGLELINE | windows::Win32::Graphics::Gdi::DT_VCENTER);
+        DrawTextW(
+            hdc,
+            &mut rw,
+            &mut r,
+            windows::Win32::Graphics::Gdi::DT_LEFT
+                | windows::Win32::Graphics::Gdi::DT_SINGLELINE
+                | windows::Win32::Graphics::Gdi::DT_VCENTER,
+        );
         let _ = SelectObject(hdc, old2);
         let _ = DeleteObject(f);
         y += 26;
@@ -441,8 +523,18 @@ unsafe fn draw_settings_panel(
     SetBkMode(hdc, TRANSPARENT);
     SetTextColor(hdc, colors.text_secondary);
     let mut footer = wide("ClaudeMeter v1.0.0 by klivak\ngithub.com/klivak/claudemeter");
-    let mut fr = RECT { left: pad, top: y, right: w - pad, bottom: rect.bottom };
-    DrawTextW(hdc, &mut footer, &mut fr, windows::Win32::Graphics::Gdi::DT_LEFT | windows::Win32::Graphics::Gdi::DT_WORDBREAK);
+    let mut fr = RECT {
+        left: pad,
+        top: y,
+        right: w - pad,
+        bottom: rect.bottom,
+    };
+    DrawTextW(
+        hdc,
+        &mut footer,
+        &mut fr,
+        windows::Win32::Graphics::Gdi::DT_LEFT | windows::Win32::Graphics::Gdi::DT_WORDBREAK,
+    );
     let _ = SelectObject(hdc, old3);
     let _ = DeleteObject(f3);
 }
@@ -465,15 +557,23 @@ unsafe fn create_font_helper(
     };
     let height = -(size_pt * 96 / 72);
     let weight = if bold { 700i32 } else { 400i32 };
-    let face: Vec<u16> = "Segoe UI".encode_utf16().chain(std::iter::once(0)).collect();
+    let face: Vec<u16> = "Segoe UI"
+        .encode_utf16()
+        .chain(std::iter::once(0))
+        .collect();
     let mut face_arr = [0u16; 32];
     for (i, &c) in face.iter().enumerate().take(31) {
         face_arr[i] = c;
     }
     windows::Win32::Graphics::Gdi::CreateFontW(
-        height, 0, 0, 0,
+        height,
+        0,
+        0,
+        0,
         weight,
-        0, 0, 0,
+        0,
+        0,
+        0,
         DEFAULT_CHARSET.0 as u32,
         OUT_DEFAULT_PRECIS.0 as u32,
         CLIP_DEFAULT_PRECIS.0 as u32,
@@ -524,16 +624,23 @@ unsafe fn show_popup(main_hwnd: HWND) {
         let y = work_area.bottom - h - 10;
 
         let _ = windows::Win32::UI::WindowsAndMessaging::MoveWindow(
-            state.popup_hwnd, x.max(0), y.max(0),
-            crate::ui::render::POPUP_WIDTH, h, false,
+            state.popup_hwnd,
+            x.max(0),
+            y.max(0),
+            crate::ui::render::POPUP_WIDTH,
+            h,
+            false,
         );
         let _ = windows::Win32::UI::WindowsAndMessaging::SetWindowPos(
             state.popup_hwnd,
             windows::Win32::UI::WindowsAndMessaging::HWND_TOPMOST,
-            0, 0, 0, 0,
+            0,
+            0,
+            0,
+            0,
             windows::Win32::UI::WindowsAndMessaging::SWP_NOMOVE
-            | windows::Win32::UI::WindowsAndMessaging::SWP_NOSIZE
-            | windows::Win32::UI::WindowsAndMessaging::SWP_SHOWWINDOW,
+                | windows::Win32::UI::WindowsAndMessaging::SWP_NOSIZE
+                | windows::Win32::UI::WindowsAndMessaging::SWP_SHOWWINDOW,
         );
         let _ = windows::Win32::UI::WindowsAndMessaging::ShowWindow(
             state.popup_hwnd,
@@ -557,14 +664,27 @@ unsafe fn show_context_menu(hwnd: HWND) {
         append_menu_sep(menu);
         append_menu_str(menu, IDM_OPEN_CLAUDE, "Open Claude.ai \u{2192}");
         if show_chatgpt {
-            append_menu_str(menu, IDM_OPEN_CHATGPT, state.i18n.t("Open ChatGPT Usage \u{2192}"));
+            append_menu_str(
+                menu,
+                IDM_OPEN_CHATGPT,
+                state.i18n.t("Open ChatGPT Usage \u{2192}"),
+            );
         }
         append_menu_sep(menu);
         append_menu_str(menu, IDM_SETTINGS, state.i18n.t("Settings"));
         // Autostart toggle with checkmark
-        let autostart_flag = if autostart { MF_STRING | MF_CHECKED } else { MF_STRING | MF_UNCHECKED };
+        let autostart_flag = if autostart {
+            MF_STRING | MF_CHECKED
+        } else {
+            MF_STRING | MF_UNCHECKED
+        };
         let autostart_text = wide(state.i18n.t("Start with Windows"));
-        let _ = AppendMenuW(menu, autostart_flag, IDM_AUTOSTART as usize, PCWSTR(autostart_text.as_ptr()));
+        let _ = AppendMenuW(
+            menu,
+            autostart_flag,
+            IDM_AUTOSTART as usize,
+            PCWSTR(autostart_text.as_ptr()),
+        );
         append_menu_sep(menu);
         append_menu_str(menu, IDM_ABOUT, &format!("ClaudeMeter v1.0.0"));
         append_menu_str(menu, IDM_EXIT, state.i18n.t("Exit"));
@@ -575,7 +695,11 @@ unsafe fn show_context_menu(hwnd: HWND) {
         let cmd = TrackPopupMenu(
             menu,
             TPM_LEFTALIGN | TPM_BOTTOMALIGN | TPM_RETURNCMD,
-            pt.x, pt.y, 0, hwnd, None,
+            pt.x,
+            pt.y,
+            0,
+            hwnd,
+            None,
         );
         let _ = DestroyMenu(menu);
 
@@ -733,10 +857,15 @@ unsafe fn on_poll_result(hwnd: HWND, usage: Option<UsageResponse>, error: Option
             let thresholds = state.config_mgr.config.notifications.thresholds.clone();
             if state.config_mgr.config.notifications.enabled {
                 for (key, metric) in u.all_metrics() {
-                    let fired = state.notification_tracker.check(&key, metric.utilization, &thresholds);
+                    let fired =
+                        state
+                            .notification_tracker
+                            .check(&key, metric.utilization, &thresholds);
                     for threshold in fired {
                         let metric_name = providers::claude::format_metric_name(&key);
-                        let reset_info = metric.resets_at.as_deref()
+                        let reset_info = metric
+                            .resets_at
+                            .as_deref()
                             .and_then(|r| i18n::seconds_until(r))
                             .map(|s| format!(" Resets in {}.", format_duration(s)))
                             .unwrap_or_default();
@@ -744,12 +873,18 @@ unsafe fn on_poll_result(hwnd: HWND, usage: Option<UsageResponse>, error: Option
                         let (title, body) = if threshold >= 90 {
                             (
                                 format!("\u{1F534} {}", state.i18n.t("Usage Critical")),
-                                format!("{} at {:.0}%!{}", metric_name, metric.utilization, reset_info),
+                                format!(
+                                    "{} at {:.0}%!{}",
+                                    metric_name, metric.utilization, reset_info
+                                ),
                             )
                         } else {
                             (
                                 format!("\u{26A0} {}", state.i18n.t("Usage Alert")),
-                                format!("{} at {:.0}%.{}", metric_name, metric.utilization, reset_info),
+                                format!(
+                                    "{} at {:.0}%.{}",
+                                    metric_name, metric.utilization, reset_info
+                                ),
                             )
                         };
                         send_toast(&title, &body);

@@ -16,7 +16,10 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
         "install_claude_desc",
         "Install Claude Code and run `claude login` to enable automatic usage tracking.",
     );
-    m.insert("Install Claude Code \u{2192}", "Install Claude Code \u{2192}");
+    m.insert(
+        "Install Claude Code \u{2192}",
+        "Install Claude Code \u{2192}",
+    );
     m.insert(
         "openai_no_api",
         "OpenAI does not provide an API to track ChatGPT subscription usage programmatically.",

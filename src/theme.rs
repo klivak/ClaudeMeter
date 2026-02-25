@@ -1,7 +1,6 @@
 use windows::core::PCWSTR;
 use windows::Win32::System::Registry::{
-    RegCloseKey, RegOpenKeyExW, RegQueryValueExW, HKEY_CURRENT_USER,
-    KEY_READ, REG_DWORD,
+    RegCloseKey, RegOpenKeyExW, RegQueryValueExW, HKEY_CURRENT_USER, KEY_READ, REG_DWORD,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]

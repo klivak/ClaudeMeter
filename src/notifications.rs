@@ -61,7 +61,13 @@ $notifier.Show($toast)
     );
 
     let _ = std::process::Command::new("powershell")
-        .args(["-WindowStyle", "Hidden", "-NonInteractive", "-Command", &script])
+        .args([
+            "-WindowStyle",
+            "Hidden",
+            "-NonInteractive",
+            "-Command",
+            &script,
+        ])
         .spawn();
 }
 

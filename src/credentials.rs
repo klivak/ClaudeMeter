@@ -1,7 +1,5 @@
 use windows::core::PCWSTR;
-use windows::Win32::Security::Credentials::{
-    CredFree, CredReadW, CREDENTIALW, CRED_TYPE_GENERIC,
-};
+use windows::Win32::Security::Credentials::{CredFree, CredReadW, CREDENTIALW, CRED_TYPE_GENERIC};
 
 #[derive(Debug)]
 pub enum CredentialError {
@@ -13,7 +11,10 @@ pub enum CredentialError {
 impl std::fmt::Display for CredentialError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::NotFound => write!(f, "Claude Code credentials not found in Windows Credential Manager"),
+            Self::NotFound => write!(
+                f,
+                "Claude Code credentials not found in Windows Credential Manager"
+            ),
             Self::WindowsError(e) => write!(f, "Windows API error: {e}"),
             Self::ParseError(e) => write!(f, "Failed to parse credential JSON: {e}"),
         }
@@ -58,7 +59,9 @@ pub fn read_claude_token() -> Result<String, CredentialError> {
 
         if blob_ptr.is_null() || blob_size == 0 {
             CredFree(pcredential as *mut _);
-            return Err(CredentialError::ParseError("Empty credential blob".to_string()));
+            return Err(CredentialError::ParseError(
+                "Empty credential blob".to_string(),
+            ));
         }
 
         // The blob may be UTF-16 (Windows stores as wide) or UTF-8
@@ -77,12 +80,16 @@ pub fn read_claude_token() -> Result<String, CredentialError> {
                 _ => {
                     // Fall back to UTF-8
                     let bytes = std::slice::from_raw_parts(blob_ptr, blob_size);
-                    String::from_utf8_lossy(bytes).trim_end_matches('\0').to_string()
+                    String::from_utf8_lossy(bytes)
+                        .trim_end_matches('\0')
+                        .to_string()
                 }
             }
         } else {
             let bytes = std::slice::from_raw_parts(blob_ptr, blob_size);
-            String::from_utf8_lossy(bytes).trim_end_matches('\0').to_string()
+            String::from_utf8_lossy(bytes)
+                .trim_end_matches('\0')
+                .to_string()
         };
 
         CredFree(pcredential as *mut _);
@@ -121,19 +128,13 @@ mod tests {
     #[test]
     fn test_extract_nested() {
         let json = r#"{"claudeAiOauth": {"accessToken": "sk-ant-oat01-test"}}"#;
-        assert_eq!(
-            extract_access_token(json).unwrap(),
-            "sk-ant-oat01-test"
-        );
+        assert_eq!(extract_access_token(json).unwrap(), "sk-ant-oat01-test");
     }
 
     #[test]
     fn test_extract_flat() {
         let json = r#"{"accessToken": "sk-ant-oat01-flat"}"#;
-        assert_eq!(
-            extract_access_token(json).unwrap(),
-            "sk-ant-oat01-flat"
-        );
+        assert_eq!(extract_access_token(json).unwrap(), "sk-ant-oat01-flat");
     }
 
     #[test]

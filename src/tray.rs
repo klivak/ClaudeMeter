@@ -4,9 +4,7 @@ use windows::Win32::UI::Shell::{
     Shell_NotifyIconW, NIF_ICON, NIF_MESSAGE, NIF_TIP, NIM_ADD, NIM_DELETE, NIM_MODIFY,
     NOTIFYICONDATAW,
 };
-use windows::Win32::UI::WindowsAndMessaging::{
-    LoadIconW, HICON, IDI_APPLICATION, WM_USER,
-};
+use windows::Win32::UI::WindowsAndMessaging::{LoadIconW, HICON, IDI_APPLICATION, WM_USER};
 
 // Tray callback message
 pub const WM_TRAY_ICON: u32 = WM_USER + 1;
@@ -54,9 +52,7 @@ impl TrayIcon {
     pub fn new(hwnd: HWND) -> Result<Self, String> {
         // For now, use default application icon as placeholder
         // In a full build, these would be loaded from embedded resources
-        let default_icon = unsafe {
-            LoadIconW(None, IDI_APPLICATION).map_err(|e| e.to_string())?
-        };
+        let default_icon = unsafe { LoadIconW(None, IDI_APPLICATION).map_err(|e| e.to_string())? };
 
         let mut tray = Self {
             hwnd,

@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use rusqlite::{Connection, Result as SqlResult, params};
+use rusqlite::{params, Connection, Result as SqlResult};
 use std::path::Path;
 
 pub struct Database {
@@ -54,7 +54,13 @@ impl Database {
         Ok(())
     }
 
-    pub fn insert(&self, provider: &str, metric: &str, utilization: f64, resets_at: Option<&str>) -> SqlResult<()> {
+    pub fn insert(
+        &self,
+        provider: &str,
+        metric: &str,
+        utilization: f64,
+        resets_at: Option<&str>,
+    ) -> SqlResult<()> {
         self.conn.execute(
             "INSERT INTO usage_history (provider, metric, utilization, resets_at)
              VALUES (?1, ?2, ?3, ?4)",
@@ -78,14 +84,15 @@ impl Database {
              ORDER BY hours_ago DESC",
         )?;
 
-        let points = stmt.query_map([], |row| {
-            Ok(ChartPoint {
-                bucket_hours_ago: row.get::<_, f64>(0)?,
-                utilization: row.get::<_, f64>(1)?,
-            })
-        })?
-        .filter_map(|r| r.ok())
-        .collect();
+        let points = stmt
+            .query_map([], |row| {
+                Ok(ChartPoint {
+                    bucket_hours_ago: row.get::<_, f64>(0)?,
+                    utilization: row.get::<_, f64>(1)?,
+                })
+            })?
+            .filter_map(|r| r.ok())
+            .collect();
 
         Ok(points)
     }

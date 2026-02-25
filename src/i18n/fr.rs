@@ -16,13 +16,22 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
         "install_claude_desc",
         "Installez Claude Code et exécutez `claude login` pour activer le suivi automatique.",
     );
-    m.insert("Install Claude Code \u{2192}", "Installer Claude Code \u{2192}");
+    m.insert(
+        "Install Claude Code \u{2192}",
+        "Installer Claude Code \u{2192}",
+    );
     m.insert(
         "openai_no_api",
         "OpenAI ne fournit pas d'API pour suivre l'utilisation de l'abonnement ChatGPT.",
     );
-    m.insert("Check your usage manually:", "Vérifiez votre utilisation manuellement :");
-    m.insert("Open ChatGPT Usage \u{2192}", "Ouvrir l'utilisation ChatGPT \u{2192}");
+    m.insert(
+        "Check your usage manually:",
+        "Vérifiez votre utilisation manuellement :",
+    );
+    m.insert(
+        "Open ChatGPT Usage \u{2192}",
+        "Ouvrir l'utilisation ChatGPT \u{2192}",
+    );
     m.insert("Refresh Now", "Actualiser maintenant");
     m.insert("Open Dashboard", "Ouvrir le tableau de bord");
     m.insert("Settings", "Paramètres");
