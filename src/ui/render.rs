@@ -117,8 +117,8 @@ impl PopupRenderer {
         unsafe {
             // Background
             let bg_brush = CreateSolidBrush(colors.background);
-            FillRect(hdc, rect, bg_brush);
-            DeleteObject(bg_brush);
+            let _ = FillRect(hdc, rect, bg_brush);
+            let _ = DeleteObject(bg_brush);
 
             let mut y = 0i32;
 
@@ -174,8 +174,8 @@ impl PopupRenderer {
         let h = self.scale(HEADER_HEIGHT);
         let surface_brush = CreateSolidBrush(colors.surface);
         let header_rect = RECT { left: 0, top: y, right: w, bottom: y + h };
-        FillRect(hdc, &header_rect, surface_brush);
-        DeleteObject(surface_brush);
+        let _ = FillRect(hdc, &header_rect, surface_brush);
+        let _ = DeleteObject(surface_brush);
 
         // Title
         let font = self.create_font(14, true);
@@ -190,8 +190,8 @@ impl PopupRenderer {
             bottom: y + h,
         };
         DrawTextW(hdc, &mut title, &mut text_rect, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
-        SelectObject(hdc, old_font);
-        DeleteObject(font);
+        let _ = SelectObject(hdc, old_font);
+        let _ = DeleteObject(font);
 
         // ⚙ button
         let btn_size = self.scale(28);
@@ -219,10 +219,10 @@ impl PopupRenderer {
     unsafe fn draw_separator(&self, hdc: HDC, w: i32, y: i32, colors: &ThemeColors) -> i32 {
         let pen = CreatePen(PS_SOLID, 1, colors.separator);
         let old_pen = SelectObject(hdc, pen);
-        MoveToEx(hdc, 0, y, None);
-        LineTo(hdc, w, y);
-        SelectObject(hdc, old_pen);
-        DeleteObject(pen);
+        let _ = MoveToEx(hdc, 0, y, None);
+        let _ = LineTo(hdc, w, y);
+        let _ = SelectObject(hdc, old_pen);
+        let _ = DeleteObject(pen);
         y + self.scale(SEPARATOR_H)
     }
 
@@ -250,8 +250,8 @@ impl PopupRenderer {
         };
         let mut header_wide = wide(&header_str);
         DrawTextW(hdc, &mut header_wide, &mut r, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
-        SelectObject(hdc, old_font);
-        DeleteObject(font);
+        let _ = SelectObject(hdc, old_font);
+        let _ = DeleteObject(font);
         y += self.scale(24);
 
         for (key, metric) in usage.all_metrics() {
@@ -306,8 +306,8 @@ impl PopupRenderer {
         let mut pct_wide = wide(&pct_str);
         DrawTextW(hdc, &mut pct_wide, &mut pct_rect, windows::Win32::Graphics::Gdi::DT_RIGHT | DT_SINGLELINE | DT_VCENTER);
 
-        SelectObject(hdc, old_font);
-        DeleteObject(font_label);
+        let _ = SelectObject(hdc, old_font);
+        let _ = DeleteObject(font_label);
 
         y += self.scale(METRIC_LABEL_H + 4);
 
@@ -319,8 +319,8 @@ impl PopupRenderer {
             bottom: y + self.scale(PROGRESS_H),
         };
         let bg_brush = CreateSolidBrush(colors.progress_bg);
-        FillRect(hdc, &bar_rect, bg_brush);
-        DeleteObject(bg_brush);
+        let _ = FillRect(hdc, &bar_rect, bg_brush);
+        let _ = DeleteObject(bg_brush);
 
         // Progress bar fill
         let fill_w = ((content_w as f64 * utilization / 100.0) as i32).max(0).min(content_w);
@@ -332,8 +332,8 @@ impl PopupRenderer {
                 bottom: y + self.scale(PROGRESS_H),
             };
             let fill_brush = CreateSolidBrush(colors.progress_color(utilization));
-            FillRect(hdc, &fill_rect, fill_brush);
-            DeleteObject(fill_brush);
+            let _ = FillRect(hdc, &fill_rect, fill_brush);
+            let _ = DeleteObject(fill_brush);
         }
 
         y += self.scale(PROGRESS_H + 4);
@@ -363,8 +363,8 @@ impl PopupRenderer {
                 };
                 let mut reset_wide = wide(&reset_text);
                 DrawTextW(hdc, &mut reset_wide, &mut reset_rect, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
-                SelectObject(hdc, old_font2);
-                DeleteObject(font_small);
+                let _ = SelectObject(hdc, old_font2);
+                let _ = DeleteObject(font_small);
                 y += self.scale(RESET_LABEL_H);
             }
         }
@@ -418,21 +418,21 @@ impl PopupRenderer {
             };
             let mut pct_wide = wide(&pct);
             DrawTextW(hdc, &mut pct_wide, &mut pct_rect, windows::Win32::Graphics::Gdi::DT_RIGHT | DT_SINGLELINE | DT_VCENTER);
-            SelectObject(hdc, old_font);
-            DeleteObject(font);
+            let _ = SelectObject(hdc, old_font);
+            let _ = DeleteObject(font);
             y += self.scale(16);
 
             // Progress bar
             let bar_rect = RECT { left: pad, top: y, right: pad + content_w, bottom: y + self.scale(8) };
             let bg = CreateSolidBrush(colors.progress_bg);
-            FillRect(hdc, &bar_rect, bg);
-            DeleteObject(bg);
+            let _ = FillRect(hdc, &bar_rect, bg);
+            let _ = DeleteObject(bg);
             let fill_w = ((content_w as f64 * utilization / 100.0) as i32).max(0).min(content_w);
             if fill_w > 0 {
                 let fill_rect = RECT { left: pad, top: y, right: pad + fill_w, bottom: y + self.scale(8) };
                 let fill = CreateSolidBrush(colors.progress_color(*utilization));
-                FillRect(hdc, &fill_rect, fill);
-                DeleteObject(fill);
+                let _ = FillRect(hdc, &fill_rect, fill);
+                let _ = DeleteObject(fill);
             }
             y += self.scale(8 + ITEM_GAP);
         }
@@ -458,8 +458,8 @@ impl PopupRenderer {
         let mut r = RECT { left: pad, top: y, right: w - pad, bottom: y + self.scale(24) };
         let mut warn_wide = wide(&format!("\u{26A0} {}", i18n.t("Claude Code not detected")));
         DrawTextW(hdc, &mut warn_wide, &mut r, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
-        SelectObject(hdc, old_font);
-        DeleteObject(font);
+        let _ = SelectObject(hdc, old_font);
+        let _ = DeleteObject(font);
         y += self.scale(28);
 
         let font2 = self.create_font(11, false);
@@ -469,16 +469,16 @@ impl PopupRenderer {
         let mut r2 = RECT { left: pad, top: y, right: w - pad, bottom: y + self.scale(60) };
         let mut desc_wide = wide(desc);
         DrawTextW(hdc, &mut desc_wide, &mut r2, DT_LEFT | windows::Win32::Graphics::Gdi::DT_WORDBREAK);
-        SelectObject(hdc, old2);
-        DeleteObject(font2);
+        let _ = SelectObject(hdc, old2);
+        let _ = DeleteObject(font2);
         y += self.scale(70);
 
         // Install link button
         let btn_h = self.scale(28);
         *install_rect = RECT { left: pad, top: y, right: w - pad, bottom: y + btn_h };
         let btn_brush = CreateSolidBrush(colors.accent);
-        FillRect(hdc, install_rect, btn_brush);
-        DeleteObject(btn_brush);
+        let _ = FillRect(hdc, install_rect, btn_brush);
+        let _ = DeleteObject(btn_brush);
         let font3 = self.create_font(12, false);
         let old3 = SelectObject(hdc, font3);
         SetBkMode(hdc, TRANSPARENT);
@@ -486,8 +486,8 @@ impl PopupRenderer {
         let mut btn_text = *install_rect;
         let mut btn_wide = wide(i18n.t("Install Claude Code \u{2192}"));
         DrawTextW(hdc, &mut btn_wide, &mut btn_text, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
-        SelectObject(hdc, old3);
-        DeleteObject(font3);
+        let _ = SelectObject(hdc, old3);
+        let _ = DeleteObject(font3);
         y += btn_h + self.scale(8);
 
         y
@@ -513,8 +513,8 @@ impl PopupRenderer {
         let mut r = RECT { left: pad, top: y, right: w - pad, bottom: y + self.scale(20) };
         let mut header_wide = wide(&header_str);
         DrawTextW(hdc, &mut header_wide, &mut r, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
-        SelectObject(hdc, old);
-        DeleteObject(font);
+        let _ = SelectObject(hdc, old);
+        let _ = DeleteObject(font);
         y += self.scale(24);
 
         // Info text
@@ -525,8 +525,8 @@ impl PopupRenderer {
         let mut r2 = RECT { left: pad, top: y, right: w - pad, bottom: y + self.scale(50) };
         let mut info_wide = wide(&info);
         DrawTextW(hdc, &mut info_wide, &mut r2, DT_LEFT | windows::Win32::Graphics::Gdi::DT_WORDBREAK);
-        SelectObject(hdc, old2);
-        DeleteObject(font2);
+        let _ = SelectObject(hdc, old2);
+        let _ = DeleteObject(font2);
         y += self.scale(55);
 
         // Link
@@ -538,8 +538,8 @@ impl PopupRenderer {
         let mut lr = *link_rect;
         let mut link_wide = wide(&link_text);
         DrawTextW(hdc, &mut link_wide, &mut lr, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
-        SelectObject(hdc, old3);
-        DeleteObject(font3);
+        let _ = SelectObject(hdc, old3);
+        let _ = DeleteObject(font3);
         y += self.scale(28);
 
         y
@@ -565,8 +565,8 @@ impl PopupRenderer {
         let mut r = RECT { left: pad, top: y, right: w - pad, bottom: y + self.scale(18) };
         let mut title_wide = wide(&title);
         DrawTextW(hdc, &mut title_wide, &mut r, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
-        SelectObject(hdc, old);
-        DeleteObject(font);
+        let _ = SelectObject(hdc, old);
+        let _ = DeleteObject(font);
         y += self.scale(20);
 
         let chart_h = self.scale(60);
@@ -575,8 +575,8 @@ impl PopupRenderer {
 
         // Chart background
         let bg = CreateSolidBrush(colors.surface);
-        FillRect(hdc, &chart_rect, bg);
-        DeleteObject(bg);
+        let _ = FillRect(hdc, &chart_rect, bg);
+        let _ = DeleteObject(bg);
 
         if !data.is_empty() {
             let bar_w = (chart_w / data.len() as i32).max(2);
@@ -592,8 +592,8 @@ impl PopupRenderer {
                     };
                     let color = if val >= 80.0 { colors.red } else if val >= 50.0 { colors.yellow } else { colors.green };
                     let bar_brush = CreateSolidBrush(color);
-                    FillRect(hdc, &bar_rect, bar_brush);
-                    DeleteObject(bar_brush);
+                    let _ = FillRect(hdc, &bar_rect, bar_brush);
+                    let _ = DeleteObject(bar_brush);
                 }
             }
         }
@@ -611,8 +611,8 @@ impl PopupRenderer {
             let mut label_wide = wide(label);
             DrawTextW(hdc, &mut label_wide, &mut lr, DT_LEFT | DT_SINGLELINE);
         }
-        SelectObject(hdc, old2);
-        DeleteObject(font2);
+        let _ = SelectObject(hdc, old2);
+        let _ = DeleteObject(font2);
         y += self.scale(14);
 
         y
@@ -633,8 +633,8 @@ impl PopupRenderer {
 
         let surface_brush = CreateSolidBrush(colors.surface);
         let footer_rect = RECT { left: 0, top: y, right: w, bottom: y + h };
-        FillRect(hdc, &footer_rect, surface_brush);
-        DeleteObject(surface_brush);
+        let _ = FillRect(hdc, &footer_rect, surface_brush);
+        let _ = DeleteObject(surface_brush);
 
         let font = self.create_font(10, false);
         let old = SelectObject(hdc, font);
@@ -644,8 +644,8 @@ impl PopupRenderer {
         let mut r = RECT { left: pad, top: y, right: w - self.scale(80), bottom: y + h };
         let mut updated_wide = wide(&updated_text);
         DrawTextW(hdc, &mut updated_wide, &mut r, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
-        SelectObject(hdc, old);
-        DeleteObject(font);
+        let _ = SelectObject(hdc, old);
+        let _ = DeleteObject(font);
 
         // Refresh button
         let btn_w = self.scale(70);
@@ -656,8 +656,8 @@ impl PopupRenderer {
             bottom: y + (h - self.scale(22)) / 2 + self.scale(22),
         };
         let btn_brush = CreateSolidBrush(colors.surface);
-        FillRect(hdc, refresh_rect, btn_brush);
-        DeleteObject(btn_brush);
+        let _ = FillRect(hdc, refresh_rect, btn_brush);
+        let _ = DeleteObject(btn_brush);
         let font2 = self.create_font(10, false);
         let old2 = SelectObject(hdc, font2);
         SetTextColor(hdc, colors.accent);
@@ -665,8 +665,8 @@ impl PopupRenderer {
         let mut br = *refresh_rect;
         let mut refresh_wide = wide(&refresh_text);
         DrawTextW(hdc, &mut refresh_wide, &mut br, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
-        SelectObject(hdc, old2);
-        DeleteObject(font2);
+        let _ = SelectObject(hdc, old2);
+        let _ = DeleteObject(font2);
     }
 
     unsafe fn draw_text_centered(&self, hdc: HDC, text: &str, rect: RECT, color: ColorRef, size: i32, bold: bool) {
@@ -682,8 +682,8 @@ impl PopupRenderer {
             &mut r,
             windows::Win32::Graphics::Gdi::DT_CENTER | DT_SINGLELINE | DT_VCENTER,
         );
-        SelectObject(hdc, old);
-        DeleteObject(font);
+        let _ = SelectObject(hdc, old);
+        let _ = DeleteObject(font);
     }
 
     unsafe fn create_font(&self, size_pt: i32, bold: bool) -> windows::Win32::Graphics::Gdi::HFONT {

@@ -35,16 +35,16 @@ impl PopupWindow {
         let (x, y) = get_popup_position(POPUP_WIDTH, height);
 
         unsafe {
-            MoveWindow(self.hwnd, x, y, POPUP_WIDTH, height, false);
-            SetWindowPos(self.hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
-            ShowWindow(self.hwnd, SW_SHOW);
+            let _ = MoveWindow(self.hwnd, x, y, POPUP_WIDTH, height, false);
+            let _ = SetWindowPos(self.hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+            let _ = ShowWindow(self.hwnd, SW_SHOW);
         }
         self.visible = true;
     }
 
     pub fn hide(&mut self) {
         unsafe {
-            ShowWindow(self.hwnd, SW_HIDE);
+            let _ = ShowWindow(self.hwnd, SW_HIDE);
         }
         self.visible = false;
     }
@@ -59,7 +59,7 @@ impl PopupWindow {
 fn get_popup_position(w: i32, h: i32) -> (i32, i32) {
     unsafe {
         let mut work_area = RECT::default();
-        SystemParametersInfoW(
+        let _ = SystemParametersInfoW(
             SPI_GETWORKAREA,
             0,
             Some(&mut work_area as *mut RECT as *mut _),

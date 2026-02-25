@@ -86,7 +86,7 @@ pub fn is_system_light_theme() -> bool {
             Some(&mut data_size),
         );
 
-        RegCloseKey(hkey).ok();
+        let _ = RegCloseKey(hkey).ok();
 
         if result.is_ok() {
             data != 0

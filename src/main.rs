@@ -183,7 +183,7 @@ unsafe fn run_message_loop(
             if msg.message == windows::Win32::UI::WindowsAndMessaging::WM_QUIT {
                 break;
             }
-            TranslateMessage(&msg);
+            let _ = TranslateMessage(&msg);
             DispatchMessageW(&msg);
         } else {
             // Yield CPU when idle
@@ -286,7 +286,7 @@ unsafe extern "system" fn popup_wnd_proc(
             let hdc = BeginPaint(hwnd, &mut ps);
 
             let mut rect = RECT::default();
-            windows::Win32::UI::WindowsAndMessaging::GetClientRect(hwnd, &mut rect);
+            let _ = windows::Win32::UI::WindowsAndMessaging::GetClientRect(hwnd, &mut rect);
 
             if let Some(state) = APP_STATE.as_mut() {
                 state.config_mgr.reload_if_changed();
@@ -317,7 +317,7 @@ unsafe extern "system" fn popup_wnd_proc(
                 }
             }
 
-            EndPaint(hwnd, &ps);
+            let _ = EndPaint(hwnd, &ps);
             LRESULT(0)
         }
         WM_LBUTTONUP => {
@@ -328,10 +328,10 @@ unsafe extern "system" fn popup_wnd_proc(
             if let Some(state) = APP_STATE.as_mut() {
                 if crate::popup::point_in_rect(pt, state.close_rect) {
                     state.popup_visible = false;
-                    windows::Win32::UI::WindowsAndMessaging::ShowWindow(hwnd, windows::Win32::UI::WindowsAndMessaging::SW_HIDE);
+                    let _ = windows::Win32::UI::WindowsAndMessaging::ShowWindow(hwnd, windows::Win32::UI::WindowsAndMessaging::SW_HIDE);
                 } else if crate::popup::point_in_rect(pt, state.settings_rect) {
                     state.popup_in_settings = !state.popup_in_settings;
-                    windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, true);
+                    let _ = windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, true);
                 } else if crate::popup::point_in_rect(pt, state.refresh_rect) {
                     // Find main hwnd and trigger poll
                     trigger_poll(hwnd); // Note: passes popup hwnd; poll result goes to main
@@ -350,7 +350,7 @@ unsafe extern "system" fn popup_wnd_proc(
             if let Some(state) = APP_STATE.as_mut() {
                 if state.popup_visible {
                     state.popup_visible = false;
-                    windows::Win32::UI::WindowsAndMessaging::ShowWindow(hwnd, windows::Win32::UI::WindowsAndMessaging::SW_HIDE);
+                    let _ = windows::Win32::UI::WindowsAndMessaging::ShowWindow(hwnd, windows::Win32::UI::WindowsAndMessaging::SW_HIDE);
                 }
             }
             LRESULT(0)
@@ -375,8 +375,8 @@ unsafe fn draw_settings_panel(
     };
 
     let bg = CreateSolidBrush(colors.background);
-    FillRect(hdc, rect, bg);
-    DeleteObject(bg);
+    let _ = FillRect(hdc, rect, bg);
+    let _ = DeleteObject(bg);
 
     let w = rect.right - rect.left;
     let pad = 16i32;
@@ -384,8 +384,8 @@ unsafe fn draw_settings_panel(
     // Header
     let surf = CreateSolidBrush(colors.surface);
     let header = RECT { left: 0, top: 0, right: w, bottom: 36 };
-    FillRect(hdc, &header, surf);
-    DeleteObject(surf);
+    let _ = FillRect(hdc, &header, surf);
+    let _ = DeleteObject(surf);
 
     let font = create_font_helper(hdc, 13, true);
     let old = SelectObject(hdc, font);
@@ -407,8 +407,8 @@ unsafe fn draw_settings_panel(
         windows::Win32::Graphics::Gdi::DT_SINGLELINE |
         windows::Win32::Graphics::Gdi::DT_VCENTER);
 
-    SelectObject(hdc, old);
-    DeleteObject(font);
+    let _ = SelectObject(hdc, old);
+    let _ = DeleteObject(font);
 
     let mut y = 44i32;
 
@@ -429,8 +429,8 @@ unsafe fn draw_settings_panel(
         let mut r = RECT { left: pad, top: y, right: w - pad, bottom: y + 22 };
         let mut rw = wide(row_text);
         DrawTextW(hdc, &mut rw, &mut r, windows::Win32::Graphics::Gdi::DT_LEFT | windows::Win32::Graphics::Gdi::DT_SINGLELINE | windows::Win32::Graphics::Gdi::DT_VCENTER);
-        SelectObject(hdc, old2);
-        DeleteObject(f);
+        let _ = SelectObject(hdc, old2);
+        let _ = DeleteObject(f);
         y += 26;
     }
 
@@ -443,8 +443,8 @@ unsafe fn draw_settings_panel(
     let mut footer = wide("ClaudeMeter v1.0.0 by klivak\ngithub.com/klivak/claudemeter");
     let mut fr = RECT { left: pad, top: y, right: w - pad, bottom: rect.bottom };
     DrawTextW(hdc, &mut footer, &mut fr, windows::Win32::Graphics::Gdi::DT_LEFT | windows::Win32::Graphics::Gdi::DT_WORDBREAK);
-    SelectObject(hdc, old3);
-    DeleteObject(f3);
+    let _ = SelectObject(hdc, old3);
+    let _ = DeleteObject(f3);
 }
 
 fn capitalize(s: &str) -> String {
@@ -487,7 +487,7 @@ unsafe fn toggle_popup(main_hwnd: HWND) {
     if let Some(state) = APP_STATE.as_mut() {
         if state.popup_visible {
             state.popup_visible = false;
-            windows::Win32::UI::WindowsAndMessaging::ShowWindow(
+            let _ = windows::Win32::UI::WindowsAndMessaging::ShowWindow(
                 state.popup_hwnd,
                 windows::Win32::UI::WindowsAndMessaging::SW_HIDE,
             );
@@ -514,7 +514,7 @@ unsafe fn show_popup(main_hwnd: HWND) {
 
         // Position near taskbar
         let mut work_area = RECT::default();
-        windows::Win32::UI::WindowsAndMessaging::SystemParametersInfoW(
+        let _ = windows::Win32::UI::WindowsAndMessaging::SystemParametersInfoW(
             windows::Win32::UI::WindowsAndMessaging::SPI_GETWORKAREA,
             0,
             Some(&mut work_area as *mut RECT as *mut _),
@@ -523,11 +523,11 @@ unsafe fn show_popup(main_hwnd: HWND) {
         let x = work_area.right - crate::ui::render::POPUP_WIDTH - 10;
         let y = work_area.bottom - h - 10;
 
-        windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+        let _ = windows::Win32::UI::WindowsAndMessaging::MoveWindow(
             state.popup_hwnd, x.max(0), y.max(0),
             crate::ui::render::POPUP_WIDTH, h, false,
         );
-        windows::Win32::UI::WindowsAndMessaging::SetWindowPos(
+        let _ = windows::Win32::UI::WindowsAndMessaging::SetWindowPos(
             state.popup_hwnd,
             windows::Win32::UI::WindowsAndMessaging::HWND_TOPMOST,
             0, 0, 0, 0,
@@ -535,12 +535,12 @@ unsafe fn show_popup(main_hwnd: HWND) {
             | windows::Win32::UI::WindowsAndMessaging::SWP_NOSIZE
             | windows::Win32::UI::WindowsAndMessaging::SWP_SHOWWINDOW,
         );
-        windows::Win32::UI::WindowsAndMessaging::ShowWindow(
+        let _ = windows::Win32::UI::WindowsAndMessaging::ShowWindow(
             state.popup_hwnd,
             windows::Win32::UI::WindowsAndMessaging::SW_SHOW,
         );
-        SetForegroundWindow(state.popup_hwnd);
-        windows::Win32::Graphics::Gdi::InvalidateRect(state.popup_hwnd, None, true);
+        let _ = SetForegroundWindow(state.popup_hwnd);
+        let _ = windows::Win32::Graphics::Gdi::InvalidateRect(state.popup_hwnd, None, true);
         state.popup_visible = true;
     }
 }
@@ -564,20 +564,20 @@ unsafe fn show_context_menu(hwnd: HWND) {
         // Autostart toggle with checkmark
         let autostart_flag = if autostart { MF_STRING | MF_CHECKED } else { MF_STRING | MF_UNCHECKED };
         let autostart_text = wide(state.i18n.t("Start with Windows"));
-        AppendMenuW(menu, autostart_flag, IDM_AUTOSTART as usize, PCWSTR(autostart_text.as_ptr()));
+        let _ = AppendMenuW(menu, autostart_flag, IDM_AUTOSTART as usize, PCWSTR(autostart_text.as_ptr()));
         append_menu_sep(menu);
         append_menu_str(menu, IDM_ABOUT, &format!("ClaudeMeter v1.0.0"));
         append_menu_str(menu, IDM_EXIT, state.i18n.t("Exit"));
 
         let mut pt = POINT::default();
-        GetCursorPos(&mut pt);
-        SetForegroundWindow(hwnd);
+        let _ = GetCursorPos(&mut pt);
+        let _ = SetForegroundWindow(hwnd);
         let cmd = TrackPopupMenu(
             menu,
             TPM_LEFTALIGN | TPM_BOTTOMALIGN | TPM_RETURNCMD,
             pt.x, pt.y, 0, hwnd, None,
         );
-        DestroyMenu(menu);
+        let _ = DestroyMenu(menu);
 
         if cmd.as_bool() {
             handle_menu_command(hwnd, cmd.0 as u32);
@@ -587,11 +587,11 @@ unsafe fn show_context_menu(hwnd: HWND) {
 
 unsafe fn append_menu_str(menu: HMENU, id: u32, text: &str) {
     let wide_text = wide(text);
-    AppendMenuW(menu, MF_STRING, id as usize, PCWSTR(wide_text.as_ptr()));
+    let _ = AppendMenuW(menu, MF_STRING, id as usize, PCWSTR(wide_text.as_ptr()));
 }
 
 unsafe fn append_menu_sep(menu: HMENU) {
-    AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null());
+    let _ = AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null());
 }
 
 unsafe fn handle_menu_command(hwnd: HWND, cmd: u32) {
@@ -769,7 +769,7 @@ unsafe fn on_poll_result(hwnd: HWND, usage: Option<UsageResponse>, error: Option
 
         // Refresh popup if visible
         if state.popup_visible {
-            windows::Win32::Graphics::Gdi::InvalidateRect(state.popup_hwnd, None, true);
+            let _ = windows::Win32::Graphics::Gdi::InvalidateRect(state.popup_hwnd, None, true);
         }
     }
 }

@@ -46,7 +46,7 @@ fn enable_autostart(exe_path: &str) -> Result<(), String> {
             Some(value_bytes),
         );
 
-        RegCloseKey(hkey).ok();
+        let _ = RegCloseKey(hkey).ok();
         result.ok().map_err(|e: windows::core::Error| e.to_string())?;
     }
     Ok(())
@@ -71,7 +71,7 @@ fn disable_autostart() -> Result<(), String> {
         }
 
         let _ = RegDeleteValueW(hkey, PCWSTR(name_wide.as_ptr()));
-        RegCloseKey(hkey).ok();
+        let _ = RegCloseKey(hkey).ok();
     }
     Ok(())
 }
@@ -105,7 +105,7 @@ pub fn is_autostart_enabled() -> bool {
         )
         .is_ok();
 
-        RegCloseKey(hkey).ok();
+        let _ = RegCloseKey(hkey).ok();
         exists
     }
 }
