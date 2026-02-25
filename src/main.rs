@@ -203,27 +203,31 @@ unsafe fn run_message_loop(exe_dir: std::path::PathBuf, config_mgr: ConfigManage
 
 unsafe fn register_main_class(hinstance: windows::Win32::Foundation::HMODULE) {
     let class_name = wide(WINDOW_CLASS);
-    let mut wc = WNDCLASSEXW::default();
-    wc.cbSize = std::mem::size_of::<WNDCLASSEXW>() as u32;
-    wc.style = CS_HREDRAW | CS_VREDRAW;
-    wc.lpfnWndProc = Some(main_wnd_proc);
-    wc.hInstance = hinstance.into();
-    wc.hIcon = LoadIconW(None, IDI_APPLICATION).unwrap_or_default();
-    wc.lpszClassName = PCWSTR(class_name.as_ptr());
+    let wc = WNDCLASSEXW {
+        cbSize: std::mem::size_of::<WNDCLASSEXW>() as u32,
+        style: CS_HREDRAW | CS_VREDRAW,
+        lpfnWndProc: Some(main_wnd_proc),
+        hInstance: hinstance.into(),
+        hIcon: LoadIconW(None, IDI_APPLICATION).unwrap_or_default(),
+        lpszClassName: PCWSTR(class_name.as_ptr()),
+        ..Default::default()
+    };
     RegisterClassExW(&wc);
 }
 
 unsafe fn register_popup_class(hinstance: windows::Win32::Foundation::HMODULE) {
     let class_name = wide(POPUP_CLASS);
-    let mut wc = WNDCLASSEXW::default();
-    wc.cbSize = std::mem::size_of::<WNDCLASSEXW>() as u32;
-    wc.style = CS_HREDRAW | CS_VREDRAW;
-    wc.lpfnWndProc = Some(popup_wnd_proc);
-    wc.hInstance = hinstance.into();
-    wc.hIcon = LoadIconW(None, IDI_APPLICATION).unwrap_or_default();
-    wc.lpszClassName = PCWSTR(class_name.as_ptr());
     // COLOR_WINDOW = 5, so (COLOR_WINDOW + 1) = 6 as background brush
-    wc.hbrBackground = windows::Win32::Graphics::Gdi::HBRUSH(6usize as *mut _);
+    let wc = WNDCLASSEXW {
+        cbSize: std::mem::size_of::<WNDCLASSEXW>() as u32,
+        style: CS_HREDRAW | CS_VREDRAW,
+        lpfnWndProc: Some(popup_wnd_proc),
+        hInstance: hinstance.into(),
+        hIcon: LoadIconW(None, IDI_APPLICATION).unwrap_or_default(),
+        lpszClassName: PCWSTR(class_name.as_ptr()),
+        hbrBackground: windows::Win32::Graphics::Gdi::HBRUSH(6usize as *mut _),
+        ..Default::default()
+    };
     RegisterClassExW(&wc);
 }
 
@@ -253,7 +257,7 @@ unsafe extern "system" fn main_wnd_proc(
             LRESULT(0)
         }
         WM_TIMER => {
-            if wparam.0 as usize == TIMER_POLL {
+            if wparam.0 == TIMER_POLL {
                 trigger_poll(hwnd);
             }
             LRESULT(0)
@@ -687,7 +691,7 @@ unsafe fn show_context_menu(hwnd: HWND) {
             PCWSTR(autostart_text.as_ptr()),
         );
         append_menu_sep(menu);
-        append_menu_str(menu, IDM_ABOUT, &format!("ClaudeMeter v1.0.0"));
+        append_menu_str(menu, IDM_ABOUT, "ClaudeMeter v1.0.0");
         append_menu_str(menu, IDM_EXIT, state.i18n.t("Exit"));
 
         let mut pt = POINT::default();
@@ -867,7 +871,7 @@ unsafe fn on_poll_result(_hwnd: HWND, usage: Option<UsageResponse>, error: Optio
                         let reset_info = metric
                             .resets_at
                             .as_deref()
-                            .and_then(|r| i18n::seconds_until(r))
+                            .and_then(i18n::seconds_until)
                             .map(|s| format!(" Resets in {}.", format_duration(s)))
                             .unwrap_or_default();
 
