@@ -63,6 +63,7 @@ struct AppState {
     refresh_rect: RECT,
     install_rect: RECT,
     chatgpt_link_rect: RECT,
+    back_rect: RECT,
     notification_tracker: NotificationTracker,
     exe_dir: std::path::PathBuf,
     chart_data: Vec<f64>,
@@ -161,6 +162,7 @@ unsafe fn run_message_loop(exe_dir: std::path::PathBuf, config_mgr: ConfigManage
         refresh_rect: RECT::default(),
         install_rect: RECT::default(),
         chatgpt_link_rect: RECT::default(),
+        back_rect: RECT::default(),
         notification_tracker: NotificationTracker::new(),
         exe_dir,
         chart_data: Vec::new(),
@@ -309,7 +311,7 @@ unsafe extern "system" fn popup_wnd_proc(
                 let renderer = PopupRenderer::new(hwnd);
 
                 if state.popup_in_settings {
-                    draw_settings_panel(hdc, &rect, &colors, &state.i18n, &state.config_mgr.config);
+                    draw_settings_panel(hdc, &rect, &colors, &state.i18n, &state.config_mgr.config, &mut state.back_rect);
                 } else {
                     renderer.draw(
                         hdc,
@@ -345,6 +347,11 @@ unsafe extern "system" fn popup_wnd_proc(
                         hwnd,
                         windows::Win32::UI::WindowsAndMessaging::SW_HIDE,
                     );
+                } else if state.popup_in_settings
+                    && crate::popup::point_in_rect(pt, state.back_rect)
+                {
+                    state.popup_in_settings = false;
+                    let _ = windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, true);
                 } else if crate::popup::point_in_rect(pt, state.settings_rect) {
                     state.popup_in_settings = !state.popup_in_settings;
                     let _ = windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, true);
@@ -385,6 +392,7 @@ unsafe fn draw_settings_panel(
     colors: &crate::ui::colors::ThemeColors,
     i18n: &I18n,
     config: &crate::config::Config,
+    back_rect: &mut RECT,
 ) {
     use windows::Win32::Graphics::Gdi::{
         CreateSolidBrush, DeleteObject, DrawTextW, FillRect, SelectObject, SetBkMode, SetTextColor,
@@ -414,7 +422,7 @@ unsafe fn draw_settings_panel(
     SetBkMode(hdc, TRANSPARENT);
     SetTextColor(hdc, colors.text_primary);
     let mut back_text = wide(i18n.t("Back"));
-    let mut back_rect = RECT {
+    *back_rect = RECT {
         left: pad,
         top: 0,
         right: w - 40,
@@ -423,7 +431,7 @@ unsafe fn draw_settings_panel(
     DrawTextW(
         hdc,
         &mut back_text,
-        &mut back_rect,
+        back_rect,
         windows::Win32::Graphics::Gdi::DT_LEFT
             | windows::Win32::Graphics::Gdi::DT_SINGLELINE
             | windows::Win32::Graphics::Gdi::DT_VCENTER,
