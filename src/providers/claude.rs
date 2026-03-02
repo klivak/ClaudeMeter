@@ -21,15 +21,35 @@ pub struct UsageResponse {
     pub seven_day_oauth_apps: Option<UsageMetric>,
     /// Any additional API fields we don't know about yet
     pub extra: HashMap<String, UsageMetric>,
+    /// Subscription type from credentials (e.g. "max", "pro")
+    pub subscription_type: Option<String>,
+    /// Rate limit tier from credentials (e.g. "default_claude_max_5x")
+    pub rate_limit_tier: Option<String>,
 }
 
 impl UsageResponse {
-    /// Detected plan based on available metrics.
-    pub fn detected_plan(&self) -> &'static str {
+    /// Detected plan display name, using rate_limit_tier for specifics.
+    /// Examples: "Max 5x", "Max 20x", "Pro", "Max"
+    pub fn detected_plan(&self) -> String {
+        // Try to parse rate_limit_tier first (most specific)
+        if let Some(tier) = &self.rate_limit_tier {
+            if let Some(plan) = format_tier(tier) {
+                return plan;
+            }
+        }
+        // Fall back to subscription_type
+        if let Some(sub) = &self.subscription_type {
+            return match sub.as_str() {
+                "max" => "Max".to_string(),
+                "pro" => "Pro".to_string(),
+                other => other.to_string(),
+            };
+        }
+        // Fall back to metric-based detection
         if self.seven_day_opus.is_some() {
-            "Max"
+            "Max".to_string()
         } else {
-            "Pro"
+            "Pro".to_string()
         }
     }
 
@@ -87,6 +107,8 @@ fn parse_response(value: serde_json::Value) -> Result<UsageResponse, String> {
         seven_day_opus: None,
         seven_day_oauth_apps: None,
         extra: HashMap::new(),
+        subscription_type: None,
+        rate_limit_tier: None,
     };
 
     for (key, val) in obj {
@@ -150,6 +172,26 @@ impl ClaudeClient {
             .map_err(|e| format!("Failed to parse response JSON: {e}"))?;
 
         parse_response(value)
+    }
+}
+
+/// Parse rate_limit_tier into a human-readable plan name.
+/// Examples: "default_claude_max_5x" → "Max 5x", "default_claude_pro" → "Pro"
+fn format_tier(tier: &str) -> Option<String> {
+    let tier = tier.strip_prefix("default_claude_").unwrap_or(tier);
+    match tier {
+        "pro" => Some("Pro".to_string()),
+        "max" => Some("Max".to_string()),
+        other => {
+            // "max_5x" → "Max 5x", "max_20x" → "Max 20x"
+            if let Some(suffix) = other.strip_prefix("max_") {
+                Some(format!("Max {}", suffix.to_uppercase()))
+            } else {
+                other
+                    .strip_prefix("pro_")
+                    .map(|suffix| format!("Pro {}", suffix.to_uppercase()))
+            }
+        }
     }
 }
 
@@ -225,5 +267,20 @@ mod tests {
         assert_eq!(format_metric_name("five_hour"), "5-hour session");
         assert_eq!(format_metric_name("seven_day"), "Weekly (7-day)");
         assert_eq!(format_metric_name("iguana_necktie"), "Iguana Necktie");
+    }
+
+    #[test]
+    fn test_format_tier() {
+        assert_eq!(
+            format_tier("default_claude_max_5x"),
+            Some("Max 5X".to_string())
+        );
+        assert_eq!(
+            format_tier("default_claude_max_20x"),
+            Some("Max 20X".to_string())
+        );
+        assert_eq!(format_tier("default_claude_pro"), Some("Pro".to_string()));
+        assert_eq!(format_tier("default_claude_max"), Some("Max".to_string()));
+        assert_eq!(format_tier("unknown_thing"), None);
     }
 }

@@ -71,5 +71,10 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Auto (English)", "Auto (Deutsch)");
     m.insert("at", "um");
     m.insert("Resets in", "Zurückgesetzt in");
+    m.insert("Tray icon colors:", "Tray-Icon-Farben:");
+    m.insert("< 50% usage", "< 50% Nutzung");
+    m.insert("50-79% usage", "50\u{2013}79% Nutzung");
+    m.insert(">= 80% usage", "\u{2265} 80% Nutzung");
+    m.insert("No data", "Keine Daten");
     m
 }

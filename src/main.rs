@@ -24,21 +24,25 @@ use crate::tray::{
     build_tooltip, TrayIcon, IDM_ABOUT, IDM_AUTOSTART, IDM_EXIT, IDM_OPEN_CHATGPT, IDM_OPEN_CLAUDE,
     IDM_OPEN_DASHBOARD, IDM_REFRESH, IDM_SETTINGS, WM_TRAY_ICON,
 };
-use crate::ui::render::PopupRenderer;
+use crate::ui::colors::colorref_to_d2d;
+use crate::ui::render::{draw_settings_panel, D2DResources, HoveredElement, PopupRenderer};
 use chrono::Local;
 use windows::core::PCWSTR;
 use windows::Win32::Foundation::{GetLastError, HWND, LPARAM, LRESULT, POINT, RECT, WPARAM};
+use windows::Win32::Graphics::Dwm::DwmSetWindowAttribute;
 use windows::Win32::Graphics::Gdi::{BeginPaint, EndPaint, PAINTSTRUCT};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::System::Threading::CreateMutexW;
+use windows::Win32::UI::Controls::WM_MOUSELEAVE;
+use windows::Win32::UI::Input::KeyboardAndMouse::{TrackMouseEvent, TME_LEAVE, TRACKMOUSEEVENT};
 use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyMenu, DispatchMessageW,
-    GetCursorPos, LoadIconW, PeekMessageW, PostMessageW, PostQuitMessage, RegisterClassExW,
-    SetForegroundWindow, TrackPopupMenu, TranslateMessage, CS_HREDRAW, CS_VREDRAW, HMENU,
-    IDI_APPLICATION, MF_CHECKED, MF_SEPARATOR, MF_STRING, MF_UNCHECKED, MSG, PM_REMOVE,
-    TPM_BOTTOMALIGN, TPM_LEFTALIGN, TPM_RETURNCMD, WM_COMMAND, WM_DESTROY, WM_KILLFOCUS,
-    WM_LBUTTONUP, WM_PAINT, WM_RBUTTONUP, WM_TIMER, WNDCLASSEXW, WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
-    WS_POPUP,
+    GetCursorPos, LoadCursorW, LoadIconW, PeekMessageW, PostMessageW, PostQuitMessage,
+    RegisterClassExW, SetCursor, SetForegroundWindow, TrackPopupMenu, TranslateMessage,
+    CS_DROPSHADOW, CS_HREDRAW, CS_VREDRAW, HMENU, IDC_ARROW, IDC_HAND, IDI_APPLICATION, MF_CHECKED,
+    MF_SEPARATOR, MF_STRING, MF_UNCHECKED, MSG, PM_REMOVE, TPM_BOTTOMALIGN, TPM_LEFTALIGN,
+    TPM_RETURNCMD, WM_COMMAND, WM_DESTROY, WM_KILLFOCUS, WM_LBUTTONUP, WM_MOUSEMOVE, WM_PAINT,
+    WM_RBUTTONUP, WM_SETCURSOR, WM_TIMER, WNDCLASSEXW, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
 };
 
 const WINDOW_CLASS: &str = "ClaudeMeterMain";
@@ -55,6 +59,7 @@ struct AppState {
     usage: Option<UsageResponse>,
     last_updated: String,
     last_error: Option<String>,
+    main_hwnd: HWND,
     popup_hwnd: HWND,
     popup_visible: bool,
     popup_in_settings: bool,
@@ -69,6 +74,11 @@ struct AppState {
     notification_tracker: NotificationTracker,
     exe_dir: std::path::PathBuf,
     chart_data: Vec<f64>,
+    chart_reset_lines: Vec<f64>,
+    // Direct2D resources
+    d2d: Option<D2DResources>,
+    hovered_element: HoveredElement,
+    mouse_tracking: bool,
 }
 
 // Safety: AppState is accessed only from the main thread via raw pointer.
@@ -148,6 +158,18 @@ unsafe fn run_message_loop(exe_dir: std::path::PathBuf, config_mgr: ConfigManage
     )
     .unwrap();
 
+    // Apply DWM attributes (rounded corners + dark mode)
+    apply_dwm_rounded_corners(popup_hwnd);
+
+    // Initialize D2D resources
+    let d2d = match D2DResources::new() {
+        Ok(d) => Some(d),
+        Err(e) => {
+            log::error!("Failed to init Direct2D: {e}");
+            None
+        }
+    };
+
     // Initialize app state
     APP_STATE = Some(AppState {
         config_mgr,
@@ -156,6 +178,7 @@ unsafe fn run_message_loop(exe_dir: std::path::PathBuf, config_mgr: ConfigManage
         usage: None,
         last_updated: String::new(),
         last_error: None,
+        main_hwnd,
         popup_hwnd,
         popup_visible: false,
         popup_in_settings: false,
@@ -169,11 +192,15 @@ unsafe fn run_message_loop(exe_dir: std::path::PathBuf, config_mgr: ConfigManage
         notification_tracker: NotificationTracker::new(),
         exe_dir,
         chart_data: Vec::new(),
+        chart_reset_lines: Vec::new(),
+        d2d,
+        hovered_element: HoveredElement::None,
+        mouse_tracking: false,
     });
 
     // Create tray icon
     if let Some(state) = APP_STATE.as_mut() {
-        match TrayIcon::new(main_hwnd, &state.exe_dir) {
+        match TrayIcon::new(main_hwnd) {
             Ok(tray) => state.tray = Some(tray),
             Err(e) => log::error!("Failed to create tray icon: {e}"),
         }
@@ -222,13 +249,13 @@ unsafe fn register_main_class(hinstance: windows::Win32::Foundation::HMODULE) {
 
 unsafe fn register_popup_class(hinstance: windows::Win32::Foundation::HMODULE) {
     let class_name = wide(POPUP_CLASS);
-    // COLOR_WINDOW = 5, so (COLOR_WINDOW + 1) = 6 as background brush
     let wc = WNDCLASSEXW {
         cbSize: std::mem::size_of::<WNDCLASSEXW>() as u32,
-        style: CS_HREDRAW | CS_VREDRAW,
+        style: CS_HREDRAW | CS_VREDRAW | CS_DROPSHADOW,
         lpfnWndProc: Some(popup_wnd_proc),
         hInstance: hinstance.into(),
         hIcon: LoadIconW(None, IDI_APPLICATION).unwrap_or_default(),
+        hCursor: LoadCursorW(None, IDC_ARROW).unwrap_or_default(),
         lpszClassName: PCWSTR(class_name.as_ptr()),
         hbrBackground: windows::Win32::Graphics::Gdi::HBRUSH(6usize as *mut _),
         ..Default::default()
@@ -301,7 +328,7 @@ unsafe extern "system" fn popup_wnd_proc(
     match msg {
         WM_PAINT => {
             let mut ps = PAINTSTRUCT::default();
-            let hdc = BeginPaint(hwnd, &mut ps);
+            let _hdc = BeginPaint(hwnd, &mut ps);
 
             let mut rect = RECT::default();
             let _ = windows::Win32::UI::WindowsAndMessaging::GetClientRect(hwnd, &mut rect);
@@ -311,41 +338,138 @@ unsafe extern "system" fn popup_wnd_proc(
                 let theme_mode = ThemeMode::from_str(&state.config_mgr.config.theme);
                 let resolved = resolve_theme(theme_mode);
                 let colors = crate::ui::colors::ThemeColors::for_theme(resolved);
-                let renderer = PopupRenderer::new(hwnd);
 
-                if state.popup_in_settings {
-                    draw_settings_panel(
-                        hdc,
-                        &rect,
-                        &colors,
-                        &state.i18n,
-                        &state.config_mgr.config,
-                        &mut state.back_rect,
-                        &mut state.setting_rects,
-                    );
-                } else {
-                    renderer.draw(
-                        hdc,
-                        &rect,
-                        &state.usage,
-                        &state.last_updated,
-                        state.config_mgr.config.show_chatgpt_section,
-                        state.config_mgr.config.compact_mode,
-                        &colors,
-                        &state.i18n,
-                        &state.chart_data,
-                        &state.last_error,
-                        &mut state.settings_rect,
-                        &mut state.close_rect,
-                        &mut state.refresh_rect,
-                        &mut state.install_rect,
-                        &mut state.chatgpt_link_rect,
-                    );
+                // Apply DWM dark mode based on theme
+                apply_dwm_dark_mode(hwnd, matches!(resolved, crate::theme::ResolvedTheme::Dark));
+
+                if let Some(d2d) = state.d2d.as_mut() {
+                    if d2d.ensure_render_target(hwnd).is_ok() {
+                        // Clone the COM render target (cheap AddRef) to avoid
+                        // borrow conflict with d2d being passed mutably to draw fns
+                        if let Some(rt) = d2d.render_target.clone() {
+                            rt.BeginDraw();
+                            let bg = colorref_to_d2d(colors.background);
+                            rt.Clear(Some(&bg as *const _));
+
+                            let renderer = PopupRenderer::new(hwnd);
+
+                            if state.popup_in_settings {
+                                draw_settings_panel(
+                                    d2d,
+                                    &rect,
+                                    &colors,
+                                    &state.i18n,
+                                    &state.config_mgr.config,
+                                    &mut state.back_rect,
+                                    &mut state.close_rect,
+                                    &mut state.setting_rects,
+                                    &state.hovered_element,
+                                );
+                            } else {
+                                renderer.draw(
+                                    d2d,
+                                    &rect,
+                                    &state.usage,
+                                    &state.last_updated,
+                                    state.config_mgr.config.show_chatgpt_section,
+                                    state.config_mgr.config.compact_mode,
+                                    &colors,
+                                    &state.i18n,
+                                    &state.chart_data,
+                                    &state.chart_reset_lines,
+                                    &state.last_error,
+                                    &state.hovered_element,
+                                    &mut state.settings_rect,
+                                    &mut state.close_rect,
+                                    &mut state.refresh_rect,
+                                    &mut state.install_rect,
+                                    &mut state.chatgpt_link_rect,
+                                );
+                            }
+
+                            if rt.EndDraw(None, None).is_err() {
+                                d2d.discard_render_target();
+                            }
+                        }
+                    }
                 }
             }
 
             let _ = EndPaint(hwnd, &ps);
             LRESULT(0)
+        }
+        WM_MOUSEMOVE => {
+            let x = (lparam.0 & 0xFFFF) as i16 as i32;
+            let y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
+            let pt = POINT { x, y };
+
+            if let Some(state) = APP_STATE.as_mut() {
+                if !state.mouse_tracking {
+                    let mut tme = TRACKMOUSEEVENT {
+                        cbSize: std::mem::size_of::<TRACKMOUSEEVENT>() as u32,
+                        dwFlags: TME_LEAVE,
+                        hwndTrack: hwnd,
+                        dwHoverTime: 0,
+                    };
+                    let _ = TrackMouseEvent(&mut tme);
+                    state.mouse_tracking = true;
+                }
+
+                let new_hover = if state.popup_in_settings {
+                    if crate::popup::point_in_rect(pt, state.back_rect) {
+                        HoveredElement::BackButton
+                    } else if crate::popup::point_in_rect(pt, state.close_rect) {
+                        HoveredElement::CloseButton
+                    } else {
+                        let mut found = HoveredElement::None;
+                        for (i, rect) in state.setting_rects.iter().enumerate() {
+                            if crate::popup::point_in_rect(pt, *rect) {
+                                found = HoveredElement::SettingRow(i);
+                                break;
+                            }
+                        }
+                        found
+                    }
+                } else if crate::popup::point_in_rect(pt, state.settings_rect) {
+                    HoveredElement::SettingsButton
+                } else if crate::popup::point_in_rect(pt, state.close_rect) {
+                    HoveredElement::CloseButton
+                } else if crate::popup::point_in_rect(pt, state.refresh_rect) {
+                    HoveredElement::RefreshButton
+                } else if crate::popup::point_in_rect(pt, state.install_rect) {
+                    HoveredElement::InstallButton
+                } else if crate::popup::point_in_rect(pt, state.chatgpt_link_rect) {
+                    HoveredElement::ChatGptLink
+                } else {
+                    HoveredElement::None
+                };
+
+                if new_hover != state.hovered_element {
+                    state.hovered_element = new_hover;
+                    let _ = windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, false);
+                }
+            }
+            LRESULT(0)
+        }
+        WM_MOUSELEAVE => {
+            if let Some(state) = APP_STATE.as_mut() {
+                state.mouse_tracking = false;
+                if state.hovered_element != HoveredElement::None {
+                    state.hovered_element = HoveredElement::None;
+                    let _ = windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, false);
+                }
+            }
+            LRESULT(0)
+        }
+        WM_SETCURSOR => {
+            if let Some(state) = APP_STATE.as_ref() {
+                if !matches!(state.hovered_element, HoveredElement::None) {
+                    let hand = LoadCursorW(None, IDC_HAND).unwrap_or_default();
+                    SetCursor(hand);
+                    return LRESULT(1);
+                }
+            }
+            DefWindowProcW(hwnd, msg, wparam, lparam)
         }
         WM_LBUTTONUP => {
             let x = (lparam.0 & 0xFFFF) as i32;
@@ -363,6 +487,13 @@ unsafe extern "system" fn popup_wnd_proc(
                     && crate::popup::point_in_rect(pt, state.back_rect)
                 {
                     state.popup_in_settings = false;
+                    let renderer = PopupRenderer::new(hwnd);
+                    let h = renderer.calculate_height(
+                        &state.usage,
+                        state.config_mgr.config.show_chatgpt_section,
+                        state.config_mgr.config.compact_mode,
+                    );
+                    resize_popup(hwnd, h);
                     let _ = windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, true);
                 } else if state.popup_in_settings
                     && crate::popup::point_in_rect(pt, state.setting_rects[0])
@@ -389,16 +520,14 @@ unsafe extern "system" fn popup_wnd_proc(
                         _ => "auto",
                     };
                     state.config_mgr.config.language = next.to_string();
-                    state.i18n =
-                        I18n::from_config(&state.config_mgr.config.language);
+                    state.i18n = I18n::from_config(&state.config_mgr.config.language);
                     state.config_mgr.save();
                     let _ = windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, true);
                 } else if state.popup_in_settings
                     && crate::popup::point_in_rect(pt, state.setting_rects[2])
                 {
                     // Compact mode: toggle
-                    state.config_mgr.config.compact_mode =
-                        !state.config_mgr.config.compact_mode;
+                    state.config_mgr.config.compact_mode = !state.config_mgr.config.compact_mode;
                     state.config_mgr.save();
                     let _ = windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, true);
                 } else if state.popup_in_settings
@@ -413,25 +542,33 @@ unsafe extern "system" fn popup_wnd_proc(
                     && crate::popup::point_in_rect(pt, state.setting_rects[4])
                 {
                     // Autostart: toggle + apply
-                    state.config_mgr.config.autostart =
-                        !state.config_mgr.config.autostart;
+                    state.config_mgr.config.autostart = !state.config_mgr.config.autostart;
                     let exe_path = state
                         .exe_dir
                         .join("claudemeter.exe")
                         .to_string_lossy()
                         .to_string();
-                    let _ = autostart::set_autostart(
-                        state.config_mgr.config.autostart,
-                        &exe_path,
-                    );
+                    let _ = autostart::set_autostart(state.config_mgr.config.autostart, &exe_path);
                     state.config_mgr.save();
                     let _ = windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, true);
                 } else if crate::popup::point_in_rect(pt, state.settings_rect) {
                     state.popup_in_settings = !state.popup_in_settings;
+                    let h = if state.popup_in_settings {
+                        settings_panel_height()
+                    } else {
+                        let renderer = PopupRenderer::new(hwnd);
+                        renderer.calculate_height(
+                            &state.usage,
+                            state.config_mgr.config.show_chatgpt_section,
+                            state.config_mgr.config.compact_mode,
+                        )
+                    };
+                    resize_popup(hwnd, h);
                     let _ = windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, true);
                 } else if crate::popup::point_in_rect(pt, state.refresh_rect) {
-                    // Find main hwnd and trigger poll
-                    trigger_poll(hwnd); // Note: passes popup hwnd; poll result goes to main
+                    state.last_updated = "...".to_string();
+                    let _ = windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, true);
+                    trigger_poll(state.main_hwnd);
                 } else if crate::popup::point_in_rect(pt, state.install_rect) {
                     let url = state.config_mgr.config.claude_install_url.clone();
                     let _ = open::that(&url);
@@ -445,6 +582,8 @@ unsafe extern "system" fn popup_wnd_proc(
         // Close popup when clicking outside (WM_KILLFOCUS)
         WM_KILLFOCUS => {
             if let Some(state) = APP_STATE.as_mut() {
+                state.hovered_element = HoveredElement::None;
+                state.mouse_tracking = false;
                 if state.popup_visible {
                     state.popup_visible = false;
                     let _ = windows::Win32::UI::WindowsAndMessaging::ShowWindow(
@@ -460,221 +599,28 @@ unsafe extern "system" fn popup_wnd_proc(
     }
 }
 
-unsafe fn draw_settings_panel(
-    hdc: windows::Win32::Graphics::Gdi::HDC,
-    rect: &RECT,
-    colors: &crate::ui::colors::ThemeColors,
-    i18n: &I18n,
-    config: &crate::config::Config,
-    back_rect: &mut RECT,
-    setting_rects: &mut [RECT; 5],
-) {
-    use windows::Win32::Graphics::Gdi::{
-        CreateSolidBrush, DeleteObject, DrawTextW, FillRect, SelectObject, SetBkMode, SetTextColor,
-        TRANSPARENT,
-    };
-
-    let bg = CreateSolidBrush(colors.background);
-    let _ = FillRect(hdc, rect, bg);
-    let _ = DeleteObject(bg);
-
-    let w = rect.right - rect.left;
-    let pad = 16i32;
-
-    // Header
-    let surf = CreateSolidBrush(colors.surface);
-    let header = RECT {
-        left: 0,
-        top: 0,
-        right: w,
-        bottom: 36,
-    };
-    let _ = FillRect(hdc, &header, surf);
-    let _ = DeleteObject(surf);
-
-    let font = create_font_helper(hdc, 13, true);
-    let old = SelectObject(hdc, font);
-    SetBkMode(hdc, TRANSPARENT);
-    SetTextColor(hdc, colors.text_primary);
-    let mut back_text = wide(i18n.t("Back"));
-    *back_rect = RECT {
-        left: pad,
-        top: 0,
-        right: w - 40,
-        bottom: 36,
-    };
-    DrawTextW(
-        hdc,
-        &mut back_text,
-        back_rect,
-        windows::Win32::Graphics::Gdi::DT_LEFT
-            | windows::Win32::Graphics::Gdi::DT_SINGLELINE
-            | windows::Win32::Graphics::Gdi::DT_VCENTER,
+/// Apply DWM rounded corners to popup window (Win11+, silently fails on Win10)
+unsafe fn apply_dwm_rounded_corners(hwnd: HWND) {
+    // DWMWA_WINDOW_CORNER_PREFERENCE = 33, DWMWCP_ROUND = 2
+    let corner_pref: u32 = 2;
+    let _ = DwmSetWindowAttribute(
+        hwnd,
+        windows::Win32::Graphics::Dwm::DWMWINDOWATTRIBUTE(33),
+        &corner_pref as *const u32 as *const _,
+        std::mem::size_of::<u32>() as u32,
     );
-
-    // Close button
-    SetTextColor(hdc, colors.text_secondary);
-    let mut close_text = wide("\u{00D7}");
-    let mut cr = RECT {
-        left: w - 32,
-        top: 0,
-        right: w - 4,
-        bottom: 36,
-    };
-    DrawTextW(
-        hdc,
-        &mut close_text,
-        &mut cr,
-        windows::Win32::Graphics::Gdi::DT_CENTER
-            | windows::Win32::Graphics::Gdi::DT_SINGLELINE
-            | windows::Win32::Graphics::Gdi::DT_VCENTER,
-    );
-
-    let _ = SelectObject(hdc, old);
-    let _ = DeleteObject(font);
-
-    let mut y = 44i32;
-
-    // Settings rows
-    let rows: &[(&str, &str)] = &[
-        (
-            "Theme",
-            &format!(
-                "{}: {}",
-                i18n.t("Theme"),
-                i18n.t(&capitalize(&config.theme))
-            ),
-        ),
-        (
-            "Language",
-            &format!("{}: {}", i18n.t("Language"), &config.language),
-        ),
-        (
-            "Compact mode",
-            &format!(
-                "[{}] {}",
-                if config.compact_mode { "x" } else { " " },
-                i18n.t("Compact mode")
-            ),
-        ),
-        (
-            "Show ChatGPT section",
-            &format!(
-                "[{}] {}",
-                if config.show_chatgpt_section {
-                    "x"
-                } else {
-                    " "
-                },
-                i18n.t("Show ChatGPT section")
-            ),
-        ),
-        (
-            "Start with Windows",
-            &format!(
-                "[{}] {}",
-                if config.autostart { "x" } else { " " },
-                i18n.t("Start with Windows")
-            ),
-        ),
-    ];
-
-    for (i, (_, row_text)) in rows.iter().enumerate() {
-        let f = create_font_helper(hdc, 11, false);
-        let old2 = SelectObject(hdc, f);
-        SetBkMode(hdc, TRANSPARENT);
-        SetTextColor(hdc, colors.text_primary);
-        let mut r = RECT {
-            left: pad,
-            top: y,
-            right: w - pad,
-            bottom: y + 22,
-        };
-        setting_rects[i] = RECT {
-            left: 0,
-            top: y,
-            right: w,
-            bottom: y + 26,
-        };
-        let mut rw = wide(row_text);
-        DrawTextW(
-            hdc,
-            &mut rw,
-            &mut r,
-            windows::Win32::Graphics::Gdi::DT_LEFT
-                | windows::Win32::Graphics::Gdi::DT_SINGLELINE
-                | windows::Win32::Graphics::Gdi::DT_VCENTER,
-        );
-        let _ = SelectObject(hdc, old2);
-        let _ = DeleteObject(f);
-        y += 26;
-    }
-
-    // Footer
-    y = rect.bottom - 50;
-    let f3 = create_font_helper(hdc, 10, false);
-    let old3 = SelectObject(hdc, f3);
-    SetBkMode(hdc, TRANSPARENT);
-    SetTextColor(hdc, colors.text_secondary);
-    let mut footer = wide("ClaudeMeter v1.0.0 by klivak\ngithub.com/klivak/claudemeter");
-    let mut fr = RECT {
-        left: pad,
-        top: y,
-        right: w - pad,
-        bottom: rect.bottom,
-    };
-    DrawTextW(
-        hdc,
-        &mut footer,
-        &mut fr,
-        windows::Win32::Graphics::Gdi::DT_LEFT | windows::Win32::Graphics::Gdi::DT_WORDBREAK,
-    );
-    let _ = SelectObject(hdc, old3);
-    let _ = DeleteObject(f3);
 }
 
-fn capitalize(s: &str) -> String {
-    let mut c = s.chars();
-    match c.next() {
-        None => String::new(),
-        Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
-    }
-}
-
-unsafe fn create_font_helper(
-    _hdc: windows::Win32::Graphics::Gdi::HDC,
-    size_pt: i32,
-    bold: bool,
-) -> windows::Win32::Graphics::Gdi::HFONT {
-    use windows::Win32::Graphics::Gdi::{
-        CLEARTYPE_QUALITY, CLIP_DEFAULT_PRECIS, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS,
-    };
-    let height = -(size_pt * 96 / 72);
-    let weight = if bold { 700i32 } else { 400i32 };
-    let face: Vec<u16> = "Segoe UI"
-        .encode_utf16()
-        .chain(std::iter::once(0))
-        .collect();
-    let mut face_arr = [0u16; 32];
-    for (i, &c) in face.iter().enumerate().take(31) {
-        face_arr[i] = c;
-    }
-    windows::Win32::Graphics::Gdi::CreateFontW(
-        height,
-        0,
-        0,
-        0,
-        weight,
-        0,
-        0,
-        0,
-        DEFAULT_CHARSET.0 as u32,
-        OUT_DEFAULT_PRECIS.0 as u32,
-        CLIP_DEFAULT_PRECIS.0 as u32,
-        CLEARTYPE_QUALITY.0 as u32,
-        0,
-        windows::core::PCWSTR(face_arr.as_ptr()),
-    )
+/// Apply DWM dark/light mode to popup window (Win11+, silently fails on Win10)
+unsafe fn apply_dwm_dark_mode(hwnd: HWND, is_dark: bool) {
+    // DWMWA_USE_IMMERSIVE_DARK_MODE = 20
+    let dark: u32 = if is_dark { 1 } else { 0 };
+    let _ = DwmSetWindowAttribute(
+        hwnd,
+        windows::Win32::Graphics::Dwm::DWMWINDOWATTRIBUTE(20),
+        &dark as *const u32 as *const _,
+        std::mem::size_of::<u32>() as u32,
+    );
 }
 
 unsafe fn toggle_popup(main_hwnd: HWND) {
@@ -691,6 +637,45 @@ unsafe fn toggle_popup(main_hwnd: HWND) {
     }
 }
 
+/// Calculate the settings panel height (header + rows + footer).
+fn settings_panel_height() -> i32 {
+    let header_h = 40;
+    let row_h = 38;
+    let num_rows = 5;
+    let legend_h = 8 + 1 + 8 + 20 + (4 * 18); // sep + gap + title + 4 icon items
+    let footer_h = 44;
+    header_h + 8 + (num_rows * row_h) + legend_h + footer_h
+}
+
+unsafe fn resize_popup(popup_hwnd: HWND, h: i32) {
+    let mut work_area = RECT::default();
+    let _ = windows::Win32::UI::WindowsAndMessaging::SystemParametersInfoW(
+        windows::Win32::UI::WindowsAndMessaging::SPI_GETWORKAREA,
+        0,
+        Some(&mut work_area as *mut RECT as *mut _),
+        windows::Win32::UI::WindowsAndMessaging::SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS(0),
+    );
+    let popup_w = crate::ui::render::POPUP_WIDTH;
+    let x = work_area.right - popup_w - 10;
+    let y = work_area.bottom - h - 10;
+
+    let _ = windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+        popup_hwnd,
+        x.max(0),
+        y.max(0),
+        popup_w,
+        h,
+        true,
+    );
+
+    // Resize D2D render target
+    if let Some(state) = APP_STATE.as_mut() {
+        if let Some(d2d) = state.d2d.as_mut() {
+            d2d.resize(popup_w as u32, h as u32);
+        }
+    }
+}
+
 unsafe fn show_popup(_main_hwnd: HWND) {
     if let Some(state) = APP_STATE.as_mut() {
         state.config_mgr.reload_if_changed();
@@ -698,33 +683,19 @@ unsafe fn show_popup(_main_hwnd: HWND) {
         let theme_mode = ThemeMode::from_str(&state.config_mgr.config.theme);
         let _resolved = resolve_theme(theme_mode);
 
-        // Calculate height
-        let renderer = PopupRenderer::new(state.popup_hwnd);
-        let h = renderer.calculate_height(
-            &state.usage,
-            state.config_mgr.config.show_chatgpt_section,
-            state.config_mgr.config.compact_mode,
-        );
+        // Calculate height based on current mode
+        let h = if state.popup_in_settings {
+            settings_panel_height()
+        } else {
+            let renderer = PopupRenderer::new(state.popup_hwnd);
+            renderer.calculate_height(
+                &state.usage,
+                state.config_mgr.config.show_chatgpt_section,
+                state.config_mgr.config.compact_mode,
+            )
+        };
 
-        // Position near taskbar
-        let mut work_area = RECT::default();
-        let _ = windows::Win32::UI::WindowsAndMessaging::SystemParametersInfoW(
-            windows::Win32::UI::WindowsAndMessaging::SPI_GETWORKAREA,
-            0,
-            Some(&mut work_area as *mut RECT as *mut _),
-            windows::Win32::UI::WindowsAndMessaging::SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS(0),
-        );
-        let x = work_area.right - crate::ui::render::POPUP_WIDTH - 10;
-        let y = work_area.bottom - h - 10;
-
-        let _ = windows::Win32::UI::WindowsAndMessaging::MoveWindow(
-            state.popup_hwnd,
-            x.max(0),
-            y.max(0),
-            crate::ui::render::POPUP_WIDTH,
-            h,
-            false,
-        );
+        resize_popup(state.popup_hwnd, h);
         let _ = windows::Win32::UI::WindowsAndMessaging::SetWindowPos(
             state.popup_hwnd,
             windows::Win32::UI::WindowsAndMessaging::HWND_TOPMOST,
@@ -901,8 +872,8 @@ unsafe fn trigger_poll(hwnd: HWND) {
 }
 
 async fn do_poll() -> (Option<UsageResponse>, Option<String>) {
-    let token = match credentials::read_claude_token() {
-        Ok(t) => t,
+    let cred_info = match credentials::read_claude_token() {
+        Ok(info) => info,
         Err(e) => {
             log::warn!("Could not read Claude token: {e}");
             return (None, Some(e.to_string()));
@@ -917,8 +888,12 @@ async fn do_poll() -> (Option<UsageResponse>, Option<String>) {
         }
     };
 
-    match client.fetch_usage(&token).await {
-        Ok(usage) => (Some(usage), None),
+    match client.fetch_usage(&cred_info.access_token).await {
+        Ok(mut usage) => {
+            usage.subscription_type = cred_info.subscription_type;
+            usage.rate_limit_tier = cred_info.rate_limit_tier;
+            (Some(usage), None)
+        }
         Err(e) => {
             log::warn!("Failed to fetch usage: {e}");
             (None, Some(e))
@@ -944,6 +919,21 @@ unsafe fn on_poll_result(_hwnd: HWND, usage: Option<UsageResponse>, error: Optio
                 // Load chart data
                 if let Ok(points) = db.query_24h_chart() {
                     state.chart_data = points.iter().map(|p| p.utilization).collect();
+                }
+            }
+
+            // Calculate 5-hour session reset lines for chart
+            state.chart_reset_lines.clear();
+            if let Some(fh) = u.five_hour.as_ref() {
+                if let Some(secs) = fh.resets_at.as_deref().and_then(crate::i18n::seconds_until) {
+                    let hours_until = secs as f64 / 3600.0;
+                    let mut hours_ago = 5.0 - hours_until;
+                    while hours_ago <= 24.0 {
+                        if hours_ago > 0.0 {
+                            state.chart_reset_lines.push(hours_ago);
+                        }
+                        hours_ago += 5.0;
+                    }
                 }
             }
 
@@ -996,8 +986,17 @@ unsafe fn on_poll_result(_hwnd: HWND, usage: Option<UsageResponse>, error: Optio
             tray.update(&state.usage, &tooltip);
         }
 
-        // Refresh popup if visible
-        if state.popup_visible {
+        // Refresh popup if visible (resize + repaint)
+        if state.popup_visible && !state.popup_in_settings {
+            let renderer = PopupRenderer::new(state.popup_hwnd);
+            let h = renderer.calculate_height(
+                &state.usage,
+                state.config_mgr.config.show_chatgpt_section,
+                state.config_mgr.config.compact_mode,
+            );
+            resize_popup(state.popup_hwnd, h);
+            let _ = windows::Win32::Graphics::Gdi::InvalidateRect(state.popup_hwnd, None, true);
+        } else if state.popup_visible {
             let _ = windows::Win32::Graphics::Gdi::InvalidateRect(state.popup_hwnd, None, true);
         }
     }

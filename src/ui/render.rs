@@ -1,32 +1,241 @@
-/// Rendering helpers for the popup window using GDI.
+/// Rendering helpers for the popup window using Direct2D + DirectWrite.
 ///
-/// The rendering is done entirely with Win32 GDI calls:
-/// - FillRect for backgrounds and progress bars
-/// - DrawTextW for text rendering
-/// - MoveToEx + LineTo for separators
+/// Replaces the legacy GDI rendering with hardware-accelerated Direct2D:
+/// - ID2D1HwndRenderTarget for all drawing (auto double-buffered)
+/// - IDWriteTextFormat for high-quality ClearType text
+/// - Antialiased rounded rectangles, ellipses, lines
 ///
-/// All coordinates are in logical pixels (DPI-scaled by Windows automatically
-/// when PerMonitorV2 DPI awareness is set and we use the correct DPI scaling).
+/// All coordinates are in DIPs (device-independent pixels, 1 DIP = 1/96 inch).
 use crate::i18n::{format_duration, seconds_until, I18n};
 use crate::providers::claude::{format_metric_name, UsageResponse};
-use crate::ui::colors::{ColorRef, ThemeColors};
-use windows::Win32::Foundation::{COLORREF, HWND, RECT};
-use windows::Win32::Graphics::Gdi::{
-    CreateFontW, CreatePen, CreateSolidBrush, DeleteObject, DrawTextW, FillRect, GetDC,
-    GetDeviceCaps, LineTo, MoveToEx, ReleaseDC, SelectObject, SetBkMode, SetTextColor,
-    DT_END_ELLIPSIS, DT_LEFT, DT_SINGLELINE, DT_VCENTER, HDC, LOGPIXELSX, PS_SOLID, TRANSPARENT,
+use crate::ui::colors::{colorref_to_d2d, ThemeColors};
+use std::collections::HashMap;
+use windows::core::PCWSTR;
+use windows::Win32::Foundation::{HWND, RECT};
+use windows::Win32::Graphics::Direct2D::Common::{
+    D2D1_ALPHA_MODE_PREMULTIPLIED, D2D1_COLOR_F, D2D1_PIXEL_FORMAT, D2D_POINT_2F, D2D_RECT_F,
+    D2D_SIZE_U,
 };
+use windows::Win32::Graphics::Direct2D::{
+    D2D1CreateFactory, ID2D1Factory, ID2D1HwndRenderTarget, D2D1_DRAW_TEXT_OPTIONS_NONE,
+    D2D1_ELLIPSE, D2D1_FACTORY_TYPE_SINGLE_THREADED, D2D1_HWND_RENDER_TARGET_PROPERTIES,
+    D2D1_PRESENT_OPTIONS_NONE, D2D1_RENDER_TARGET_PROPERTIES, D2D1_ROUNDED_RECT,
+};
+use windows::Win32::Graphics::DirectWrite::{
+    DWriteCreateFactory, IDWriteFactory, IDWriteTextFormat, DWRITE_FACTORY_TYPE_SHARED,
+    DWRITE_FONT_STRETCH_NORMAL, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_WEIGHT_BOLD,
+    DWRITE_FONT_WEIGHT_REGULAR, DWRITE_MEASURING_MODE_NATURAL, DWRITE_PARAGRAPH_ALIGNMENT_CENTER,
+    DWRITE_PARAGRAPH_ALIGNMENT_NEAR, DWRITE_TEXT_ALIGNMENT_CENTER, DWRITE_TEXT_ALIGNMENT_LEADING,
+    DWRITE_TEXT_ALIGNMENT_TRAILING, DWRITE_WORD_WRAPPING_WRAP,
+};
+use windows::Win32::Graphics::Dxgi::Common::DXGI_FORMAT_B8G8R8A8_UNORM;
+use windows::Win32::Graphics::Gdi::{GetDC, GetDeviceCaps, ReleaseDC, LOGPIXELSX};
 
-pub const POPUP_WIDTH: i32 = 360;
-pub const HEADER_HEIGHT: i32 = 36;
+pub const POPUP_WIDTH: i32 = 380;
+pub const HEADER_HEIGHT: i32 = 40;
 pub const PADDING: i32 = 16;
-pub const METRIC_LABEL_H: i32 = 20;
-pub const PROGRESS_H: i32 = 10;
+pub const METRIC_LABEL_H: i32 = 22;
+pub const PROGRESS_H: i32 = 14;
 pub const RESET_LABEL_H: i32 = 18;
 pub const SECTION_GAP: i32 = 14;
 pub const ITEM_GAP: i32 = 8;
 pub const SEPARATOR_H: i32 = 1;
-pub const FOOTER_H: i32 = 36;
+pub const FOOTER_H: i32 = 38;
+
+// --- HoveredElement enum ---
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum HoveredElement {
+    None,
+    SettingsButton,
+    CloseButton,
+    RefreshButton,
+    InstallButton,
+    ChatGptLink,
+    BackButton,
+    SettingRow(usize),
+}
+
+// --- Text format cache key ---
+
+#[derive(Hash, Eq, PartialEq, Clone)]
+struct TextFormatKey {
+    size_pt: i32,
+    bold: bool,
+    h_align: u8, // 0=leading, 1=trailing, 2=center
+    v_align: u8, // 0=near, 1=center
+}
+
+// --- D2DResources ---
+
+pub struct D2DResources {
+    pub factory: ID2D1Factory,
+    pub dwrite_factory: IDWriteFactory,
+    pub render_target: Option<ID2D1HwndRenderTarget>,
+    text_formats: HashMap<TextFormatKey, IDWriteTextFormat>,
+}
+
+impl D2DResources {
+    pub fn new() -> Result<Self, String> {
+        unsafe {
+            let factory: ID2D1Factory = D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, None)
+                .map_err(|e| format!("D2D1CreateFactory failed: {e}"))?;
+
+            let dwrite_factory: IDWriteFactory = DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED)
+                .map_err(|e| format!("DWriteCreateFactory failed: {e}"))?;
+
+            Ok(Self {
+                factory,
+                dwrite_factory,
+                render_target: None,
+                text_formats: HashMap::new(),
+            })
+        }
+    }
+
+    pub fn ensure_render_target(&mut self, hwnd: HWND) -> Result<(), String> {
+        if self.render_target.is_some() {
+            return Ok(());
+        }
+        unsafe {
+            let mut rc = RECT::default();
+            let _ = windows::Win32::UI::WindowsAndMessaging::GetClientRect(hwnd, &mut rc);
+
+            let size = D2D_SIZE_U {
+                width: (rc.right - rc.left).max(1) as u32,
+                height: (rc.bottom - rc.top).max(1) as u32,
+            };
+
+            let pixel_format = D2D1_PIXEL_FORMAT {
+                format: DXGI_FORMAT_B8G8R8A8_UNORM,
+                alphaMode: D2D1_ALPHA_MODE_PREMULTIPLIED,
+            };
+
+            let rt_props = D2D1_RENDER_TARGET_PROPERTIES {
+                pixelFormat: pixel_format,
+                dpiX: 96.0,
+                dpiY: 96.0,
+                ..Default::default()
+            };
+
+            let hwnd_props = D2D1_HWND_RENDER_TARGET_PROPERTIES {
+                hwnd,
+                pixelSize: size,
+                presentOptions: D2D1_PRESENT_OPTIONS_NONE,
+            };
+
+            let rt = self
+                .factory
+                .CreateHwndRenderTarget(&rt_props, &hwnd_props)
+                .map_err(|e| format!("CreateHwndRenderTarget failed: {e}"))?;
+
+            self.render_target = Some(rt);
+        }
+        Ok(())
+    }
+
+    pub fn resize(&mut self, w: u32, h: u32) {
+        if let Some(rt) = self.render_target.as_ref() {
+            let size = D2D_SIZE_U {
+                width: w.max(1),
+                height: h.max(1),
+            };
+            unsafe {
+                let _ = rt.Resize(&size);
+            }
+        }
+    }
+
+    pub fn discard_render_target(&mut self) {
+        self.render_target = None;
+    }
+
+    fn get_text_format(
+        &mut self,
+        size_pt: i32,
+        bold: bool,
+        h_align: u8,
+        v_align: u8,
+    ) -> &IDWriteTextFormat {
+        let key = TextFormatKey {
+            size_pt,
+            bold,
+            h_align,
+            v_align,
+        };
+        if !self.text_formats.contains_key(&key) {
+            let weight = if bold {
+                DWRITE_FONT_WEIGHT_BOLD
+            } else {
+                DWRITE_FONT_WEIGHT_REGULAR
+            };
+            // Convert pt to DIPs: 1pt = 96/72 DIPs
+            let font_size = size_pt as f32 * 96.0 / 72.0;
+            let font_name = wide("Segoe UI");
+            let locale = wide("en-us");
+            let format = unsafe {
+                self.dwrite_factory
+                    .CreateTextFormat(
+                        PCWSTR(font_name.as_ptr()),
+                        None,
+                        weight,
+                        DWRITE_FONT_STYLE_NORMAL,
+                        DWRITE_FONT_STRETCH_NORMAL,
+                        font_size,
+                        PCWSTR(locale.as_ptr()),
+                    )
+                    .expect("CreateTextFormat failed")
+            };
+            // Set alignment
+            unsafe {
+                let h = match h_align {
+                    1 => DWRITE_TEXT_ALIGNMENT_TRAILING,
+                    2 => DWRITE_TEXT_ALIGNMENT_CENTER,
+                    _ => DWRITE_TEXT_ALIGNMENT_LEADING,
+                };
+                let v = match v_align {
+                    1 => DWRITE_PARAGRAPH_ALIGNMENT_CENTER,
+                    _ => DWRITE_PARAGRAPH_ALIGNMENT_NEAR,
+                };
+                let _ = format.SetTextAlignment(h);
+                let _ = format.SetParagraphAlignment(v);
+            }
+            self.text_formats.insert(key.clone(), format);
+        }
+        self.text_formats.get(&key).unwrap()
+    }
+
+    /// Get a text format for word-wrapping text
+    fn get_text_format_wrap(&mut self, size_pt: i32, bold: bool) -> IDWriteTextFormat {
+        let weight = if bold {
+            DWRITE_FONT_WEIGHT_BOLD
+        } else {
+            DWRITE_FONT_WEIGHT_REGULAR
+        };
+        let font_size = size_pt as f32 * 96.0 / 72.0;
+        let font_name = wide("Segoe UI");
+        let locale = wide("en-us");
+        let format = unsafe {
+            self.dwrite_factory
+                .CreateTextFormat(
+                    PCWSTR(font_name.as_ptr()),
+                    None,
+                    weight,
+                    DWRITE_FONT_STYLE_NORMAL,
+                    DWRITE_FONT_STRETCH_NORMAL,
+                    font_size,
+                    PCWSTR(locale.as_ptr()),
+                )
+                .expect("CreateTextFormat failed")
+        };
+        unsafe {
+            let _ = format.SetWordWrapping(DWRITE_WORD_WRAPPING_WRAP);
+        }
+        format
+    }
+}
+
+// --- PopupRenderer ---
 
 pub struct PopupRenderer {
     pub dpi_scale: f32,
@@ -47,7 +256,12 @@ impl PopupRenderer {
         (px as f32 * self.dpi_scale) as i32
     }
 
+    fn sf(&self, px: i32) -> f32 {
+        px as f32 * self.dpi_scale
+    }
+
     /// Calculate the total height needed for the popup in full mode.
+    /// Must exactly mirror the layout in draw() to prevent clipping.
     pub fn calculate_height(
         &self,
         usage: &Option<UsageResponse>,
@@ -62,43 +276,48 @@ impl PopupRenderer {
                 .max(1) as i32;
             return self.scale(
                 HEADER_HEIGHT
+                    + SEPARATOR_H
                     + PADDING
-                    + metric_count * (PROGRESS_H + ITEM_GAP)
+                    + metric_count * (16 + 8 + ITEM_GAP)
                     + PADDING
+                    + SEPARATOR_H
                     + FOOTER_H,
             );
         }
 
-        let mut h = HEADER_HEIGHT + PADDING;
+        let mut h = 0;
+        h += HEADER_HEIGHT;
+        h += SEPARATOR_H;
+        h += PADDING;
 
         match usage {
             None => {
-                h += 120; // "not detected" message
+                h += 28 + 70 + 28 + 8;
             }
             Some(u) => {
+                h += 24;
                 let metric_count = u.all_metrics().len() as i32;
-                // Each metric: label + progress bar + reset label + gap
-                h += metric_count * (METRIC_LABEL_H + PROGRESS_H + RESET_LABEL_H + SECTION_GAP);
-                h += SECTION_GAP; // after section
+                h += metric_count
+                    * (METRIC_LABEL_H + 4 + PROGRESS_H + 4 + RESET_LABEL_H + SECTION_GAP);
             }
         }
 
         if show_chatgpt {
-            h += 10 + 20 + 40 + 28 + 10; // section header + info text + link
+            h += SEPARATOR_H + 8 + 24 + 55 + 28;
         }
 
         h += SEPARATOR_H + PADDING;
-        // History chart
-        h += 20 + 80 + PADDING;
-
+        h += 22 + 70 + 4 + 14;
+        h += PADDING;
         h += SEPARATOR_H + FOOTER_H;
 
         self.scale(h)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn draw(
         &self,
-        hdc: HDC,
+        d2d: &mut D2DResources,
         rect: &RECT,
         usage: &Option<UsageResponse>,
         last_updated: &str,
@@ -107,144 +326,209 @@ impl PopupRenderer {
         colors: &ThemeColors,
         i18n: &I18n,
         chart_data: &[f64],
+        reset_lines: &[f64],
         last_error: &Option<String>,
-        // Button hit areas (output)
+        hovered: &HoveredElement,
         settings_rect: &mut RECT,
         close_rect: &mut RECT,
         refresh_rect: &mut RECT,
         install_rect: &mut RECT,
         chatgpt_link_rect: &mut RECT,
     ) {
-        let w = rect.right - rect.left;
+        let Some(rt) = d2d.render_target.clone() else {
+            return;
+        };
+        let w = (rect.right - rect.left) as f32;
 
         unsafe {
-            // Background
-            let bg_brush = CreateSolidBrush(colors.background);
-            let _ = FillRect(hdc, rect, bg_brush);
-            let _ = DeleteObject(bg_brush);
-
-            let mut y = 0i32;
+            let mut y = 0.0f32;
 
             // Header
-            y = self.draw_header(hdc, w, y, colors, i18n, settings_rect, close_rect);
+            y = self.draw_header(
+                &rt,
+                d2d,
+                w,
+                y,
+                colors,
+                i18n,
+                hovered,
+                settings_rect,
+                close_rect,
+            );
 
             // Separator
-            y = self.draw_separator(hdc, w, y, colors);
+            y = self.draw_separator(&rt, w, y, colors);
 
-            y += self.scale(PADDING);
+            y += self.sf(PADDING);
 
             if compact {
-                y = self.draw_compact_metrics(hdc, w, y, usage, colors, i18n);
+                y = self.draw_compact_metrics(&rt, d2d, w, y, usage, colors);
             } else {
                 match usage {
                     None => {
                         y = self.draw_not_detected(
-                            hdc, w, y, colors, i18n, last_error, install_rect,
+                            &rt,
+                            d2d,
+                            w,
+                            y,
+                            colors,
+                            i18n,
+                            last_error,
+                            install_rect,
                         );
                     }
                     Some(u) => {
-                        y = self.draw_claude_section(hdc, w, y, u, colors, i18n);
+                        y = self.draw_claude_section(&rt, d2d, w, y, u, colors, i18n);
                     }
                 }
 
                 if show_chatgpt {
-                    y = self.draw_separator(hdc, w, y, colors);
-                    y += self.scale(8);
-                    y = self.draw_chatgpt_section(hdc, w, y, colors, i18n, chatgpt_link_rect);
+                    y = self.draw_separator(&rt, w, y, colors);
+                    y += self.sf(8);
+                    y = self.draw_chatgpt_section(&rt, d2d, w, y, colors, i18n, chatgpt_link_rect);
                 }
 
                 // History chart
-                y = self.draw_separator(hdc, w, y, colors);
-                y += self.scale(PADDING);
-                y = self.draw_chart(hdc, w, y, chart_data, colors, i18n);
-                y += self.scale(PADDING);
+                y = self.draw_separator(&rt, w, y, colors);
+                y += self.sf(PADDING);
+                y = self.draw_chart(&rt, d2d, w, y, chart_data, reset_lines, colors, i18n);
+                y += self.sf(PADDING);
             }
 
             // Footer
-            self.draw_separator(hdc, w, y, colors);
+            self.draw_separator(&rt, w, y, colors);
             self.draw_footer(
-                hdc,
+                &rt,
+                d2d,
                 w,
-                y + self.scale(SEPARATOR_H),
+                y + self.sf(SEPARATOR_H),
                 last_updated,
                 colors,
                 i18n,
+                hovered,
                 refresh_rect,
             );
+
+            // 1px border
+            self.draw_border(&rt, w, (rect.bottom - rect.top) as f32, colors);
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     unsafe fn draw_header(
         &self,
-        hdc: HDC,
-        w: i32,
-        y: i32,
+        rt: &ID2D1HwndRenderTarget,
+        d2d: &mut D2DResources,
+        w: f32,
+        y: f32,
         colors: &ThemeColors,
         i18n: &I18n,
+        hovered: &HoveredElement,
         settings_rect: &mut RECT,
         close_rect: &mut RECT,
-    ) -> i32 {
-        let h = self.scale(HEADER_HEIGHT);
-        let surface_brush = CreateSolidBrush(colors.surface);
-        let header_rect = RECT {
-            left: 0,
-            top: y,
-            right: w,
-            bottom: y + h,
-        };
-        let _ = FillRect(hdc, &header_rect, surface_brush);
-        let _ = DeleteObject(surface_brush);
+    ) -> f32 {
+        let h = self.sf(HEADER_HEIGHT);
+        let pad = self.sf(PADDING);
 
-        // Title
-        let font = self.create_font(14, true);
-        let old_font = SelectObject(hdc, font);
-        SetBkMode(hdc, TRANSPARENT);
-        SetTextColor(hdc, colors.text_primary);
-        let mut title = wide(i18n.t("ClaudeMeter"));
-        let mut text_rect = RECT {
-            left: self.scale(PADDING),
-            top: y,
-            right: w - self.scale(80),
-            bottom: y + h,
-        };
-        DrawTextW(
-            hdc,
-            &mut title,
-            &mut text_rect,
-            DT_LEFT | DT_SINGLELINE | DT_VCENTER,
+        // Header background
+        let surface_brush = rt
+            .CreateSolidColorBrush(&colorref_to_d2d(colors.surface) as *const _, None)
+            .unwrap();
+        rt.FillRectangle(
+            &D2D_RECT_F {
+                left: 0.0,
+                top: y,
+                right: w,
+                bottom: y + h,
+            },
+            &surface_brush,
         );
-        let _ = SelectObject(hdc, old_font);
-        let _ = DeleteObject(font);
+
+        // Title "ClaudeMeter"
+        let title_text = wide(i18n.t("ClaudeMeter"));
+        let title_format = d2d.get_text_format(14, true, 0, 1).clone();
+        let title_brush = rt
+            .CreateSolidColorBrush(&colorref_to_d2d(colors.text_primary) as *const _, None)
+            .unwrap();
+        rt.DrawText(
+            &title_text[..title_text.len() - 1],
+            &title_format,
+            &D2D_RECT_F {
+                left: pad,
+                top: y,
+                right: w - self.sf(80),
+                bottom: y + h,
+            },
+            &title_brush,
+            D2D1_DRAW_TEXT_OPTIONS_NONE,
+            DWRITE_MEASURING_MODE_NATURAL,
+        );
 
         // ⚙ button
-        let btn_size = self.scale(28);
-        let btn_y = y + (h - btn_size) / 2;
-        *settings_rect = RECT {
-            left: w - self.scale(64),
+        let btn_size = self.sf(28);
+        let btn_y = y + (h - btn_size) / 2.0;
+        let settings_r = D2D_RECT_F {
+            left: w - self.sf(64),
             top: btn_y,
-            right: w - self.scale(36),
+            right: w - self.sf(36),
             bottom: btn_y + btn_size,
         };
+        *settings_rect = to_win32_rect(&settings_r);
+
+        // Hover highlight for settings button
+        if matches!(hovered, HoveredElement::SettingsButton) {
+            let hover_brush = rt
+                .CreateSolidColorBrush(&colorref_to_d2d(colors.hover) as *const _, None)
+                .unwrap();
+            rt.FillRoundedRectangle(
+                &D2D1_ROUNDED_RECT {
+                    rect: settings_r,
+                    radiusX: 4.0,
+                    radiusY: 4.0,
+                },
+                &hover_brush,
+            );
+        }
+
         self.draw_text_centered(
-            hdc,
+            rt,
+            d2d,
             "\u{2699}",
-            *settings_rect,
+            settings_r,
             colors.text_secondary,
             14,
             false,
         );
 
         // × button
-        *close_rect = RECT {
-            left: w - self.scale(32),
+        let close_r = D2D_RECT_F {
+            left: w - self.sf(32),
             top: btn_y,
-            right: w - self.scale(4),
+            right: w - self.sf(4),
             bottom: btn_y + btn_size,
         };
+        *close_rect = to_win32_rect(&close_r);
+
+        // Hover highlight for close button
+        if matches!(hovered, HoveredElement::CloseButton) {
+            let hover_brush = rt
+                .CreateSolidColorBrush(&colorref_to_d2d(colors.hover) as *const _, None)
+                .unwrap();
+            rt.FillRoundedRectangle(
+                &D2D1_ROUNDED_RECT {
+                    rect: close_r,
+                    radiusX: 4.0,
+                    radiusY: 4.0,
+                },
+                &hover_brush,
+            );
+        }
+
         self.draw_text_centered(
-            hdc,
+            rt,
+            d2d,
             "\u{00D7}",
-            *close_rect,
+            close_r,
             colors.text_secondary,
             14,
             false,
@@ -253,57 +537,72 @@ impl PopupRenderer {
         y + h
     }
 
-    unsafe fn draw_separator(&self, hdc: HDC, w: i32, y: i32, colors: &ThemeColors) -> i32 {
-        let pen = CreatePen(PS_SOLID, 1, colors.separator);
-        let old_pen = SelectObject(hdc, pen);
-        let _ = MoveToEx(hdc, 0, y, None);
-        let _ = LineTo(hdc, w, y);
-        let _ = SelectObject(hdc, old_pen);
-        let _ = DeleteObject(pen);
-        y + self.scale(SEPARATOR_H)
+    unsafe fn draw_separator(
+        &self,
+        rt: &ID2D1HwndRenderTarget,
+        w: f32,
+        y: f32,
+        colors: &ThemeColors,
+    ) -> f32 {
+        let brush = rt
+            .CreateSolidColorBrush(&colorref_to_d2d(colors.separator) as *const _, None)
+            .unwrap();
+        rt.DrawLine(
+            D2D_POINT_2F { x: 0.0, y },
+            D2D_POINT_2F { x: w, y },
+            &brush,
+            1.0,
+            None,
+        );
+        y + self.sf(SEPARATOR_H)
     }
 
     unsafe fn draw_claude_section(
         &self,
-        hdc: HDC,
-        w: i32,
-        mut y: i32,
+        rt: &ID2D1HwndRenderTarget,
+        d2d: &mut D2DResources,
+        w: f32,
+        mut y: f32,
         usage: &UsageResponse,
         colors: &ThemeColors,
         i18n: &I18n,
-    ) -> i32 {
+    ) -> f32 {
+        let pad = self.sf(PADDING);
+
         // Section header: "☁ CLAUDE · Pro plan"
-        let plan = i18n.t(usage.detected_plan());
+        let detected = usage.detected_plan();
+        let plan = i18n.t(&detected);
         let header_str = format!(
             "\u{2601} {} \u{00B7} {} {}",
             i18n.t("CLAUDE"),
             i18n.t("Plan"),
             plan
         );
-        let font = self.create_font(12, true);
-        let old_font = SelectObject(hdc, font);
-        SetBkMode(hdc, TRANSPARENT);
-        SetTextColor(hdc, colors.text_secondary);
-        let mut r = RECT {
-            left: self.scale(PADDING),
-            top: y,
-            right: w - self.scale(PADDING),
-            bottom: y + self.scale(20),
-        };
-        let mut header_wide = wide(&header_str);
-        DrawTextW(
-            hdc,
-            &mut header_wide,
-            &mut r,
-            DT_LEFT | DT_SINGLELINE | DT_VCENTER,
+
+        let header_text = wide(&header_str);
+        let format = d2d.get_text_format(12, true, 0, 1).clone();
+        let brush = rt
+            .CreateSolidColorBrush(&colorref_to_d2d(colors.text_secondary) as *const _, None)
+            .unwrap();
+        rt.DrawText(
+            &header_text[..header_text.len() - 1],
+            &format,
+            &D2D_RECT_F {
+                left: pad,
+                top: y,
+                right: w - pad,
+                bottom: y + self.sf(20),
+            },
+            &brush,
+            D2D1_DRAW_TEXT_OPTIONS_NONE,
+            DWRITE_MEASURING_MODE_NATURAL,
         );
-        let _ = SelectObject(hdc, old_font);
-        let _ = DeleteObject(font);
-        y += self.scale(24);
+        y += self.sf(24);
 
         for (key, metric) in usage.all_metrics() {
             y = self.draw_metric(
-                hdc,
+                rt,
+                d2d,
                 w,
                 y,
                 &key,
@@ -312,99 +611,121 @@ impl PopupRenderer {
                 colors,
                 i18n,
             );
-            y += self.scale(SECTION_GAP);
+            y += self.sf(SECTION_GAP);
         }
 
         y
     }
 
+    #[allow(clippy::too_many_arguments)]
     unsafe fn draw_metric(
         &self,
-        hdc: HDC,
-        w: i32,
-        mut y: i32,
+        rt: &ID2D1HwndRenderTarget,
+        d2d: &mut D2DResources,
+        w: f32,
+        mut y: f32,
         key: &str,
         utilization: f64,
         resets_at: Option<&str>,
         colors: &ThemeColors,
         i18n: &I18n,
-    ) -> i32 {
-        let pad = self.scale(PADDING);
-        let content_w = w - pad * 2;
+    ) -> f32 {
+        let pad = self.sf(PADDING);
+        let content_w = w - pad * 2.0;
+        let bar_h = self.sf(PROGRESS_H);
+        let radius = bar_h / 2.0;
 
         // Label + percentage on same line
         let metric_name_str = format_metric_name(key);
         let display_name = i18n.t(&metric_name_str);
         let pct_str = format!("{:.0}%", utilization);
 
-        let font_label = self.create_font(12, false);
-        let old_font = SelectObject(hdc, font_label);
-        SetBkMode(hdc, TRANSPARENT);
-        SetTextColor(hdc, colors.text_primary);
-
-        let mut label_rect = RECT {
-            left: pad,
-            top: y,
-            right: w - pad - self.scale(40),
-            bottom: y + self.scale(METRIC_LABEL_H),
-        };
-        let mut label_wide = wide(display_name);
-        DrawTextW(
-            hdc,
-            &mut label_wide,
-            &mut label_rect,
-            DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS,
-        );
-
-        // Percentage right-aligned
-        SetTextColor(hdc, colors.progress_color(utilization));
-        let mut pct_rect = RECT {
-            left: w - pad - self.scale(40),
-            top: y,
-            right: w - pad,
-            bottom: y + self.scale(METRIC_LABEL_H),
-        };
-        let mut pct_wide = wide(&pct_str);
-        DrawTextW(
-            hdc,
-            &mut pct_wide,
-            &mut pct_rect,
-            windows::Win32::Graphics::Gdi::DT_RIGHT | DT_SINGLELINE | DT_VCENTER,
-        );
-
-        let _ = SelectObject(hdc, old_font);
-        let _ = DeleteObject(font_label);
-
-        y += self.scale(METRIC_LABEL_H + 4);
-
-        // Progress bar background
-        let bar_rect = RECT {
-            left: pad,
-            top: y,
-            right: pad + content_w,
-            bottom: y + self.scale(PROGRESS_H),
-        };
-        let bg_brush = CreateSolidBrush(colors.progress_bg);
-        let _ = FillRect(hdc, &bar_rect, bg_brush);
-        let _ = DeleteObject(bg_brush);
-
-        // Progress bar fill
-        let fill_w = ((content_w as f64 * utilization / 100.0) as i32)
-            .max(0)
-            .min(content_w);
-        if fill_w > 0 {
-            let fill_rect = RECT {
+        // Label (left)
+        let label_text = wide(display_name);
+        let label_format = d2d.get_text_format(12, false, 0, 1).clone();
+        let label_brush = rt
+            .CreateSolidColorBrush(&colorref_to_d2d(colors.text_primary) as *const _, None)
+            .unwrap();
+        rt.DrawText(
+            &label_text[..label_text.len() - 1],
+            &label_format,
+            &D2D_RECT_F {
                 left: pad,
                 top: y,
-                right: pad + fill_w,
-                bottom: y + self.scale(PROGRESS_H),
-            };
-            let fill_brush = CreateSolidBrush(colors.progress_color(utilization));
-            let _ = FillRect(hdc, &fill_rect, fill_brush);
-            let _ = DeleteObject(fill_brush);
+                right: w - pad - self.sf(50),
+                bottom: y + self.sf(METRIC_LABEL_H),
+            },
+            &label_brush,
+            D2D1_DRAW_TEXT_OPTIONS_NONE,
+            DWRITE_MEASURING_MODE_NATURAL,
+        );
+
+        // Percentage (right, bold, colored)
+        let pct_text = wide(&pct_str);
+        let pct_format = d2d.get_text_format(12, true, 1, 1).clone();
+        let pct_color = colorref_to_d2d(colors.progress_color(utilization));
+        let pct_brush = rt
+            .CreateSolidColorBrush(&pct_color as *const _, None)
+            .unwrap();
+        rt.DrawText(
+            &pct_text[..pct_text.len() - 1],
+            &pct_format,
+            &D2D_RECT_F {
+                left: w - pad - self.sf(50),
+                top: y,
+                right: w - pad,
+                bottom: y + self.sf(METRIC_LABEL_H),
+            },
+            &pct_brush,
+            D2D1_DRAW_TEXT_OPTIONS_NONE,
+            DWRITE_MEASURING_MODE_NATURAL,
+        );
+
+        y += self.sf(METRIC_LABEL_H + 4);
+
+        // Progress bar background (rounded)
+        let bg_brush = rt
+            .CreateSolidColorBrush(&colorref_to_d2d(colors.progress_bg) as *const _, None)
+            .unwrap();
+        rt.FillRoundedRectangle(
+            &D2D1_ROUNDED_RECT {
+                rect: D2D_RECT_F {
+                    left: pad,
+                    top: y,
+                    right: pad + content_w,
+                    bottom: y + bar_h,
+                },
+                radiusX: radius,
+                radiusY: radius,
+            },
+            &bg_brush,
+        );
+
+        // Progress bar fill (rounded)
+        let fill_w = (content_w * utilization as f32 / 100.0)
+            .max(0.0)
+            .min(content_w);
+        if fill_w > 0.5 {
+            let fill_color = colorref_to_d2d(colors.progress_color(utilization));
+            let fill_brush = rt
+                .CreateSolidColorBrush(&fill_color as *const _, None)
+                .unwrap();
+            rt.FillRoundedRectangle(
+                &D2D1_ROUNDED_RECT {
+                    rect: D2D_RECT_F {
+                        left: pad,
+                        top: y,
+                        right: pad + fill_w,
+                        bottom: y + bar_h,
+                    },
+                    radiusX: radius.min(fill_w / 2.0),
+                    radiusY: radius,
+                },
+                &fill_brush,
+            );
         }
 
-        y += self.scale(PROGRESS_H + 4);
+        y += bar_h + self.sf(4);
 
         // Reset time
         if let Some(reset_str) = resets_at {
@@ -419,26 +740,28 @@ impl PopupRenderer {
             };
 
             if !reset_text.is_empty() {
-                let font_small = self.create_font(11, false);
-                let old_font2 = SelectObject(hdc, font_small);
-                SetBkMode(hdc, TRANSPARENT);
-                SetTextColor(hdc, colors.text_secondary);
-                let mut reset_rect = RECT {
-                    left: pad,
-                    top: y,
-                    right: w - pad,
-                    bottom: y + self.scale(RESET_LABEL_H),
-                };
-                let mut reset_wide = wide(&reset_text);
-                DrawTextW(
-                    hdc,
-                    &mut reset_wide,
-                    &mut reset_rect,
-                    DT_LEFT | DT_SINGLELINE | DT_VCENTER,
+                let text = wide(&reset_text);
+                let format = d2d.get_text_format(10, false, 0, 1).clone();
+                let brush = rt
+                    .CreateSolidColorBrush(
+                        &colorref_to_d2d(colors.text_secondary) as *const _,
+                        None,
+                    )
+                    .unwrap();
+                rt.DrawText(
+                    &text[..text.len() - 1],
+                    &format,
+                    &D2D_RECT_F {
+                        left: pad,
+                        top: y,
+                        right: w - pad,
+                        bottom: y + self.sf(RESET_LABEL_H),
+                    },
+                    &brush,
+                    D2D1_DRAW_TEXT_OPTIONS_NONE,
+                    DWRITE_MEASURING_MODE_NATURAL,
                 );
-                let _ = SelectObject(hdc, old_font2);
-                let _ = DeleteObject(font_small);
-                y += self.scale(RESET_LABEL_H);
+                y += self.sf(RESET_LABEL_H);
             }
         }
 
@@ -447,15 +770,15 @@ impl PopupRenderer {
 
     unsafe fn draw_compact_metrics(
         &self,
-        hdc: HDC,
-        w: i32,
-        mut y: i32,
+        rt: &ID2D1HwndRenderTarget,
+        d2d: &mut D2DResources,
+        w: f32,
+        mut y: f32,
         usage: &Option<UsageResponse>,
         colors: &ThemeColors,
-        _i18n: &I18n,
-    ) -> i32 {
-        let pad = self.scale(PADDING);
-        let content_w = w - pad * 2;
+    ) -> f32 {
+        let pad = self.sf(PADDING);
+        let content_w = w - pad * 2.0;
 
         let metrics: Vec<(String, f64)> = match usage {
             Some(u) => u
@@ -468,86 +791,100 @@ impl PopupRenderer {
 
         for (name, utilization) in &metrics {
             // Label
-            let font = self.create_font(11, false);
-            let old_font = SelectObject(hdc, font);
-            SetBkMode(hdc, TRANSPARENT);
-            SetTextColor(hdc, colors.text_primary);
-            let mut label_rect = RECT {
-                left: pad,
-                top: y,
-                right: w - pad - self.scale(35),
-                bottom: y + self.scale(16),
-            };
-            let mut label_wide = wide(name);
-            DrawTextW(
-                hdc,
-                &mut label_wide,
-                &mut label_rect,
-                DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS,
-            );
-
-            SetTextColor(hdc, colors.progress_color(*utilization));
-            let pct = format!("{:.0}%", utilization);
-            let mut pct_rect = RECT {
-                left: w - pad - self.scale(35),
-                top: y,
-                right: w - pad,
-                bottom: y + self.scale(16),
-            };
-            let mut pct_wide = wide(&pct);
-            DrawTextW(
-                hdc,
-                &mut pct_wide,
-                &mut pct_rect,
-                windows::Win32::Graphics::Gdi::DT_RIGHT | DT_SINGLELINE | DT_VCENTER,
-            );
-            let _ = SelectObject(hdc, old_font);
-            let _ = DeleteObject(font);
-            y += self.scale(16);
-
-            // Progress bar
-            let bar_rect = RECT {
-                left: pad,
-                top: y,
-                right: pad + content_w,
-                bottom: y + self.scale(8),
-            };
-            let bg = CreateSolidBrush(colors.progress_bg);
-            let _ = FillRect(hdc, &bar_rect, bg);
-            let _ = DeleteObject(bg);
-            let fill_w = ((content_w as f64 * utilization / 100.0) as i32)
-                .max(0)
-                .min(content_w);
-            if fill_w > 0 {
-                let fill_rect = RECT {
+            let label_text = wide(name);
+            let label_format = d2d.get_text_format(11, false, 0, 1).clone();
+            let label_brush = rt
+                .CreateSolidColorBrush(&colorref_to_d2d(colors.text_primary) as *const _, None)
+                .unwrap();
+            rt.DrawText(
+                &label_text[..label_text.len() - 1],
+                &label_format,
+                &D2D_RECT_F {
                     left: pad,
                     top: y,
-                    right: pad + fill_w,
-                    bottom: y + self.scale(8),
-                };
-                let fill = CreateSolidBrush(colors.progress_color(*utilization));
-                let _ = FillRect(hdc, &fill_rect, fill);
-                let _ = DeleteObject(fill);
+                    right: w - pad - self.sf(35),
+                    bottom: y + self.sf(16),
+                },
+                &label_brush,
+                D2D1_DRAW_TEXT_OPTIONS_NONE,
+                DWRITE_MEASURING_MODE_NATURAL,
+            );
+
+            // Percentage (right)
+            let pct = format!("{:.0}%", utilization);
+            let pct_text = wide(&pct);
+            let pct_format = d2d.get_text_format(11, false, 1, 1).clone();
+            let pct_color = colorref_to_d2d(colors.progress_color(*utilization));
+            let pct_brush = rt
+                .CreateSolidColorBrush(&pct_color as *const _, None)
+                .unwrap();
+            rt.DrawText(
+                &pct_text[..pct_text.len() - 1],
+                &pct_format,
+                &D2D_RECT_F {
+                    left: w - pad - self.sf(35),
+                    top: y,
+                    right: w - pad,
+                    bottom: y + self.sf(16),
+                },
+                &pct_brush,
+                D2D1_DRAW_TEXT_OPTIONS_NONE,
+                DWRITE_MEASURING_MODE_NATURAL,
+            );
+            y += self.sf(16);
+
+            // Progress bar (flat)
+            let bar_h = self.sf(8);
+            let bg_brush = rt
+                .CreateSolidColorBrush(&colorref_to_d2d(colors.progress_bg) as *const _, None)
+                .unwrap();
+            rt.FillRectangle(
+                &D2D_RECT_F {
+                    left: pad,
+                    top: y,
+                    right: pad + content_w,
+                    bottom: y + bar_h,
+                },
+                &bg_brush,
+            );
+            let fill_w = (content_w * *utilization as f32 / 100.0)
+                .max(0.0)
+                .min(content_w);
+            if fill_w > 0.5 {
+                let fill_color = colorref_to_d2d(colors.progress_color(*utilization));
+                let fill_brush = rt
+                    .CreateSolidColorBrush(&fill_color as *const _, None)
+                    .unwrap();
+                rt.FillRectangle(
+                    &D2D_RECT_F {
+                        left: pad,
+                        top: y,
+                        right: pad + fill_w,
+                        bottom: y + bar_h,
+                    },
+                    &fill_brush,
+                );
             }
-            y += self.scale(8 + ITEM_GAP);
+            y += bar_h + self.sf(ITEM_GAP);
         }
 
         y
     }
 
+    #[allow(clippy::too_many_arguments)]
     unsafe fn draw_not_detected(
         &self,
-        hdc: HDC,
-        w: i32,
-        mut y: i32,
+        rt: &ID2D1HwndRenderTarget,
+        d2d: &mut D2DResources,
+        w: f32,
+        mut y: f32,
         colors: &ThemeColors,
         i18n: &I18n,
         last_error: &Option<String>,
         install_rect: &mut RECT,
-    ) -> i32 {
-        let pad = self.scale(PADDING);
+    ) -> f32 {
+        let pad = self.sf(PADDING);
 
-        // Determine what to show based on the error
         let is_cred_error = last_error
             .as_ref()
             .is_some_and(|e| e.contains("credentials not found"));
@@ -566,387 +903,966 @@ impl PopupRenderer {
             )
         };
 
-        let font = self.create_font(12, true);
-        let old_font = SelectObject(hdc, font);
-        SetBkMode(hdc, TRANSPARENT);
-        SetTextColor(hdc, colors.yellow);
-        let mut r = RECT {
-            left: pad,
-            top: y,
-            right: w - pad,
-            bottom: y + self.scale(24),
-        };
-        let mut warn_wide = wide(&format!("\u{26A0} {}", title));
-        DrawTextW(
-            hdc,
-            &mut warn_wide,
-            &mut r,
-            DT_LEFT | DT_SINGLELINE | DT_VCENTER,
+        // Warning title
+        let warn_str = format!("\u{26A0} {}", title);
+        let warn_text = wide(&warn_str);
+        let warn_format = d2d.get_text_format(12, true, 0, 1).clone();
+        let warn_brush = rt
+            .CreateSolidColorBrush(&colorref_to_d2d(colors.yellow) as *const _, None)
+            .unwrap();
+        rt.DrawText(
+            &warn_text[..warn_text.len() - 1],
+            &warn_format,
+            &D2D_RECT_F {
+                left: pad,
+                top: y,
+                right: w - pad,
+                bottom: y + self.sf(24),
+            },
+            &warn_brush,
+            D2D1_DRAW_TEXT_OPTIONS_NONE,
+            DWRITE_MEASURING_MODE_NATURAL,
         );
-        let _ = SelectObject(hdc, old_font);
-        let _ = DeleteObject(font);
-        y += self.scale(28);
+        y += self.sf(28);
 
-        let font2 = self.create_font(11, false);
-        let old2 = SelectObject(hdc, font2);
-        SetTextColor(hdc, colors.text_secondary);
-        let mut r2 = RECT {
-            left: pad,
-            top: y,
-            right: w - pad,
-            bottom: y + self.scale(60),
-        };
-        let mut desc_wide = wide(desc);
-        DrawTextW(
-            hdc,
-            &mut desc_wide,
-            &mut r2,
-            DT_LEFT | windows::Win32::Graphics::Gdi::DT_WORDBREAK,
+        // Description (word wrap)
+        let desc_text = wide(desc);
+        let desc_format = d2d.get_text_format_wrap(11, false);
+        let desc_brush = rt
+            .CreateSolidColorBrush(&colorref_to_d2d(colors.text_secondary) as *const _, None)
+            .unwrap();
+        rt.DrawText(
+            &desc_text[..desc_text.len() - 1],
+            &desc_format,
+            &D2D_RECT_F {
+                left: pad,
+                top: y,
+                right: w - pad,
+                bottom: y + self.sf(60),
+            },
+            &desc_brush,
+            D2D1_DRAW_TEXT_OPTIONS_NONE,
+            DWRITE_MEASURING_MODE_NATURAL,
         );
-        let _ = SelectObject(hdc, old2);
-        let _ = DeleteObject(font2);
-        y += self.scale(70);
+        y += self.sf(70);
 
         // Action button
-        let btn_h = self.scale(28);
-        *install_rect = RECT {
+        let btn_h = self.sf(28);
+        let btn_rect = D2D_RECT_F {
             left: pad,
             top: y,
             right: w - pad,
             bottom: y + btn_h,
         };
-        let btn_brush = CreateSolidBrush(colors.accent);
-        let _ = FillRect(hdc, install_rect, btn_brush);
-        let _ = DeleteObject(btn_brush);
-        let font3 = self.create_font(12, false);
-        let old3 = SelectObject(hdc, font3);
-        SetBkMode(hdc, TRANSPARENT);
-        SetTextColor(hdc, COLORREF(0x00FFFFFF)); // white
-        let mut btn_text = *install_rect;
-        let mut btn_wide = wide(btn_label);
-        DrawTextW(
-            hdc,
-            &mut btn_wide,
-            &mut btn_text,
-            DT_LEFT | DT_SINGLELINE | DT_VCENTER,
+        *install_rect = to_win32_rect(&btn_rect);
+
+        let btn_brush = rt
+            .CreateSolidColorBrush(&colorref_to_d2d(colors.accent) as *const _, None)
+            .unwrap();
+        rt.FillRoundedRectangle(
+            &D2D1_ROUNDED_RECT {
+                rect: btn_rect,
+                radiusX: 4.0,
+                radiusY: 4.0,
+            },
+            &btn_brush,
         );
-        let _ = SelectObject(hdc, old3);
-        let _ = DeleteObject(font3);
-        y += btn_h + self.scale(8);
+
+        let btn_text = wide(btn_label);
+        let btn_format = d2d.get_text_format(12, false, 0, 1).clone();
+        let white = D2D1_COLOR_F {
+            r: 1.0,
+            g: 1.0,
+            b: 1.0,
+            a: 1.0,
+        };
+        let btn_text_brush = rt.CreateSolidColorBrush(&white as *const _, None).unwrap();
+        let text_rect = D2D_RECT_F {
+            left: pad + self.sf(8),
+            top: y,
+            right: w - pad - self.sf(8),
+            bottom: y + btn_h,
+        };
+        rt.DrawText(
+            &btn_text[..btn_text.len() - 1],
+            &btn_format,
+            &text_rect,
+            &btn_text_brush,
+            D2D1_DRAW_TEXT_OPTIONS_NONE,
+            DWRITE_MEASURING_MODE_NATURAL,
+        );
+        y += btn_h + self.sf(8);
 
         y
     }
 
     unsafe fn draw_chatgpt_section(
         &self,
-        hdc: HDC,
-        w: i32,
-        mut y: i32,
+        rt: &ID2D1HwndRenderTarget,
+        d2d: &mut D2DResources,
+        w: f32,
+        mut y: f32,
         colors: &ThemeColors,
         i18n: &I18n,
         link_rect: &mut RECT,
-    ) -> i32 {
-        let pad = self.scale(PADDING);
+    ) -> f32 {
+        let pad = self.sf(PADDING);
 
         // Section header
-        let font = self.create_font(12, true);
-        let old = SelectObject(hdc, font);
-        SetBkMode(hdc, TRANSPARENT);
-        SetTextColor(hdc, colors.text_secondary);
         let header_str = format!("\u{25CE} {}", i18n.t("CHATGPT / CODEX"));
-        let mut r = RECT {
-            left: pad,
-            top: y,
-            right: w - pad,
-            bottom: y + self.scale(20),
-        };
-        let mut header_wide = wide(&header_str);
-        DrawTextW(
-            hdc,
-            &mut header_wide,
-            &mut r,
-            DT_LEFT | DT_SINGLELINE | DT_VCENTER,
+        let header_text = wide(&header_str);
+        let header_format = d2d.get_text_format(12, true, 0, 1).clone();
+        let header_brush = rt
+            .CreateSolidColorBrush(&colorref_to_d2d(colors.text_secondary) as *const _, None)
+            .unwrap();
+        rt.DrawText(
+            &header_text[..header_text.len() - 1],
+            &header_format,
+            &D2D_RECT_F {
+                left: pad,
+                top: y,
+                right: w - pad,
+                bottom: y + self.sf(20),
+            },
+            &header_brush,
+            D2D1_DRAW_TEXT_OPTIONS_NONE,
+            DWRITE_MEASURING_MODE_NATURAL,
         );
-        let _ = SelectObject(hdc, old);
-        let _ = DeleteObject(font);
-        y += self.scale(24);
+        y += self.sf(24);
 
-        // Info text
-        let font2 = self.create_font(11, false);
-        let old2 = SelectObject(hdc, font2);
-        SetTextColor(hdc, colors.text_secondary);
+        // Info text (word wrap)
         let info = format!("\u{24D8} {}", i18n.t("openai_no_api"));
-        let mut r2 = RECT {
-            left: pad,
-            top: y,
-            right: w - pad,
-            bottom: y + self.scale(50),
-        };
-        let mut info_wide = wide(&info);
-        DrawTextW(
-            hdc,
-            &mut info_wide,
-            &mut r2,
-            DT_LEFT | windows::Win32::Graphics::Gdi::DT_WORDBREAK,
+        let info_text = wide(&info);
+        let info_format = d2d.get_text_format_wrap(11, false);
+        let info_brush = rt
+            .CreateSolidColorBrush(&colorref_to_d2d(colors.text_secondary) as *const _, None)
+            .unwrap();
+        rt.DrawText(
+            &info_text[..info_text.len() - 1],
+            &info_format,
+            &D2D_RECT_F {
+                left: pad,
+                top: y,
+                right: w - pad,
+                bottom: y + self.sf(50),
+            },
+            &info_brush,
+            D2D1_DRAW_TEXT_OPTIONS_NONE,
+            DWRITE_MEASURING_MODE_NATURAL,
         );
-        let _ = SelectObject(hdc, old2);
-        let _ = DeleteObject(font2);
-        y += self.scale(55);
+        y += self.sf(55);
 
         // Link
-        let font3 = self.create_font(12, false);
-        let old3 = SelectObject(hdc, font3);
-        SetTextColor(hdc, colors.accent);
-        let link_text = format!("\u{1F4CA} {}", i18n.t("Open ChatGPT Usage \u{2192}"));
-        *link_rect = RECT {
+        let link_str = format!("\u{1F4CA} {}", i18n.t("Open ChatGPT Usage \u{2192}"));
+        let link_text = wide(&link_str);
+        let link_format = d2d.get_text_format(12, false, 0, 1).clone();
+        let link_brush = rt
+            .CreateSolidColorBrush(&colorref_to_d2d(colors.accent) as *const _, None)
+            .unwrap();
+        let lr = D2D_RECT_F {
             left: pad,
             top: y,
             right: w - pad,
-            bottom: y + self.scale(22),
+            bottom: y + self.sf(22),
         };
-        let mut lr = *link_rect;
-        let mut link_wide = wide(&link_text);
-        DrawTextW(
-            hdc,
-            &mut link_wide,
-            &mut lr,
-            DT_LEFT | DT_SINGLELINE | DT_VCENTER,
+        *link_rect = to_win32_rect(&lr);
+        rt.DrawText(
+            &link_text[..link_text.len() - 1],
+            &link_format,
+            &lr,
+            &link_brush,
+            D2D1_DRAW_TEXT_OPTIONS_NONE,
+            DWRITE_MEASURING_MODE_NATURAL,
         );
-        let _ = SelectObject(hdc, old3);
-        let _ = DeleteObject(font3);
-        y += self.scale(28);
+        y += self.sf(28);
 
         y
     }
 
+    #[allow(clippy::too_many_arguments)]
     unsafe fn draw_chart(
         &self,
-        hdc: HDC,
-        w: i32,
-        mut y: i32,
+        rt: &ID2D1HwndRenderTarget,
+        d2d: &mut D2DResources,
+        w: f32,
+        mut y: f32,
         data: &[f64],
+        reset_lines: &[f64],
         colors: &ThemeColors,
         i18n: &I18n,
-    ) -> i32 {
-        let pad = self.scale(PADDING);
+    ) -> f32 {
+        let pad = self.sf(PADDING);
 
         // Header
-        let font = self.create_font(11, true);
-        let old = SelectObject(hdc, font);
-        SetBkMode(hdc, TRANSPARENT);
-        SetTextColor(hdc, colors.text_secondary);
-        let title = format!("\u{1F4C8} {}", i18n.t("Usage History (24h)"));
-        let mut r = RECT {
-            left: pad,
-            top: y,
-            right: w - pad,
-            bottom: y + self.scale(18),
-        };
-        let mut title_wide = wide(&title);
-        DrawTextW(
-            hdc,
-            &mut title_wide,
-            &mut r,
-            DT_LEFT | DT_SINGLELINE | DT_VCENTER,
+        let title = i18n.t("Usage History (24h)");
+        let title_text = wide(title);
+        let title_format = d2d.get_text_format(11, true, 0, 1).clone();
+        let title_brush = rt
+            .CreateSolidColorBrush(&colorref_to_d2d(colors.text_secondary) as *const _, None)
+            .unwrap();
+        rt.DrawText(
+            &title_text[..title_text.len() - 1],
+            &title_format,
+            &D2D_RECT_F {
+                left: pad,
+                top: y,
+                right: w - pad,
+                bottom: y + self.sf(18),
+            },
+            &title_brush,
+            D2D1_DRAW_TEXT_OPTIONS_NONE,
+            DWRITE_MEASURING_MODE_NATURAL,
         );
-        let _ = SelectObject(hdc, old);
-        let _ = DeleteObject(font);
-        y += self.scale(20);
+        y += self.sf(22);
 
-        let chart_h = self.scale(60);
-        let chart_w = w - pad * 2;
-        let chart_rect = RECT {
-            left: pad,
-            top: y,
-            right: pad + chart_w,
-            bottom: y + chart_h,
-        };
+        let chart_h = self.sf(70);
+        let chart_w = w - pad * 2.0;
 
         // Chart background
-        let bg = CreateSolidBrush(colors.surface);
-        let _ = FillRect(hdc, &chart_rect, bg);
-        let _ = DeleteObject(bg);
+        let bg_brush = rt
+            .CreateSolidColorBrush(&colorref_to_d2d(colors.surface) as *const _, None)
+            .unwrap();
+        rt.FillRectangle(
+            &D2D_RECT_F {
+                left: pad,
+                top: y,
+                right: pad + chart_w,
+                bottom: y + chart_h,
+            },
+            &bg_brush,
+        );
+
+        // Grid lines at 25%, 50%, 75%
+        let grid_brush = rt
+            .CreateSolidColorBrush(&colorref_to_d2d(colors.separator) as *const _, None)
+            .unwrap();
+        for pct in [25, 50, 75] {
+            let gy = y + chart_h - (chart_h * pct as f32 / 100.0);
+            rt.DrawLine(
+                D2D_POINT_2F { x: pad, y: gy },
+                D2D_POINT_2F {
+                    x: pad + chart_w,
+                    y: gy,
+                },
+                &grid_brush,
+                1.0,
+                None,
+            );
+        }
 
         if !data.is_empty() {
-            let bar_w = (chart_w / data.len() as i32).max(2);
+            let bar_w = (chart_w / data.len() as f32).max(2.0);
+            let gap = 1.0f32.max(bar_w / 6.0);
             for (i, &val) in data.iter().enumerate() {
-                let bar_h = ((val / 100.0) * chart_h as f64) as i32;
-                if bar_h > 0 {
-                    let bar_x = pad + i as i32 * bar_w;
-                    let bar_rect = RECT {
-                        left: bar_x,
-                        top: y + chart_h - bar_h,
-                        right: bar_x + bar_w - 1,
-                        bottom: y + chart_h,
-                    };
+                let bar_h_px = (val / 100.0) * chart_h as f64;
+                if bar_h_px > 0.5 {
+                    let bar_x = pad + i as f32 * bar_w;
                     let color = if val >= 80.0 {
-                        colors.red
+                        colorref_to_d2d(colors.red)
                     } else if val >= 50.0 {
-                        colors.yellow
+                        colorref_to_d2d(colors.yellow)
                     } else {
-                        colors.green
+                        colorref_to_d2d(colors.green)
                     };
-                    let bar_brush = CreateSolidBrush(color);
-                    let _ = FillRect(hdc, &bar_rect, bar_brush);
-                    let _ = DeleteObject(bar_brush);
+                    let bar_brush = rt.CreateSolidColorBrush(&color as *const _, None).unwrap();
+                    rt.FillRectangle(
+                        &D2D_RECT_F {
+                            left: bar_x + gap,
+                            top: y + chart_h - bar_h_px as f32,
+                            right: bar_x + bar_w - gap,
+                            bottom: y + chart_h,
+                        },
+                        &bar_brush,
+                    );
                 }
             }
         }
 
-        y += chart_h + self.scale(4);
+        // Reset lines (dashed vertical)
+        if !reset_lines.is_empty() {
+            let reset_brush = rt
+                .CreateSolidColorBrush(&colorref_to_d2d(colors.accent) as *const _, None)
+                .unwrap();
+            let chart_top = y;
+            for &hours_ago in reset_lines {
+                let rx = pad + chart_w * (1.0 - hours_ago as f32 / 24.0);
+                if rx >= pad && rx <= pad + chart_w {
+                    let dash = 3.0f32;
+                    let mut dy = chart_top;
+                    while dy < chart_top + chart_h {
+                        let end = (dy + dash).min(chart_top + chart_h);
+                        rt.DrawLine(
+                            D2D_POINT_2F { x: rx, y: dy },
+                            D2D_POINT_2F { x: rx, y: end },
+                            &reset_brush,
+                            1.0,
+                            None,
+                        );
+                        dy += dash * 2.0;
+                    }
+                }
+            }
+        }
+
+        y += chart_h + self.sf(4);
 
         // X-axis labels
-        let font2 = self.create_font(9, false);
-        let old2 = SelectObject(hdc, font2);
-        SetTextColor(hdc, colors.text_secondary);
         let labels = ["24h", "18h", "12h", "6h", "now"];
         for (i, label) in labels.iter().enumerate() {
-            let lx = pad + (i as i32 * chart_w / 4);
-            let mut lr = RECT {
-                left: lx - self.scale(10),
-                top: y,
-                right: lx + self.scale(20),
-                bottom: y + self.scale(14),
-            };
-            let mut label_wide = wide(label);
-            DrawTextW(hdc, &mut label_wide, &mut lr, DT_LEFT | DT_SINGLELINE);
+            let lx = pad + (i as f32 * chart_w / 4.0);
+            let text = wide(label);
+            let format = d2d.get_text_format(9, false, 0, 0).clone();
+            let brush = rt
+                .CreateSolidColorBrush(&colorref_to_d2d(colors.text_secondary) as *const _, None)
+                .unwrap();
+            rt.DrawText(
+                &text[..text.len() - 1],
+                &format,
+                &D2D_RECT_F {
+                    left: lx - self.sf(10),
+                    top: y,
+                    right: lx + self.sf(20),
+                    bottom: y + self.sf(14),
+                },
+                &brush,
+                D2D1_DRAW_TEXT_OPTIONS_NONE,
+                DWRITE_MEASURING_MODE_NATURAL,
+            );
         }
-        let _ = SelectObject(hdc, old2);
-        let _ = DeleteObject(font2);
-        y += self.scale(14);
+        y += self.sf(14);
 
         y
     }
 
+    #[allow(clippy::too_many_arguments)]
     unsafe fn draw_footer(
         &self,
-        hdc: HDC,
-        w: i32,
-        y: i32,
+        rt: &ID2D1HwndRenderTarget,
+        d2d: &mut D2DResources,
+        w: f32,
+        y: f32,
         last_updated: &str,
         colors: &ThemeColors,
         i18n: &I18n,
+        hovered: &HoveredElement,
         refresh_rect: &mut RECT,
     ) {
-        let h = self.scale(FOOTER_H);
-        let pad = self.scale(PADDING);
+        let h = self.sf(FOOTER_H);
+        let pad = self.sf(PADDING);
 
-        let surface_brush = CreateSolidBrush(colors.surface);
-        let footer_rect = RECT {
-            left: 0,
-            top: y,
-            right: w,
-            bottom: y + h,
-        };
-        let _ = FillRect(hdc, &footer_rect, surface_brush);
-        let _ = DeleteObject(surface_brush);
-
-        let font = self.create_font(10, false);
-        let old = SelectObject(hdc, font);
-        SetBkMode(hdc, TRANSPARENT);
-        SetTextColor(hdc, colors.text_secondary);
-        let updated_text = format!("{} {}", i18n.t("Last updated:"), last_updated);
-        let mut r = RECT {
-            left: pad,
-            top: y,
-            right: w - self.scale(80),
-            bottom: y + h,
-        };
-        let mut updated_wide = wide(&updated_text);
-        DrawTextW(
-            hdc,
-            &mut updated_wide,
-            &mut r,
-            DT_LEFT | DT_SINGLELINE | DT_VCENTER,
+        // Footer background
+        let surface_brush = rt
+            .CreateSolidColorBrush(&colorref_to_d2d(colors.surface) as *const _, None)
+            .unwrap();
+        rt.FillRectangle(
+            &D2D_RECT_F {
+                left: 0.0,
+                top: y,
+                right: w,
+                bottom: y + h,
+            },
+            &surface_brush,
         );
-        let _ = SelectObject(hdc, old);
-        let _ = DeleteObject(font);
+
+        // Last updated text
+        let updated_text = format!("{} {}", i18n.t("Last updated:"), last_updated);
+        let updated_wide = wide(&updated_text);
+        let updated_format = d2d.get_text_format(10, false, 0, 1).clone();
+        let text_brush = rt
+            .CreateSolidColorBrush(&colorref_to_d2d(colors.text_secondary) as *const _, None)
+            .unwrap();
+        rt.DrawText(
+            &updated_wide[..updated_wide.len() - 1],
+            &updated_format,
+            &D2D_RECT_F {
+                left: pad,
+                top: y,
+                right: w - self.sf(90),
+                bottom: y + h,
+            },
+            &text_brush,
+            D2D1_DRAW_TEXT_OPTIONS_NONE,
+            DWRITE_MEASURING_MODE_NATURAL,
+        );
 
         // Refresh button
-        let btn_w = self.scale(70);
-        *refresh_rect = RECT {
+        let btn_w = self.sf(78);
+        let btn_h = self.sf(26);
+        let btn_rect = D2D_RECT_F {
             left: w - btn_w - pad,
-            top: y + (h - self.scale(22)) / 2,
+            top: y + (h - btn_h) / 2.0,
             right: w - pad,
-            bottom: y + (h - self.scale(22)) / 2 + self.scale(22),
+            bottom: y + (h - btn_h) / 2.0 + btn_h,
         };
-        let btn_brush = CreateSolidBrush(colors.surface);
-        let _ = FillRect(hdc, refresh_rect, btn_brush);
-        let _ = DeleteObject(btn_brush);
-        let font2 = self.create_font(10, false);
-        let old2 = SelectObject(hdc, font2);
-        SetTextColor(hdc, colors.accent);
-        let refresh_text = format!("\u{1F504} {}", i18n.t("Refresh"));
-        let mut br = *refresh_rect;
-        let mut refresh_wide = wide(&refresh_text);
-        DrawTextW(
-            hdc,
-            &mut refresh_wide,
-            &mut br,
-            DT_LEFT | DT_SINGLELINE | DT_VCENTER,
-        );
-        let _ = SelectObject(hdc, old2);
-        let _ = DeleteObject(font2);
+        *refresh_rect = to_win32_rect(&btn_rect);
+
+        let is_hovered = matches!(hovered, HoveredElement::RefreshButton);
+
+        if is_hovered {
+            // Filled accent button when hovered
+            let fill_brush = rt
+                .CreateSolidColorBrush(&colorref_to_d2d(colors.accent) as *const _, None)
+                .unwrap();
+            rt.FillRoundedRectangle(
+                &D2D1_ROUNDED_RECT {
+                    rect: btn_rect,
+                    radiusX: self.sf(6),
+                    radiusY: self.sf(6),
+                },
+                &fill_brush,
+            );
+            // White text on hover
+            let white = D2D1_COLOR_F {
+                r: 1.0,
+                g: 1.0,
+                b: 1.0,
+                a: 1.0,
+            };
+            let text_brush = rt.CreateSolidColorBrush(&white as *const _, None).unwrap();
+            let refresh_text = wide(i18n.t("Refresh"));
+            let text_format = d2d.get_text_format(10, false, 2, 1).clone();
+            rt.DrawText(
+                &refresh_text[..refresh_text.len() - 1],
+                &text_format,
+                &btn_rect,
+                &text_brush,
+                D2D1_DRAW_TEXT_OPTIONS_NONE,
+                DWRITE_MEASURING_MODE_NATURAL,
+            );
+        } else {
+            // Outlined button (normal state)
+            let border_brush = rt
+                .CreateSolidColorBrush(&colorref_to_d2d(colors.accent) as *const _, None)
+                .unwrap();
+            let bg_brush = rt
+                .CreateSolidColorBrush(&colorref_to_d2d(colors.surface) as *const _, None)
+                .unwrap();
+            rt.FillRoundedRectangle(
+                &D2D1_ROUNDED_RECT {
+                    rect: btn_rect,
+                    radiusX: self.sf(6),
+                    radiusY: self.sf(6),
+                },
+                &bg_brush,
+            );
+            rt.DrawRoundedRectangle(
+                &D2D1_ROUNDED_RECT {
+                    rect: btn_rect,
+                    radiusX: self.sf(6),
+                    radiusY: self.sf(6),
+                },
+                &border_brush,
+                1.0,
+                None,
+            );
+            // Accent text
+            let accent_brush = rt
+                .CreateSolidColorBrush(&colorref_to_d2d(colors.accent) as *const _, None)
+                .unwrap();
+            let refresh_text = wide(i18n.t("Refresh"));
+            let text_format = d2d.get_text_format(10, false, 2, 1).clone();
+            rt.DrawText(
+                &refresh_text[..refresh_text.len() - 1],
+                &text_format,
+                &btn_rect,
+                &accent_brush,
+                D2D1_DRAW_TEXT_OPTIONS_NONE,
+                DWRITE_MEASURING_MODE_NATURAL,
+            );
+        }
     }
 
     unsafe fn draw_text_centered(
         &self,
-        hdc: HDC,
+        rt: &ID2D1HwndRenderTarget,
+        d2d: &mut D2DResources,
         text: &str,
-        rect: RECT,
-        color: ColorRef,
+        rect: D2D_RECT_F,
+        color: windows::Win32::Foundation::COLORREF,
         size: i32,
         bold: bool,
     ) {
-        let font = self.create_font(size, bold);
-        let old = SelectObject(hdc, font);
-        SetBkMode(hdc, TRANSPARENT);
-        SetTextColor(hdc, color);
-        let mut r = rect;
-        let mut text_wide = wide(text);
-        DrawTextW(
-            hdc,
-            &mut text_wide,
-            &mut r,
-            windows::Win32::Graphics::Gdi::DT_CENTER | DT_SINGLELINE | DT_VCENTER,
+        let format = d2d.get_text_format(size, bold, 2, 1).clone();
+        let brush = rt
+            .CreateSolidColorBrush(&colorref_to_d2d(color) as *const _, None)
+            .unwrap();
+        let text_wide = wide(text);
+        rt.DrawText(
+            &text_wide[..text_wide.len() - 1],
+            &format,
+            &rect,
+            &brush,
+            D2D1_DRAW_TEXT_OPTIONS_NONE,
+            DWRITE_MEASURING_MODE_NATURAL,
         );
-        let _ = SelectObject(hdc, old);
-        let _ = DeleteObject(font);
     }
 
-    unsafe fn create_font(&self, size_pt: i32, bold: bool) -> windows::Win32::Graphics::Gdi::HFONT {
-        use windows::Win32::Graphics::Gdi::{
-            CLEARTYPE_QUALITY, CLIP_DEFAULT_PRECIS, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS,
+    unsafe fn draw_border(&self, rt: &ID2D1HwndRenderTarget, w: f32, h: f32, colors: &ThemeColors) {
+        let brush = rt
+            .CreateSolidColorBrush(&colorref_to_d2d(colors.border) as *const _, None)
+            .unwrap();
+        rt.DrawRectangle(
+            &D2D_RECT_F {
+                left: 0.5,
+                top: 0.5,
+                right: w - 0.5,
+                bottom: h - 0.5,
+            },
+            &brush,
+            1.0,
+            None,
+        );
+    }
+}
+
+/// Settings panel rendering (D2D)
+#[allow(clippy::too_many_arguments)]
+pub unsafe fn draw_settings_panel(
+    d2d: &mut D2DResources,
+    rect: &RECT,
+    colors: &ThemeColors,
+    i18n: &I18n,
+    config: &crate::config::Config,
+    back_rect: &mut RECT,
+    close_rect: &mut RECT,
+    setting_rects: &mut [RECT; 5],
+    hovered: &HoveredElement,
+) {
+    let Some(rt) = d2d.render_target.clone() else {
+        return;
+    };
+    let w = (rect.right - rect.left) as f32;
+    let pad = 16.0f32;
+    let header_h = 40.0f32;
+    let row_h = 38.0f32;
+
+    // Header background
+    let surf_brush = rt
+        .CreateSolidColorBrush(&colorref_to_d2d(colors.surface) as *const _, None)
+        .unwrap();
+    rt.FillRectangle(
+        &D2D_RECT_F {
+            left: 0.0,
+            top: 0.0,
+            right: w,
+            bottom: header_h,
+        },
+        &surf_brush,
+    );
+
+    // Header separator
+    let sep_brush = rt
+        .CreateSolidColorBrush(&colorref_to_d2d(colors.separator) as *const _, None)
+        .unwrap();
+    rt.DrawLine(
+        D2D_POINT_2F {
+            x: 0.0,
+            y: header_h,
+        },
+        D2D_POINT_2F { x: w, y: header_h },
+        &sep_brush,
+        1.0,
+        None,
+    );
+
+    // Back button: "← Back"
+    let back_r = D2D_RECT_F {
+        left: pad,
+        top: 0.0,
+        right: w / 2.0,
+        bottom: header_h,
+    };
+    *back_rect = to_win32_rect(&back_r);
+
+    // Hover highlight for back button
+    if matches!(hovered, HoveredElement::BackButton) {
+        let hover_brush = rt
+            .CreateSolidColorBrush(&colorref_to_d2d(colors.hover) as *const _, None)
+            .unwrap();
+        rt.FillRoundedRectangle(
+            &D2D1_ROUNDED_RECT {
+                rect: D2D_RECT_F {
+                    left: pad - 4.0,
+                    top: 6.0,
+                    right: pad + 80.0,
+                    bottom: header_h - 6.0,
+                },
+                radiusX: 4.0,
+                radiusY: 4.0,
+            },
+            &hover_brush,
+        );
+    }
+
+    let back_text = wide(i18n.t("Back"));
+    let back_format = d2d.get_text_format(13, true, 0, 1).clone();
+    let accent_brush = rt
+        .CreateSolidColorBrush(&colorref_to_d2d(colors.accent) as *const _, None)
+        .unwrap();
+    rt.DrawText(
+        &back_text[..back_text.len() - 1],
+        &back_format,
+        &back_r,
+        &accent_brush,
+        D2D1_DRAW_TEXT_OPTIONS_NONE,
+        DWRITE_MEASURING_MODE_NATURAL,
+    );
+
+    // Title centered
+    let title_text = wide(i18n.t("Settings"));
+    let title_format = d2d.get_text_format(13, true, 2, 1).clone();
+    let title_brush = rt
+        .CreateSolidColorBrush(&colorref_to_d2d(colors.text_primary) as *const _, None)
+        .unwrap();
+    rt.DrawText(
+        &title_text[..title_text.len() - 1],
+        &title_format,
+        &D2D_RECT_F {
+            left: 0.0,
+            top: 0.0,
+            right: w,
+            bottom: header_h,
+        },
+        &title_brush,
+        D2D1_DRAW_TEXT_OPTIONS_NONE,
+        DWRITE_MEASURING_MODE_NATURAL,
+    );
+
+    // Close button ×
+    let close_r = D2D_RECT_F {
+        left: w - 36.0,
+        top: 0.0,
+        right: w - 4.0,
+        bottom: header_h,
+    };
+    *close_rect = to_win32_rect(&close_r);
+
+    if matches!(hovered, HoveredElement::CloseButton) {
+        let hover_brush = rt
+            .CreateSolidColorBrush(&colorref_to_d2d(colors.hover) as *const _, None)
+            .unwrap();
+        rt.FillRoundedRectangle(
+            &D2D1_ROUNDED_RECT {
+                rect: D2D_RECT_F {
+                    left: w - 36.0,
+                    top: 6.0,
+                    right: w - 4.0,
+                    bottom: header_h - 6.0,
+                },
+                radiusX: 4.0,
+                radiusY: 4.0,
+            },
+            &hover_brush,
+        );
+    }
+
+    let close_text = wide("\u{00D7}");
+    let close_format = d2d.get_text_format(13, false, 2, 1).clone();
+    let close_brush = rt
+        .CreateSolidColorBrush(&colorref_to_d2d(colors.text_secondary) as *const _, None)
+        .unwrap();
+    rt.DrawText(
+        &close_text[..close_text.len() - 1],
+        &close_format,
+        &close_r,
+        &close_brush,
+        D2D1_DRAW_TEXT_OPTIONS_NONE,
+        DWRITE_MEASURING_MODE_NATURAL,
+    );
+
+    let mut y = header_h + 8.0;
+
+    // Settings rows
+    let check_on = "\u{2611}"; // ☑
+    let check_off = "\u{2610}"; // ☐
+    let rows: Vec<(String, String)> = vec![
+        (
+            i18n.t("Theme").to_string(),
+            i18n.t(&capitalize(&config.theme)).to_string(),
+        ),
+        (
+            i18n.t("Language").to_string(),
+            config.language.to_uppercase(),
+        ),
+        (
+            i18n.t("Compact mode").to_string(),
+            (if config.compact_mode {
+                check_on
+            } else {
+                check_off
+            })
+            .to_string(),
+        ),
+        (
+            i18n.t("Show ChatGPT section").to_string(),
+            (if config.show_chatgpt_section {
+                check_on
+            } else {
+                check_off
+            })
+            .to_string(),
+        ),
+        (
+            i18n.t("Start with Windows").to_string(),
+            (if config.autostart {
+                check_on
+            } else {
+                check_off
+            })
+            .to_string(),
+        ),
+    ];
+
+    for (i, (label, value)) in rows.iter().enumerate() {
+        let is_hovered = matches!(hovered, HoveredElement::SettingRow(idx) if *idx == i);
+
+        // Row background
+        let row_color = if is_hovered {
+            colorref_to_d2d(colors.hover)
+        } else if i % 2 == 1 {
+            colorref_to_d2d(colors.surface)
+        } else {
+            colorref_to_d2d(colors.background)
         };
-        let height = -self.scale(size_pt);
-        let weight = if bold { 700i32 } else { 400i32 };
-        let face: Vec<u16> = "Segoe UI"
-            .encode_utf16()
-            .chain(std::iter::once(0))
-            .collect();
-        let mut face_arr = [0u16; 32];
-        for (i, &c) in face.iter().enumerate().take(31) {
-            face_arr[i] = c;
+        let row_brush = rt
+            .CreateSolidColorBrush(&row_color as *const _, None)
+            .unwrap();
+        rt.FillRectangle(
+            &D2D_RECT_F {
+                left: 0.0,
+                top: y,
+                right: w,
+                bottom: y + row_h,
+            },
+            &row_brush,
+        );
+
+        setting_rects[i] = RECT {
+            left: 0,
+            top: y as i32,
+            right: w as i32,
+            bottom: (y + row_h) as i32,
+        };
+
+        // Label (left)
+        let label_text = wide(label);
+        let label_format = d2d.get_text_format(12, false, 0, 1).clone();
+        let label_brush = rt
+            .CreateSolidColorBrush(&colorref_to_d2d(colors.text_primary) as *const _, None)
+            .unwrap();
+        rt.DrawText(
+            &label_text[..label_text.len() - 1],
+            &label_format,
+            &D2D_RECT_F {
+                left: pad,
+                top: y,
+                right: w / 2.0 + 40.0,
+                bottom: y + row_h,
+            },
+            &label_brush,
+            D2D1_DRAW_TEXT_OPTIONS_NONE,
+            DWRITE_MEASURING_MODE_NATURAL,
+        );
+
+        // Value (right)
+        let val_text = wide(value);
+        let val_format = d2d.get_text_format(12, false, 1, 1).clone();
+        let val_brush = rt
+            .CreateSolidColorBrush(&colorref_to_d2d(colors.accent) as *const _, None)
+            .unwrap();
+        rt.DrawText(
+            &val_text[..val_text.len() - 1],
+            &val_format,
+            &D2D_RECT_F {
+                left: w / 2.0 + 40.0,
+                top: y,
+                right: w - pad,
+                bottom: y + row_h,
+            },
+            &val_brush,
+            D2D1_DRAW_TEXT_OPTIONS_NONE,
+            DWRITE_MEASURING_MODE_NATURAL,
+        );
+
+        y += row_h;
+
+        // Separator between rows
+        if i < rows.len() - 1 {
+            rt.DrawLine(
+                D2D_POINT_2F { x: pad, y },
+                D2D_POINT_2F { x: w - pad, y },
+                &sep_brush,
+                1.0,
+                None,
+            );
         }
-        CreateFontW(
-            height,
-            0,
-            0,
-            0,
-            weight,
-            0,
-            0,
-            0,
-            DEFAULT_CHARSET.0 as u32,
-            OUT_DEFAULT_PRECIS.0 as u32,
-            CLIP_DEFAULT_PRECIS.0 as u32,
-            CLEARTYPE_QUALITY.0 as u32,
-            0,
-            windows::core::PCWSTR(face_arr.as_ptr()),
-        )
+    }
+
+    // Icon legend section
+    y += 8.0;
+    rt.DrawLine(
+        D2D_POINT_2F { x: pad, y },
+        D2D_POINT_2F { x: w - pad, y },
+        &sep_brush,
+        1.0,
+        None,
+    );
+    y += 8.0;
+
+    // Legend title
+    let legend_title = wide(i18n.t("Tray icon colors:"));
+    let legend_format = d2d.get_text_format(11, false, 0, 0).clone();
+    let legend_brush = rt
+        .CreateSolidColorBrush(&colorref_to_d2d(colors.text_secondary) as *const _, None)
+        .unwrap();
+    rt.DrawText(
+        &legend_title[..legend_title.len() - 1],
+        &legend_format,
+        &D2D_RECT_F {
+            left: pad,
+            top: y,
+            right: w - pad,
+            bottom: y + 18.0,
+        },
+        &legend_brush,
+        D2D1_DRAW_TEXT_OPTIONS_NONE,
+        DWRITE_MEASURING_MODE_NATURAL,
+    );
+    y += 20.0;
+
+    // Icon items: colored circle + text
+    let icon_items: [(windows::Win32::Foundation::COLORREF, &str); 4] = [
+        (colors.green, i18n.t("< 50% usage")),
+        (colors.yellow, i18n.t("50-79% usage")),
+        (colors.red, i18n.t(">= 80% usage")),
+        (colors.separator, i18n.t("No data")),
+    ];
+
+    for (color, label) in &icon_items {
+        let circle_size = 10.0f32;
+        let circle_y = y + (16.0 - circle_size) / 2.0;
+        let cx = pad + 2.0 + circle_size / 2.0;
+        let cy = circle_y + circle_size / 2.0;
+
+        let circle_brush = rt
+            .CreateSolidColorBrush(&colorref_to_d2d(*color) as *const _, None)
+            .unwrap();
+        rt.FillEllipse(
+            &D2D1_ELLIPSE {
+                point: D2D_POINT_2F { x: cx, y: cy },
+                radiusX: circle_size / 2.0,
+                radiusY: circle_size / 2.0,
+            },
+            &circle_brush,
+        );
+
+        let lbl_text = wide(label);
+        let lbl_format = d2d.get_text_format(11, false, 0, 0).clone();
+        let lbl_brush = rt
+            .CreateSolidColorBrush(&colorref_to_d2d(colors.text_primary) as *const _, None)
+            .unwrap();
+        rt.DrawText(
+            &lbl_text[..lbl_text.len() - 1],
+            &lbl_format,
+            &D2D_RECT_F {
+                left: pad + 18.0,
+                top: y,
+                right: w - pad,
+                bottom: y + 16.0,
+            },
+            &lbl_brush,
+            D2D1_DRAW_TEXT_OPTIONS_NONE,
+            DWRITE_MEASURING_MODE_NATURAL,
+        );
+        y += 18.0;
+    }
+
+    // Footer
+    let footer_y = (rect.bottom - 44) as f32;
+    rt.DrawLine(
+        D2D_POINT_2F {
+            x: 0.0,
+            y: footer_y,
+        },
+        D2D_POINT_2F { x: w, y: footer_y },
+        &sep_brush,
+        1.0,
+        None,
+    );
+
+    let fy = footer_y + 6.0;
+    let footer_text1 = wide("ClaudeMeter v1.0.0 by klivak");
+    let footer_format = d2d.get_text_format(10, false, 0, 0).clone();
+    let footer_brush = rt
+        .CreateSolidColorBrush(&colorref_to_d2d(colors.text_secondary) as *const _, None)
+        .unwrap();
+    rt.DrawText(
+        &footer_text1[..footer_text1.len() - 1],
+        &footer_format,
+        &D2D_RECT_F {
+            left: pad,
+            top: fy,
+            right: w - pad,
+            bottom: fy + 16.0,
+        },
+        &footer_brush,
+        D2D1_DRAW_TEXT_OPTIONS_NONE,
+        DWRITE_MEASURING_MODE_NATURAL,
+    );
+
+    let footer_text2 = wide("github.com/klivak/claudemeter");
+    let footer_link_brush = rt
+        .CreateSolidColorBrush(&colorref_to_d2d(colors.accent) as *const _, None)
+        .unwrap();
+    rt.DrawText(
+        &footer_text2[..footer_text2.len() - 1],
+        &footer_format,
+        &D2D_RECT_F {
+            left: pad,
+            top: fy + 16.0,
+            right: w - pad,
+            bottom: fy + 32.0,
+        },
+        &footer_link_brush,
+        D2D1_DRAW_TEXT_OPTIONS_NONE,
+        DWRITE_MEASURING_MODE_NATURAL,
+    );
+
+    // 1px border
+    let border_brush = rt
+        .CreateSolidColorBrush(&colorref_to_d2d(colors.border) as *const _, None)
+        .unwrap();
+    let h = (rect.bottom - rect.top) as f32;
+    rt.DrawRectangle(
+        &D2D_RECT_F {
+            left: 0.5,
+            top: 0.5,
+            right: w - 0.5,
+            bottom: h - 0.5,
+        },
+        &border_brush,
+        1.0,
+        None,
+    );
+}
+
+fn capitalize(s: &str) -> String {
+    let mut c = s.chars();
+    match c.next() {
+        None => String::new(),
+        Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
     }
 }
 
 fn wide(s: &str) -> Vec<u16> {
     s.encode_utf16().chain(std::iter::once(0)).collect()
+}
+
+fn to_win32_rect(r: &D2D_RECT_F) -> RECT {
+    RECT {
+        left: r.left as i32,
+        top: r.top as i32,
+        right: r.right as i32,
+        bottom: r.bottom as i32,
+    }
 }

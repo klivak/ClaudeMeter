@@ -44,14 +44,14 @@ ClaudeMeter is **purposefully built in Rust** to be as lightweight as physically
 
 ### Step 1: Install Claude Code (one-time)
 
-ClaudeMeter reads your Claude credentials automatically. You need Claude Code installed and logged in:
+ClaudeMeter reads your Claude credentials automatically. You need [Claude Code](https://claude.ai/download) installed and logged in:
 
 ```bash
 # Install Claude Code (if not already)
 # Download from https://claude.ai/download
 
-# Log in (creates OAuth token in Windows Credential Manager)
-claude login
+# Log in (creates OAuth token that ClaudeMeter will use)
+claude
 ```
 
 ### Step 2: Download & Run ClaudeMeter
@@ -141,10 +141,40 @@ cargo build --release
 
 **Requirements:** Rust 1.75+ and Windows SDK (included with [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)).
 
+## 🔑 How Authentication Works
+
+ClaudeMeter does **not** ask for your password or API key. It reuses the OAuth token that [Claude Code](https://claude.ai/download) already stores on your machine.
+
+**Token lookup order:**
+
+| # | Location | Used by |
+|---|----------|---------|
+| 1 | `~/.claude/.credentials.json` | Claude Code v2.x+ |
+| 2 | Windows Credential Manager (`Claude Code-credentials`) | Claude Code v1.x (legacy) |
+
+When you run `claude` and log in via the browser, Claude Code saves an OAuth token to `~/.claude/.credentials.json`. ClaudeMeter reads this file to authenticate with the Anthropic Usage API — no extra setup needed.
+
+**What's stored in the file:**
+
+```json
+{
+  "claudeAiOauth": {
+    "accessToken": "sk-ant-oat01-...",
+    "refreshToken": "sk-ant-ort01-...",
+    "expiresAt": 1772467364905,
+    "subscriptionType": "max"
+  }
+}
+```
+
+ClaudeMeter uses `accessToken` to fetch your usage data and `subscriptionType` to display your plan (Pro/Max). It never modifies this file.
+
+> **Troubleshooting:** If ClaudeMeter shows "Credentials not found", run `claude` in a terminal and log in. Then click Refresh in ClaudeMeter.
+
 ## ❓ FAQ
 
 **Q: Does it work without Claude Code installed?**
-A: ClaudeMeter launches but shows a "Claude Code not detected" message with a download link.
+A: ClaudeMeter launches but shows a "Credentials not found" message with a link to claude.ai. You need Claude Code logged in so ClaudeMeter can read the OAuth token from `~/.claude/.credentials.json`.
 
 **Q: How much RAM does it really use?**
 A: Typically **3–8 MB**. Built in Rust with native Win32 API — no Electron, no browser engine.

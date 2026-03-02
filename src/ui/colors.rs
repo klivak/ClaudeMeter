@@ -1,5 +1,6 @@
 use crate::theme::ResolvedTheme;
 use windows::Win32::Foundation::COLORREF;
+use windows::Win32::Graphics::Direct2D::Common::D2D1_COLOR_F;
 
 pub type ColorRef = COLORREF;
 
@@ -20,6 +21,17 @@ fn hex(hex: &str) -> ColorRef {
     rgb(r, g, b)
 }
 
+/// Convert a COLORREF (0x00BBGGRR) to D2D1_COLOR_F (r,g,b,a as f32 in 0.0..1.0)
+pub fn colorref_to_d2d(cr: ColorRef) -> D2D1_COLOR_F {
+    let val = cr.0;
+    D2D1_COLOR_F {
+        r: (val & 0xFF) as f32 / 255.0,
+        g: ((val >> 8) & 0xFF) as f32 / 255.0,
+        b: ((val >> 16) & 0xFF) as f32 / 255.0,
+        a: 1.0,
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ThemeColors {
     pub background: ColorRef,
@@ -32,6 +44,8 @@ pub struct ThemeColors {
     pub red: ColorRef,
     pub accent: ColorRef,
     pub separator: ColorRef,
+    pub hover: ColorRef,
+    pub border: ColorRef,
 }
 
 impl ThemeColors {
@@ -54,6 +68,8 @@ impl ThemeColors {
             red: hex("d20f39"),
             accent: hex("89b4fa"),
             separator: hex("45475a"),
+            hover: hex("3b3c50"),
+            border: hex("45475a"),
         }
     }
 
@@ -69,6 +85,8 @@ impl ThemeColors {
             red: hex("d20f39"),
             accent: hex("1e66f5"),
             separator: hex("bcc0cc"),
+            hover: hex("ced3dd"),
+            border: hex("9ca0b0"),
         }
     }
 

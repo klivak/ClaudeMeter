@@ -1,12 +1,11 @@
 use crate::providers::claude::UsageResponse;
-use std::path::Path;
 use windows::Win32::Foundation::HWND;
 use windows::Win32::UI::Shell::{
     Shell_NotifyIconW, NIF_ICON, NIF_MESSAGE, NIF_TIP, NIM_ADD, NIM_DELETE, NIM_MODIFY,
     NOTIFYICONDATAW,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    LoadIconW, LoadImageW, HICON, IDI_APPLICATION, IMAGE_ICON, LR_LOADFROMFILE, WM_USER,
+    LoadIconW, LoadImageW, HICON, IDI_APPLICATION, IMAGE_ICON, LR_DEFAULTSIZE, LR_SHARED, WM_USER,
 };
 
 // Tray callback message
@@ -51,39 +50,37 @@ pub struct TrayIcon {
     icon_gray: HICON,
 }
 
-fn load_icon_from_file(path: &Path) -> Result<HICON, String> {
-    let path_wide: Vec<u16> = path
-        .to_string_lossy()
-        .encode_utf16()
-        .chain(std::iter::once(0))
-        .collect();
+// Resource IDs for embedded tray icons (must match build.rs)
+const ICON_GREEN_ID: u16 = 101;
+const ICON_YELLOW_ID: u16 = 102;
+const ICON_RED_ID: u16 = 103;
+const ICON_GRAY_ID: u16 = 104;
+
+fn load_icon_from_resource(resource_id: u16) -> Result<HICON, String> {
     unsafe {
+        let hinstance = windows::Win32::System::LibraryLoader::GetModuleHandleW(None)
+            .map_err(|e| format!("GetModuleHandleW: {e}"))?;
         let handle = LoadImageW(
-            None,
-            windows::core::PCWSTR(path_wide.as_ptr()),
+            hinstance,
+            windows::core::PCWSTR(resource_id as usize as *const u16),
             IMAGE_ICON,
-            0,
-            0,
-            LR_LOADFROMFILE,
+            16,
+            16,
+            LR_DEFAULTSIZE | LR_SHARED,
         )
-        .map_err(|e| format!("Failed to load icon {}: {e}", path.display()))?;
+        .map_err(|e| format!("Failed to load icon resource {resource_id}: {e}"))?;
         Ok(HICON(handle.0))
     }
 }
 
 impl TrayIcon {
-    pub fn new(hwnd: HWND, exe_dir: &Path) -> Result<Self, String> {
-        let fallback =
-            unsafe { LoadIconW(None, IDI_APPLICATION).map_err(|e| e.to_string())? };
+    pub fn new(hwnd: HWND) -> Result<Self, String> {
+        let fallback = unsafe { LoadIconW(None, IDI_APPLICATION).map_err(|e| e.to_string())? };
 
-        let icon_green = load_icon_from_file(&exe_dir.join("assets/icon_green.ico"))
-            .unwrap_or(fallback);
-        let icon_yellow = load_icon_from_file(&exe_dir.join("assets/icon_yellow.ico"))
-            .unwrap_or(fallback);
-        let icon_red = load_icon_from_file(&exe_dir.join("assets/icon_red.ico"))
-            .unwrap_or(fallback);
-        let icon_gray = load_icon_from_file(&exe_dir.join("assets/icon_gray.ico"))
-            .unwrap_or(fallback);
+        let icon_green = load_icon_from_resource(ICON_GREEN_ID).unwrap_or(fallback);
+        let icon_yellow = load_icon_from_resource(ICON_YELLOW_ID).unwrap_or(fallback);
+        let icon_red = load_icon_from_resource(ICON_RED_ID).unwrap_or(fallback);
+        let icon_gray = load_icon_from_resource(ICON_GRAY_ID).unwrap_or(fallback);
 
         let tray = Self {
             hwnd,
@@ -183,6 +180,7 @@ pub fn build_tooltip(usage: &Option<UsageResponse>, show_chatgpt: bool) -> Strin
                     .and_then(crate::i18n::seconds_until)
                     .map(|s| format!(" | {}", format_duration(s)))
                     .unwrap_or_default();
+                lines.push(String::new()); // empty line between metrics
                 lines.push(format!("{}: {:.0}%{}", name, metric.utilization, reset_str));
             }
         }
