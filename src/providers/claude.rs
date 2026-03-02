@@ -161,6 +161,15 @@ impl ClaudeClient {
             .map_err(|e| format!("HTTP request failed: {e}"))?;
 
         let status = response.status();
+        if status.as_u16() == 429 {
+            let retry_after = response
+                .headers()
+                .get("retry-after")
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("60")
+                .to_string();
+            return Err(format!("Rate limited (429). Retry after {retry_after}s"));
+        }
         if !status.is_success() {
             let body = response.text().await.unwrap_or_default();
             return Err(format!("API returned {status}: {body}"));

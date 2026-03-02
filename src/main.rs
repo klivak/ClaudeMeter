@@ -21,8 +21,9 @@ use crate::notifications::{send_toast, NotificationTracker};
 use crate::providers::claude::{ClaudeClient, UsageResponse};
 use crate::theme::{resolve_theme, ThemeMode};
 use crate::tray::{
-    build_tooltip, TrayIcon, IDM_ABOUT, IDM_AUTOSTART, IDM_EXIT, IDM_OPEN_CHATGPT, IDM_OPEN_CLAUDE,
-    IDM_OPEN_DASHBOARD, IDM_REFRESH, IDM_SETTINGS, WM_TRAY_ICON,
+    build_tooltip, TrayIcon, IDM_ABOUT, IDM_AUTOSTART, IDM_EXIT, IDM_EXPORT_CSV,
+    IDM_OPEN_CHATGPT, IDM_OPEN_CLAUDE, IDM_OPEN_DASHBOARD, IDM_REFRESH, IDM_SETTINGS,
+    WM_TRAY_ICON,
 };
 use crate::ui::colors::colorref_to_d2d;
 use crate::ui::render::{draw_settings_panel, D2DResources, HoveredElement, PopupRenderer};
@@ -39,16 +40,26 @@ use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyMenu, DispatchMessageW,
     GetCursorPos, LoadCursorW, LoadIconW, PeekMessageW, PostMessageW, PostQuitMessage,
     RegisterClassExW, SetCursor, SetForegroundWindow, TrackPopupMenu, TranslateMessage,
-    CS_DROPSHADOW, CS_HREDRAW, CS_VREDRAW, HMENU, IDC_ARROW, IDC_HAND, IDI_APPLICATION, MF_CHECKED,
-    MF_SEPARATOR, MF_STRING, MF_UNCHECKED, MSG, PM_REMOVE, TPM_BOTTOMALIGN, TPM_LEFTALIGN,
-    TPM_RETURNCMD, WM_COMMAND, WM_DESTROY, WM_KILLFOCUS, WM_LBUTTONUP, WM_MOUSEMOVE, WM_PAINT,
-    WM_RBUTTONUP, WM_SETCURSOR, WM_TIMER, WNDCLASSEXW, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
+    CS_DROPSHADOW, CS_HREDRAW, CS_VREDRAW, GWL_EXSTYLE, HMENU, IDC_ARROW, IDC_HAND,
+    IDI_APPLICATION, MF_CHECKED, MF_SEPARATOR, MF_STRING, MF_UNCHECKED, MSG, PM_REMOVE,
+    SetLayeredWindowAttributes, SetWindowLongW, GetWindowLongW,
+    TPM_BOTTOMALIGN, TPM_LEFTALIGN, TPM_RETURNCMD, WM_COMMAND, WM_DESTROY, WM_KEYDOWN,
+    WM_KILLFOCUS, WM_LBUTTONUP, WM_MOUSEMOVE, WM_PAINT, WM_RBUTTONUP, WM_SETCURSOR, WM_TIMER,
+    WNDCLASSEXW, WS_EX_LAYERED, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
 };
+use windows::Win32::UI::WindowsAndMessaging::LWA_ALPHA;
 
 const WINDOW_CLASS: &str = "ClaudeMeterMain";
 const POPUP_CLASS: &str = "ClaudeMeterPopup";
 const TIMER_POLL: usize = 1;
+const TIMER_ANIM: usize = 2;
+const TIMER_BLINK: usize = 3;
+const TIMER_FADE: usize = 4;
 const TIMER_POLL_INTERVAL_MS: u32 = 120_000; // 2 minutes
+const ANIM_INTERVAL_MS: u32 = 16; // ~60fps
+const BLINK_INTERVAL_MS: u32 = 500;
+const FADE_INTERVAL_MS: u32 = 16;
+const IDLE_TIMEOUT_MS: u32 = 5 * 60 * 1000; // 5 minutes
 const WM_POLL_RESULT: u32 = 0x0400 + 20; // WM_USER + 20
 
 /// Shared application state accessible from the window proc.
@@ -75,6 +86,22 @@ struct AppState {
     exe_dir: std::path::PathBuf,
     chart_data: Vec<f64>,
     chart_reset_lines: Vec<f64>,
+    // Chart hit-testing
+    chart_rect: RECT,
+    chart_bar_count: usize,
+    // Animation state for progress bars
+    anim_targets: Vec<f64>,
+    anim_current: Vec<f64>,
+    anim_active: bool,
+    // Fade-in animation
+    fade_alpha: u8,
+    // Tray icon blink on critical usage
+    blink_active: bool,
+    blink_visible: bool,
+    // Retry backoff
+    consecutive_failures: u32,
+    // Last poll timestamp for auto-refresh
+    last_poll_time: Option<std::time::Instant>,
     // Direct2D resources
     d2d: Option<D2DResources>,
     hovered_element: HoveredElement,
@@ -160,6 +187,7 @@ unsafe fn run_message_loop(exe_dir: std::path::PathBuf, config_mgr: ConfigManage
 
     // Apply DWM attributes (rounded corners + dark mode)
     apply_dwm_rounded_corners(popup_hwnd);
+    apply_mica_backdrop(popup_hwnd);
 
     // Initialize D2D resources
     let d2d = match D2DResources::new() {
@@ -193,6 +221,16 @@ unsafe fn run_message_loop(exe_dir: std::path::PathBuf, config_mgr: ConfigManage
         exe_dir,
         chart_data: Vec::new(),
         chart_reset_lines: Vec::new(),
+        chart_rect: RECT::default(),
+        chart_bar_count: 0,
+        anim_targets: Vec::new(),
+        anim_current: Vec::new(),
+        anim_active: false,
+        fade_alpha: 255,
+        blink_active: false,
+        blink_visible: true,
+        consecutive_failures: 0,
+        last_poll_time: None,
         d2d,
         hovered_element: HoveredElement::None,
         mouse_tracking: false,
@@ -203,6 +241,14 @@ unsafe fn run_message_loop(exe_dir: std::path::PathBuf, config_mgr: ConfigManage
         match TrayIcon::new(main_hwnd) {
             Ok(tray) => state.tray = Some(tray),
             Err(e) => log::error!("Failed to create tray icon: {e}"),
+        }
+
+        // Startup notification
+        if state.config_mgr.config.notifications.enabled {
+            send_toast(
+                "ClaudeMeter",
+                state.i18n.t("Running in system tray. Click the icon for details."),
+            );
         }
     }
 
@@ -290,7 +336,26 @@ unsafe extern "system" fn main_wnd_proc(
         }
         WM_TIMER => {
             if wparam.0 == TIMER_POLL {
-                trigger_poll(hwnd);
+                // Skip polling when user is idle (screen locked, AFK)
+                if !is_user_idle(IDLE_TIMEOUT_MS) {
+                    trigger_poll(hwnd);
+                }
+            } else if wparam.0 == TIMER_BLINK {
+                // Blink tray icon when critical usage
+                if let Some(state) = APP_STATE.as_mut() {
+                    state.blink_visible = !state.blink_visible;
+                    if let Some(tray) = &mut state.tray {
+                        if state.blink_visible {
+                            let tooltip = build_tooltip(
+                                &state.usage,
+                                state.config_mgr.config.show_chatgpt_section,
+                            );
+                            tray.update(&state.usage, &tooltip);
+                        } else {
+                            tray.update(&None, "ClaudeMeter");
+                        }
+                    }
+                }
             }
             LRESULT(0)
         }
@@ -379,11 +444,14 @@ unsafe extern "system" fn popup_wnd_proc(
                                     &state.chart_reset_lines,
                                     &state.last_error,
                                     &state.hovered_element,
+                                    &state.anim_current,
                                     &mut state.settings_rect,
                                     &mut state.close_rect,
                                     &mut state.refresh_rect,
                                     &mut state.install_rect,
                                     &mut state.chatgpt_link_rect,
+                                    &mut state.chart_rect,
+                                    &mut state.chart_bar_count,
                                 );
                             }
 
@@ -396,6 +464,58 @@ unsafe extern "system" fn popup_wnd_proc(
             }
 
             let _ = EndPaint(hwnd, &ps);
+            LRESULT(0)
+        }
+        WM_TIMER => {
+            if wparam.0 == TIMER_ANIM {
+                if let Some(state) = APP_STATE.as_mut() {
+                    if state.anim_active {
+                        let mut all_done = true;
+                        for (cur, &tgt) in state
+                            .anim_current
+                            .iter_mut()
+                            .zip(state.anim_targets.iter())
+                        {
+                            let diff = tgt - *cur;
+                            if diff.abs() < 0.5 {
+                                *cur = tgt;
+                            } else {
+                                *cur += diff * 0.15;
+                                all_done = false;
+                            }
+                        }
+                        let _ = windows::Win32::Graphics::Gdi::InvalidateRect(
+                            hwnd, None, false,
+                        );
+                        if all_done {
+                            state.anim_active = false;
+                            let _ = windows::Win32::UI::WindowsAndMessaging::KillTimer(
+                                hwnd,
+                                TIMER_ANIM,
+                            );
+                        }
+                    }
+                }
+            } else if wparam.0 == TIMER_FADE {
+                if let Some(state) = APP_STATE.as_mut() {
+                    let new_alpha = (state.fade_alpha as u16 + 30).min(255) as u8;
+                    state.fade_alpha = new_alpha;
+                    let _ = SetLayeredWindowAttributes(
+                        hwnd,
+                        windows::Win32::Foundation::COLORREF(0),
+                        new_alpha,
+                        LWA_ALPHA,
+                    );
+                    if new_alpha == 255 {
+                        // Fade complete — remove WS_EX_LAYERED for normal rendering
+                        let ex = GetWindowLongW(hwnd, GWL_EXSTYLE);
+                        SetWindowLongW(hwnd, GWL_EXSTYLE, ex & !(WS_EX_LAYERED.0 as i32));
+                        let _ = windows::Win32::UI::WindowsAndMessaging::KillTimer(
+                            hwnd, TIMER_FADE,
+                        );
+                    }
+                }
+            }
             LRESULT(0)
         }
         WM_MOUSEMOVE => {
@@ -440,6 +560,15 @@ unsafe extern "system" fn popup_wnd_proc(
                     HoveredElement::InstallButton
                 } else if crate::popup::point_in_rect(pt, state.chatgpt_link_rect) {
                     HoveredElement::ChatGptLink
+                } else if crate::popup::point_in_rect(pt, state.chart_rect)
+                    && state.chart_bar_count > 0
+                {
+                    let chart_w = state.chart_rect.right - state.chart_rect.left;
+                    let rel_x = pt.x - state.chart_rect.left;
+                    let bar_idx =
+                        (rel_x as usize * state.chart_bar_count / chart_w as usize)
+                            .min(state.chart_bar_count - 1);
+                    HoveredElement::ChartBar(bar_idx)
                 } else {
                     HoveredElement::None
                 };
@@ -463,7 +592,10 @@ unsafe extern "system" fn popup_wnd_proc(
         }
         WM_SETCURSOR => {
             if let Some(state) = APP_STATE.as_ref() {
-                if !matches!(state.hovered_element, HoveredElement::None) {
+                if !matches!(
+                    state.hovered_element,
+                    HoveredElement::None | HoveredElement::ChartBar(_)
+                ) {
                     let hand = LoadCursorW(None, IDC_HAND).unwrap_or_default();
                     SetCursor(hand);
                     return LRESULT(1);
@@ -575,6 +707,24 @@ unsafe extern "system" fn popup_wnd_proc(
             }
             LRESULT(0)
         }
+        WM_KEYDOWN => {
+            let vk = wparam.0 as u16;
+            if vk == 0x1B {
+                // VK_ESCAPE — close popup
+                if let Some(state) = APP_STATE.as_mut() {
+                    hide_popup(state);
+                }
+            } else if vk == 0x74 {
+                // VK_F5 — refresh
+                if let Some(state) = APP_STATE.as_mut() {
+                    state.last_updated = "...".to_string();
+                    let _ =
+                        windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, false);
+                    trigger_poll(state.main_hwnd);
+                }
+            }
+            LRESULT(0)
+        }
         // Close popup when clicking outside (WM_KILLFOCUS)
         WM_KILLFOCUS => {
             if let Some(state) = APP_STATE.as_mut() {
@@ -601,6 +751,18 @@ unsafe fn apply_dwm_rounded_corners(hwnd: HWND) {
     );
 }
 
+/// Apply Mica backdrop to popup window (Win11 22H2+, silently fails on older)
+unsafe fn apply_mica_backdrop(hwnd: HWND) {
+    // DWMWA_SYSTEMBACKDROP_TYPE = 38, value 2 = Mica
+    let backdrop_type: u32 = 2;
+    let _ = DwmSetWindowAttribute(
+        hwnd,
+        windows::Win32::Graphics::Dwm::DWMWINDOWATTRIBUTE(38),
+        &backdrop_type as *const u32 as *const _,
+        std::mem::size_of::<u32>() as u32,
+    );
+}
+
 /// Apply DWM dark/light mode to popup window (Win11+, silently fails on Win10)
 unsafe fn apply_dwm_dark_mode(hwnd: HWND, is_dark: bool) {
     // DWMWA_USE_IMMERSIVE_DARK_MODE = 20
@@ -618,6 +780,14 @@ unsafe fn hide_popup(state: &mut AppState) {
     state.popup_visible = false;
     state.hovered_element = HoveredElement::None;
     state.mouse_tracking = false;
+    state.anim_active = false;
+    let _ = windows::Win32::UI::WindowsAndMessaging::KillTimer(state.popup_hwnd, TIMER_ANIM);
+    let _ = windows::Win32::UI::WindowsAndMessaging::KillTimer(state.popup_hwnd, TIMER_FADE);
+    // Remove WS_EX_LAYERED if still set from fade
+    let ex = GetWindowLongW(state.popup_hwnd, GWL_EXSTYLE);
+    if ex & WS_EX_LAYERED.0 as i32 != 0 {
+        SetWindowLongW(state.popup_hwnd, GWL_EXSTYLE, ex & !(WS_EX_LAYERED.0 as i32));
+    }
     let _ = windows::Win32::UI::WindowsAndMessaging::ShowWindow(
         state.popup_hwnd,
         windows::Win32::UI::WindowsAndMessaging::SW_HIDE,
@@ -712,6 +882,18 @@ unsafe fn show_popup(_main_hwnd: HWND) {
         };
 
         resize_popup(state.popup_hwnd, h);
+
+        // Fade-in: add WS_EX_LAYERED and start transparent
+        let ex = GetWindowLongW(state.popup_hwnd, GWL_EXSTYLE);
+        SetWindowLongW(state.popup_hwnd, GWL_EXSTYLE, ex | WS_EX_LAYERED.0 as i32);
+        state.fade_alpha = 0;
+        let _ = SetLayeredWindowAttributes(
+            state.popup_hwnd,
+            windows::Win32::Foundation::COLORREF(0),
+            0,
+            LWA_ALPHA,
+        );
+
         let _ = windows::Win32::UI::WindowsAndMessaging::SetWindowPos(
             state.popup_hwnd,
             windows::Win32::UI::WindowsAndMessaging::HWND_TOPMOST,
@@ -730,6 +912,53 @@ unsafe fn show_popup(_main_hwnd: HWND) {
         let _ = SetForegroundWindow(state.popup_hwnd);
         let _ = windows::Win32::Graphics::Gdi::InvalidateRect(state.popup_hwnd, None, true);
         state.popup_visible = true;
+
+        // Start fade-in timer
+        windows::Win32::UI::WindowsAndMessaging::SetTimer(
+            state.popup_hwnd,
+            TIMER_FADE,
+            FADE_INTERVAL_MS,
+            None,
+        );
+
+        // Stop tray icon blink when user opens popup
+        if state.blink_active {
+            state.blink_active = false;
+            state.blink_visible = true;
+            let _ = windows::Win32::UI::WindowsAndMessaging::KillTimer(
+                state.main_hwnd,
+                TIMER_BLINK,
+            );
+            // Restore normal icon
+            let tooltip = build_tooltip(
+                &state.usage,
+                state.config_mgr.config.show_chatgpt_section,
+            );
+            if let Some(tray) = &mut state.tray {
+                tray.update(&state.usage, &tooltip);
+            }
+        }
+
+        // Start animation if we have targets
+        if !state.anim_targets.is_empty() {
+            state.anim_current = vec![0.0; state.anim_targets.len()];
+            state.anim_active = true;
+            windows::Win32::UI::WindowsAndMessaging::SetTimer(
+                state.popup_hwnd,
+                TIMER_ANIM,
+                ANIM_INTERVAL_MS,
+                None,
+            );
+        }
+
+        // Auto-refresh if data is stale (older than 60s)
+        let stale = state
+            .last_poll_time
+            .map(|t| t.elapsed().as_secs() > 60)
+            .unwrap_or(true);
+        if stale {
+            trigger_poll(state.main_hwnd);
+        }
     }
 }
 
@@ -742,6 +971,7 @@ unsafe fn show_context_menu(hwnd: HWND) {
         append_menu_str(menu, IDM_REFRESH, state.i18n.t("Refresh Now"));
         append_menu_sep(menu);
         append_menu_str(menu, IDM_OPEN_DASHBOARD, state.i18n.t("Open Dashboard"));
+        append_menu_str(menu, IDM_EXPORT_CSV, state.i18n.t("Export History (CSV)"));
         append_menu_sep(menu);
         append_menu_str(menu, IDM_OPEN_CLAUDE, "Open Claude.ai \u{2192}");
         if show_chatgpt {
@@ -767,7 +997,7 @@ unsafe fn show_context_menu(hwnd: HWND) {
             PCWSTR(autostart_text.as_ptr()),
         );
         append_menu_sep(menu);
-        append_menu_str(menu, IDM_ABOUT, "ClaudeMeter v1.1.0");
+        append_menu_str(menu, IDM_ABOUT, "ClaudeMeter v1.2.0");
         append_menu_str(menu, IDM_EXIT, state.i18n.t("Exit"));
 
         let mut pt = POINT::default();
@@ -808,7 +1038,7 @@ unsafe fn handle_menu_command(hwnd: HWND, cmd: u32) {
             show_popup(hwnd);
         }
         IDM_OPEN_CLAUDE => {
-            let _ = open::that("https://claude.ai");
+            let _ = open::that("https://claude.ai/settings/usage");
         }
         IDM_OPEN_CHATGPT => {
             if let Some(state) = APP_STATE.as_ref() {
@@ -834,11 +1064,54 @@ unsafe fn handle_menu_command(hwnd: HWND, cmd: u32) {
                 let _ = autostart::set_autostart(new_val, &exe_path);
             }
         }
+        IDM_EXPORT_CSV => {
+            if let Some(state) = APP_STATE.as_ref() {
+                let csv_path = state.exe_dir.join("claudemeter_history.csv");
+                match Database::open(&state.exe_dir) {
+                    Ok(db) => match db.export_csv(&csv_path) {
+                        Ok(count) => {
+                            let msg = format!(
+                                "{} rows exported to:\n{}",
+                                count,
+                                csv_path.display()
+                            );
+                            let _ = windows::Win32::UI::WindowsAndMessaging::MessageBoxW(
+                                hwnd,
+                                windows::core::PCWSTR(wide(&msg).as_ptr()),
+                                windows::core::PCWSTR(wide("Export CSV").as_ptr()),
+                                windows::Win32::UI::WindowsAndMessaging::MB_ICONINFORMATION
+                                    | windows::Win32::UI::WindowsAndMessaging::MB_OK,
+                            );
+                        }
+                        Err(e) => {
+                            let msg = format!("Export failed: {e}");
+                            let _ = windows::Win32::UI::WindowsAndMessaging::MessageBoxW(
+                                hwnd,
+                                windows::core::PCWSTR(wide(&msg).as_ptr()),
+                                windows::core::PCWSTR(wide("Export CSV").as_ptr()),
+                                windows::Win32::UI::WindowsAndMessaging::MB_ICONERROR
+                                    | windows::Win32::UI::WindowsAndMessaging::MB_OK,
+                            );
+                        }
+                    },
+                    Err(e) => {
+                        let msg = format!("Could not open database: {e}");
+                        let _ = windows::Win32::UI::WindowsAndMessaging::MessageBoxW(
+                            hwnd,
+                            windows::core::PCWSTR(wide(&msg).as_ptr()),
+                            windows::core::PCWSTR(wide("Export CSV").as_ptr()),
+                            windows::Win32::UI::WindowsAndMessaging::MB_ICONERROR
+                                | windows::Win32::UI::WindowsAndMessaging::MB_OK,
+                        );
+                    }
+                }
+            }
+        }
         IDM_ABOUT => {
             // Show simple about message
             let _ = windows::Win32::UI::WindowsAndMessaging::MessageBoxW(
                 hwnd,
-                windows::core::PCWSTR(wide("ClaudeMeter v1.1.0\nby klivak\nhttps://github.com/klivak/claudemeter\n\nMIT License").as_ptr()),
+                windows::core::PCWSTR(wide("ClaudeMeter v1.2.0\nby klivak\nhttps://github.com/klivak/claudemeter\n\nMIT License").as_ptr()),
                 windows::core::PCWSTR(wide("About ClaudeMeter").as_ptr()),
                 windows::Win32::UI::WindowsAndMessaging::MB_ICONINFORMATION | windows::Win32::UI::WindowsAndMessaging::MB_OK,
             );
@@ -917,9 +1190,12 @@ async fn do_poll() -> (Option<UsageResponse>, Option<String>) {
     }
 }
 
-unsafe fn on_poll_result(_hwnd: HWND, usage: Option<UsageResponse>, error: Option<String>) {
+unsafe fn on_poll_result(hwnd: HWND, usage: Option<UsageResponse>, error: Option<String>) {
     if let Some(state) = APP_STATE.as_mut() {
+        state.last_poll_time = Some(std::time::Instant::now());
+
         if let Some(u) = &usage {
+            state.consecutive_failures = 0;
             state.last_updated = Local::now().format("%H:%M:%S").to_string();
 
             // Store to DB (best effort)
@@ -963,38 +1239,110 @@ unsafe fn on_poll_result(_hwnd: HWND, usage: Option<UsageResponse>, error: Optio
                             .check(&key, metric.utilization, &thresholds);
                     for threshold in fired {
                         let metric_name = providers::claude::format_metric_name(&key);
-                        let reset_info = metric
+                        let reset_duration = metric
                             .resets_at
                             .as_deref()
                             .and_then(i18n::seconds_until)
-                            .map(|s| format!(" Resets in {}.", format_duration(s)))
-                            .unwrap_or_default();
+                            .map(format_duration);
+                        let reset_target = metric
+                            .resets_at
+                            .as_deref()
+                            .and_then(i18n::format_reset_target);
+                        let reset_info = match (&reset_duration, &reset_target) {
+                            (Some(dur), Some(tgt)) => {
+                                format!("\n{} {} {}", state.i18n.t("resets in"), dur, tgt)
+                            }
+                            (Some(dur), None) => {
+                                format!("\n{} {}", state.i18n.t("resets in"), dur)
+                            }
+                            _ => String::new(),
+                        };
 
                         let (title, body) = if threshold >= 90 {
                             (
-                                format!("\u{1F534} {}", state.i18n.t("Usage Critical")),
                                 format!(
-                                    "{} at {:.0}%!{}",
-                                    metric_name, metric.utilization, reset_info
+                                    "ClaudeMeter — {}",
+                                    state.i18n.t("Usage Critical")
+                                ),
+                                format!(
+                                    "{}: {:.0}% ({} {}%){}", metric_name,
+                                    metric.utilization,
+                                    state.i18n.t("exceeded"),
+                                    threshold, reset_info
                                 ),
                             )
                         } else {
                             (
-                                format!("\u{26A0} {}", state.i18n.t("Usage Alert")),
                                 format!(
-                                    "{} at {:.0}%.{}",
-                                    metric_name, metric.utilization, reset_info
+                                    "ClaudeMeter — {}",
+                                    state.i18n.t("Usage Alert")
+                                ),
+                                format!(
+                                    "{}: {:.0}% ({} {}%){}", metric_name,
+                                    metric.utilization,
+                                    state.i18n.t("exceeded"),
+                                    threshold, reset_info
                                 ),
                             )
                         };
                         send_toast(&title, &body);
+
+                        // Play notification sound
+                        if state.config_mgr.config.notifications.sound {
+                            play_notification_sound(threshold >= 90);
+                        }
+
+                        // Start tray icon blink for critical usage
+                        if threshold >= 90 && !state.blink_active {
+                            state.blink_active = true;
+                            state.blink_visible = true;
+                            windows::Win32::UI::WindowsAndMessaging::SetTimer(
+                                state.main_hwnd,
+                                TIMER_BLINK,
+                                BLINK_INTERVAL_MS,
+                                None,
+                            );
+                        }
                     }
                 }
             }
+        } else {
+            // Poll failed — track for backoff
+            state.consecutive_failures += 1;
         }
 
         state.usage = usage;
         state.last_error = error;
+
+        // Adjust polling interval with exponential backoff on failures
+        let base = state.config_mgr.config.polling_interval_clamped() as u32 * 1000;
+        let interval = if state.consecutive_failures > 0 {
+            let multiplier = 2u32.pow(state.consecutive_failures.min(3));
+            (base * multiplier).min(600_000) // cap at 10 minutes
+        } else {
+            base
+        };
+        let _ = windows::Win32::UI::WindowsAndMessaging::KillTimer(hwnd, TIMER_POLL);
+        windows::Win32::UI::WindowsAndMessaging::SetTimer(hwnd, TIMER_POLL, interval, None);
+
+        // Start progress bar animation
+        if let Some(u) = &state.usage {
+            let targets: Vec<f64> = u.all_metrics().iter().map(|(_, m)| m.utilization).collect();
+            // Initialize current values at 0 if sizes differ (new data shape)
+            if state.anim_current.len() != targets.len() {
+                state.anim_current = vec![0.0; targets.len()];
+            }
+            state.anim_targets = targets;
+            state.anim_active = true;
+            if state.popup_visible {
+                windows::Win32::UI::WindowsAndMessaging::SetTimer(
+                    state.popup_hwnd,
+                    TIMER_ANIM,
+                    ANIM_INTERVAL_MS,
+                    None,
+                );
+            }
+        }
 
         // Update tray
         let tooltip = build_tooltip(&state.usage, state.config_mgr.config.show_chatgpt_section);
@@ -1038,4 +1386,44 @@ fn ensure_single_instance() -> bool {
 
 fn wide(s: &str) -> Vec<u16> {
     s.encode_utf16().chain(std::iter::once(0)).collect()
+}
+
+/// Check if the user has been idle for more than `timeout_ms` milliseconds.
+fn is_user_idle(timeout_ms: u32) -> bool {
+    #[repr(C)]
+    #[allow(clippy::upper_case_acronyms)]
+    struct LASTINPUTINFO {
+        cb_size: u32,
+        dw_time: u32,
+    }
+    extern "system" {
+        fn GetLastInputInfo(plii: *mut LASTINPUTINFO) -> i32;
+        fn GetTickCount() -> u32;
+    }
+    unsafe {
+        let mut lii = LASTINPUTINFO {
+            cb_size: 8,
+            dw_time: 0,
+        };
+        if GetLastInputInfo(&mut lii) != 0 {
+            let idle = GetTickCount().wrapping_sub(lii.dw_time);
+            idle > timeout_ms
+        } else {
+            false
+        }
+    }
+}
+
+/// Play a system notification sound.
+fn play_notification_sound(critical: bool) {
+    extern "system" {
+        fn MessageBeep(uType: u32) -> i32;
+    }
+    unsafe {
+        if critical {
+            MessageBeep(0x10); // MB_ICONHAND — critical/error sound
+        } else {
+            MessageBeep(0x30); // MB_ICONEXCLAMATION — warning sound
+        }
+    }
 }

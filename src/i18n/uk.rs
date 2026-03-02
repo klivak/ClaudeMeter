@@ -39,6 +39,7 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     );
     m.insert("Refresh Now", "Оновити зараз");
     m.insert("Open Dashboard", "Відкрити панель");
+    m.insert("Export History (CSV)", "Експорт історії (CSV)");
     m.insert("Settings", "Налаштування");
     m.insert("Start with Windows", "Запускати з Windows");
     m.insert("About", "Про програму");
@@ -47,6 +48,7 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Refresh", "Оновити");
     m.insert("Usage Alert", "Попередження використання");
     m.insert("Usage Critical", "Критичне використання");
+    m.insert("Running in system tray. Click the icon for details.", "Працює в системному треї. Натисніть на іконку для деталей.");
     m.insert("Compact mode", "Компактний режим");
     m.insert("Theme", "Тема");
     m.insert("Language", "Мова");
@@ -76,5 +78,6 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("50-79% usage", "50\u{2013}79% використання");
     m.insert(">= 80% usage", "\u{2265} 80% використання");
     m.insert("No data", "Немає даних");
+    m.insert("exceeded", "перевищено");
     m
 }

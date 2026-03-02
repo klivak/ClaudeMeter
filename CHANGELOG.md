@@ -5,6 +5,31 @@ All notable changes to ClaudeMeter will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-03-03
+
+### Added
+- **Dynamic tray icon with % number** — shows actual utilization percentage on the tray icon
+- **Gradient progress bars** — smooth color gradients on metric bars
+- **Animated progress bars** — bars smoothly fill on popup open (~60fps lerp)
+- **Popup fade-in animation** — smooth opacity transition when opening dashboard
+- **Chart bar hover tooltip** — hover chart bars to see exact % and time
+- **CSV export** — export full usage history from context menu
+- **Mica backdrop** — Windows 11 translucent Mica effect on popup
+- **Keyboard shortcuts** — ESC to close popup, F5 to refresh
+- **Notification sound** — system beep with notifications (configurable)
+- **Informative notifications** — shows metric name, current %, exceeded threshold, and reset time
+- **Startup notification** — "Running in system tray" toast on launch
+- **Auto-refresh on popup open** — triggers poll if data is older than 60 seconds
+- **Tray icon blink** — icon blinks when usage exceeds 90% until popup is opened
+- **Idle detection** — pauses API polling when PC is idle for 5+ minutes (saves bandwidth)
+- **Retry with exponential backoff** — on API errors, poll interval doubles (up to 10 min cap)
+- **Rate-limit (429) handling** — graceful retry-after parsing for Anthropic API
+- **Config validation** — sanitizes polling interval, thresholds, theme, and language on load
+
+### Fixed
+- PowerShell notification window no longer flashes on startup (CREATE_NO_WINDOW flag)
+- Tray icon text contrast — black text on green/yellow, white text on red/gray for readability
+
 ## [1.1.0] - 2026-03-02
 
 ### Added

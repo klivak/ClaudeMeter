@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use rusqlite::{params, Connection, Result as SqlResult};
+use std::io::Write;
 use std::path::Path;
 
 pub struct Database {
@@ -97,5 +98,38 @@ impl Database {
             .collect();
 
         Ok(points)
+    }
+
+    /// Export all usage history to a CSV file. Returns the number of rows written.
+    pub fn export_csv(&self, path: &Path) -> SqlResult<usize> {
+        let mut stmt = self.conn.prepare(
+            "SELECT timestamp, provider, metric, utilization, resets_at
+             FROM usage_history ORDER BY timestamp DESC",
+        )?;
+
+        let mut file = std::fs::File::create(path).map_err(|e| {
+            rusqlite::Error::ToSqlConversionFailure(Box::new(e))
+        })?;
+
+        let _ = writeln!(file, "timestamp,provider,metric,utilization,resets_at");
+        let mut count = 0usize;
+
+        let rows = stmt.query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, f64>(3)?,
+                row.get::<_, Option<String>>(4)?,
+            ))
+        })?;
+
+        for (ts, provider, metric, util, resets) in rows.flatten() {
+            let resets_str = resets.unwrap_or_default();
+            let _ = writeln!(file, "{},{},{},{:.2},{}", ts, provider, metric, util, resets_str);
+            count += 1;
+        }
+
+        Ok(count)
     }
 }

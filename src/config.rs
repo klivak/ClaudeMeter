@@ -55,6 +55,29 @@ impl Config {
     pub fn polling_interval_clamped(&self) -> u64 {
         self.polling_interval_seconds.clamp(30, 600)
     }
+
+    /// Validate and fix config values to safe ranges.
+    pub fn validate(&mut self) {
+        self.polling_interval_seconds = self.polling_interval_seconds.clamp(30, 600);
+
+        // Thresholds: keep only 1..=100, remove duplicates, sort
+        self.notifications.thresholds.retain(|&t| (1..=100).contains(&t));
+        self.notifications.thresholds.sort();
+        self.notifications.thresholds.dedup();
+        if self.notifications.thresholds.is_empty() {
+            self.notifications.thresholds = vec![50, 75, 90];
+        }
+
+        // Validate theme
+        if !["auto", "dark", "light"].contains(&self.theme.as_str()) {
+            self.theme = "auto".to_string();
+        }
+
+        // Validate language
+        if !["auto", "en", "uk", "es", "de", "fr"].contains(&self.language.as_str()) {
+            self.language = "auto".to_string();
+        }
+    }
 }
 
 pub struct ConfigManager {
@@ -79,7 +102,8 @@ impl ConfigManager {
         if self.path.exists() {
             match fs::read_to_string(&self.path) {
                 Ok(content) => match serde_json::from_str::<Config>(&content) {
-                    Ok(cfg) => {
+                    Ok(mut cfg) => {
+                        cfg.validate();
                         self.config = cfg;
                         self.last_modified = fs::metadata(&self.path)
                             .ok()

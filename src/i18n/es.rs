@@ -39,6 +39,7 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     );
     m.insert("Refresh Now", "Actualizar ahora");
     m.insert("Open Dashboard", "Abrir panel");
+    m.insert("Export History (CSV)", "Exportar historial (CSV)");
     m.insert("Settings", "Configuración");
     m.insert("Start with Windows", "Iniciar con Windows");
     m.insert("About", "Acerca de");
@@ -47,6 +48,7 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Refresh", "Actualizar");
     m.insert("Usage Alert", "Alerta de uso");
     m.insert("Usage Critical", "Uso crítico");
+    m.insert("Running in system tray. Click the icon for details.", "Ejecutándose en la bandeja del sistema. Haz clic en el icono para más detalles.");
     m.insert("Compact mode", "Modo compacto");
     m.insert("Theme", "Tema");
     m.insert("Language", "Idioma");
@@ -76,5 +78,6 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("50-79% usage", "50\u{2013}79% uso");
     m.insert(">= 80% usage", "\u{2265} 80% uso");
     m.insert("No data", "Sin datos");
+    m.insert("exceeded", "superado");
     m
 }

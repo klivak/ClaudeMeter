@@ -60,15 +60,23 @@ $notifier.Show($toast)
 "#
     );
 
-    let _ = std::process::Command::new("powershell")
-        .args([
-            "-WindowStyle",
-            "Hidden",
-            "-NonInteractive",
-            "-Command",
-            &script,
-        ])
-        .spawn();
+    #[cfg(target_os = "windows")]
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+    let mut cmd = std::process::Command::new("powershell");
+    cmd.args([
+        "-WindowStyle",
+        "Hidden",
+        "-NonInteractive",
+        "-Command",
+        &script,
+    ]);
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+    let _ = cmd.spawn();
 }
 
 #[cfg(test)]

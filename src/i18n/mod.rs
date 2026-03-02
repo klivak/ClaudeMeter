@@ -133,6 +133,74 @@ pub fn seconds_until(resets_at: &str) -> Option<i64> {
     Some(diff)
 }
 
+/// Format the reset timestamp as a local target time.
+/// Respects Windows 12h/24h system setting.
+/// 24h: "(Thu 14:00)" or "(14:00)". 12h: "(Thu 2:00 PM)" or "(2:00 PM)".
+pub fn format_reset_target(resets_at: &str) -> Option<String> {
+    use chrono::{DateTime, Local, Utc};
+    let reset_utc: DateTime<Utc> = resets_at.parse().ok()?;
+    let reset_local = reset_utc.with_timezone(&Local);
+    let now_local = Local::now();
+    let time_fmt = if is_system_24h() { "%H:%M" } else { "%I:%M %p" };
+    if reset_local.date_naive() == now_local.date_naive() {
+        Some(format!("({})", reset_local.format(time_fmt)))
+    } else {
+        Some(format!("({} {})", reset_local.format("%a"), reset_local.format(time_fmt)))
+    }
+}
+
+/// Detect Windows 12h vs 24h clock from registry (Control Panel\International\iTime).
+/// Returns true for 24h format. Defaults to 24h if registry read fails.
+pub fn is_system_24h() -> bool {
+    use windows::core::PCWSTR;
+    use windows::Win32::System::Registry::{
+        RegCloseKey, RegOpenKeyExW, RegQueryValueExW, HKEY_CURRENT_USER, KEY_READ, REG_SZ,
+    };
+
+    const KEY: &str = "Control Panel\\International";
+    const VALUE: &str = "iTime";
+
+    let key_wide: Vec<u16> = KEY.encode_utf16().chain(std::iter::once(0)).collect();
+    let value_wide: Vec<u16> = VALUE.encode_utf16().chain(std::iter::once(0)).collect();
+
+    unsafe {
+        let mut hkey = windows::Win32::System::Registry::HKEY::default();
+        if RegOpenKeyExW(
+            HKEY_CURRENT_USER,
+            PCWSTR(key_wide.as_ptr()),
+            0,
+            KEY_READ,
+            &mut hkey,
+        )
+        .is_err()
+        {
+            return true;
+        }
+
+        let mut buf = [0u16; 4];
+        let mut data_size = (buf.len() * 2) as u32;
+        let mut data_type = REG_SZ;
+
+        let result = RegQueryValueExW(
+            hkey,
+            PCWSTR(value_wide.as_ptr()),
+            None,
+            Some(&mut data_type),
+            Some(buf.as_mut_ptr() as *mut u8),
+            Some(&mut data_size),
+        );
+
+        let _ = RegCloseKey(hkey);
+
+        if result.is_ok() && data_size >= 2 {
+            // "1" = 24h, "0" = 12h
+            buf[0] == b'1' as u16
+        } else {
+            true
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

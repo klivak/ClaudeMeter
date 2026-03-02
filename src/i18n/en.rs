@@ -33,6 +33,7 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Open ChatGPT Usage \u{2192}", "Open ChatGPT Usage \u{2192}");
     m.insert("Refresh Now", "Refresh Now");
     m.insert("Open Dashboard", "Open Dashboard");
+    m.insert("Export History (CSV)", "Export History (CSV)");
     m.insert("Settings", "Settings");
     m.insert("Start with Windows", "Start with Windows");
     m.insert("About", "About");
@@ -41,6 +42,7 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Refresh", "Refresh");
     m.insert("Usage Alert", "Usage Alert");
     m.insert("Usage Critical", "Usage Critical");
+    m.insert("Running in system tray. Click the icon for details.", "Running in system tray. Click the icon for details.");
     m.insert("Compact mode", "Compact mode");
     m.insert("Theme", "Theme");
     m.insert("Language", "Language");
@@ -70,5 +72,6 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("50-79% usage", "50\u{2013}79% usage");
     m.insert(">= 80% usage", "\u{2265} 80% usage");
     m.insert("No data", "No data");
+    m.insert("exceeded", "exceeded");
     m
 }

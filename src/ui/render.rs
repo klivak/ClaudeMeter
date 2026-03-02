@@ -6,19 +6,20 @@
 /// - Antialiased rounded rectangles, ellipses, lines
 ///
 /// All coordinates are in DIPs (device-independent pixels, 1 DIP = 1/96 inch).
-use crate::i18n::{format_duration, seconds_until, I18n};
+use crate::i18n::{format_duration, format_reset_target, is_system_24h, seconds_until, I18n};
 use crate::providers::claude::{format_metric_name, UsageResponse};
-use crate::ui::colors::{colorref_to_d2d, ThemeColors};
+use crate::ui::colors::{colorref_to_d2d, lighten_d2d, ThemeColors};
 use std::collections::HashMap;
 use windows::core::PCWSTR;
 use windows::Win32::Foundation::{HWND, RECT};
 use windows::Win32::Graphics::Direct2D::Common::{
-    D2D1_ALPHA_MODE_PREMULTIPLIED, D2D1_COLOR_F, D2D1_PIXEL_FORMAT, D2D_POINT_2F, D2D_RECT_F,
-    D2D_SIZE_U,
+    D2D1_ALPHA_MODE_PREMULTIPLIED, D2D1_COLOR_F, D2D1_GRADIENT_STOP, D2D1_PIXEL_FORMAT,
+    D2D_POINT_2F, D2D_RECT_F, D2D_SIZE_U,
 };
 use windows::Win32::Graphics::Direct2D::{
     D2D1CreateFactory, ID2D1Factory, ID2D1HwndRenderTarget, D2D1_DRAW_TEXT_OPTIONS_NONE,
-    D2D1_ELLIPSE, D2D1_FACTORY_TYPE_SINGLE_THREADED, D2D1_HWND_RENDER_TARGET_PROPERTIES,
+    D2D1_ELLIPSE, D2D1_EXTEND_MODE_CLAMP, D2D1_FACTORY_TYPE_SINGLE_THREADED, D2D1_GAMMA_2_2,
+    D2D1_HWND_RENDER_TARGET_PROPERTIES, D2D1_LINEAR_GRADIENT_BRUSH_PROPERTIES,
     D2D1_PRESENT_OPTIONS_NONE, D2D1_RENDER_TARGET_PROPERTIES, D2D1_ROUNDED_RECT,
 };
 use windows::Win32::Graphics::DirectWrite::{
@@ -54,6 +55,7 @@ pub enum HoveredElement {
     ChatGptLink,
     BackButton,
     SettingRow(usize),
+    ChartBar(usize),
 }
 
 // --- Text format cache key ---
@@ -335,11 +337,14 @@ impl PopupRenderer {
         reset_lines: &[f64],
         last_error: &Option<String>,
         hovered: &HoveredElement,
+        anim_values: &[f64],
         settings_rect: &mut RECT,
         close_rect: &mut RECT,
         refresh_rect: &mut RECT,
         install_rect: &mut RECT,
         chatgpt_link_rect: &mut RECT,
+        chart_rect_out: &mut RECT,
+        chart_bar_count_out: &mut usize,
     ) {
         let Some(rt) = d2d.render_target.clone() else {
             return;
@@ -384,7 +389,9 @@ impl PopupRenderer {
                         );
                     }
                     Some(u) => {
-                        y = self.draw_claude_section(&rt, d2d, w, y, u, colors, i18n);
+                        y = self.draw_claude_section(
+                            &rt, d2d, w, y, u, colors, i18n, anim_values,
+                        );
                     }
                 }
 
@@ -397,7 +404,19 @@ impl PopupRenderer {
                 // History chart
                 y = self.draw_separator(&rt, w, y, colors);
                 y += self.sf(PADDING);
-                y = self.draw_chart(&rt, d2d, w, y, chart_data, reset_lines, colors, i18n);
+                y = self.draw_chart(
+                    &rt,
+                    d2d,
+                    w,
+                    y,
+                    chart_data,
+                    reset_lines,
+                    colors,
+                    i18n,
+                    hovered,
+                    chart_rect_out,
+                    chart_bar_count_out,
+                );
                 y += self.sf(PADDING);
             }
 
@@ -563,6 +582,7 @@ impl PopupRenderer {
         y + self.sf(SEPARATOR_H)
     }
 
+    #[allow(clippy::too_many_arguments)]
     unsafe fn draw_claude_section(
         &self,
         rt: &ID2D1HwndRenderTarget,
@@ -572,6 +592,7 @@ impl PopupRenderer {
         usage: &UsageResponse,
         colors: &ThemeColors,
         i18n: &I18n,
+        anim_values: &[f64],
     ) -> f32 {
         let pad = self.sf(PADDING);
 
@@ -605,14 +626,19 @@ impl PopupRenderer {
         );
         y += self.sf(24);
 
-        for (key, metric) in usage.all_metrics() {
+        for (i, (key, metric)) in usage.all_metrics().iter().enumerate() {
+            let util = if i < anim_values.len() {
+                anim_values[i]
+            } else {
+                metric.utilization
+            };
             y = self.draw_metric(
                 rt,
                 d2d,
                 w,
                 y,
-                &key,
-                metric.utilization,
+                key,
+                util,
                 metric.resets_at.as_deref(),
                 colors,
                 i18n,
@@ -707,28 +733,49 @@ impl PopupRenderer {
             &bg_brush,
         );
 
-        // Progress bar fill (rounded)
+        // Progress bar fill (rounded, gradient)
         let fill_w = (content_w * utilization as f32 / 100.0)
             .max(0.0)
             .min(content_w);
         if fill_w > 0.5 {
             let fill_color = colorref_to_d2d(colors.progress_color(utilization));
-            let fill_brush = rt
-                .CreateSolidColorBrush(&fill_color as *const _, None)
-                .unwrap();
-            rt.FillRoundedRectangle(
-                &D2D1_ROUNDED_RECT {
-                    rect: D2D_RECT_F {
-                        left: pad,
-                        top: y,
-                        right: pad + fill_w,
-                        bottom: y + bar_h,
-                    },
-                    radiusX: radius.min(fill_w / 2.0),
-                    radiusY: radius,
+            let light_color = lighten_d2d(&fill_color, 0.35);
+            let stops = [
+                D2D1_GRADIENT_STOP {
+                    position: 0.0,
+                    color: fill_color,
                 },
-                &fill_brush,
-            );
+                D2D1_GRADIENT_STOP {
+                    position: 1.0,
+                    color: light_color,
+                },
+            ];
+            let fill_rect = D2D1_ROUNDED_RECT {
+                rect: D2D_RECT_F {
+                    left: pad,
+                    top: y,
+                    right: pad + fill_w,
+                    bottom: y + bar_h,
+                },
+                radiusX: radius.min(fill_w / 2.0),
+                radiusY: radius,
+            };
+            if let Ok(stop_coll) =
+                rt.CreateGradientStopCollection(&stops, D2D1_GAMMA_2_2, D2D1_EXTEND_MODE_CLAMP)
+            {
+                let grad_props = D2D1_LINEAR_GRADIENT_BRUSH_PROPERTIES {
+                    startPoint: D2D_POINT_2F { x: pad, y: 0.0 },
+                    endPoint: D2D_POINT_2F {
+                        x: pad + fill_w,
+                        y: 0.0,
+                    },
+                };
+                if let Ok(grad_brush) =
+                    rt.CreateLinearGradientBrush(&grad_props, None, &stop_coll)
+                {
+                    rt.FillRoundedRectangle(&fill_rect, &grad_brush);
+                }
+            }
         }
 
         y += bar_h + self.sf(4);
@@ -737,7 +784,9 @@ impl PopupRenderer {
         if let Some(reset_str) = resets_at {
             let reset_text = if let Some(secs) = seconds_until(reset_str) {
                 if secs > 0 {
-                    format!("{} {}", i18n.t("resets in"), format_duration(secs))
+                    let duration = format_duration(secs);
+                    let target = format_reset_target(reset_str).unwrap_or_default();
+                    format!("{} {} {}", i18n.t("resets in"), duration, target)
                 } else {
                     "resetting soon".to_string()
                 }
@@ -1096,6 +1145,9 @@ impl PopupRenderer {
         reset_lines: &[f64],
         colors: &ThemeColors,
         i18n: &I18n,
+        hovered: &HoveredElement,
+        chart_rect_out: &mut RECT,
+        chart_bar_count_out: &mut usize,
     ) -> f32 {
         let pad = self.sf(PADDING);
 
@@ -1123,6 +1175,15 @@ impl PopupRenderer {
 
         let chart_h = self.sf(70);
         let chart_w = w - pad * 2.0;
+
+        // Output chart area for hit-testing
+        *chart_rect_out = RECT {
+            left: pad as i32,
+            top: y as i32,
+            right: (pad + chart_w) as i32,
+            bottom: (y + chart_h) as i32,
+        };
+        *chart_bar_count_out = data.len();
 
         // Chart background
         let bg_brush = rt
@@ -1210,10 +1271,77 @@ impl PopupRenderer {
             }
         }
 
+        // Hover tooltip
+        if let HoveredElement::ChartBar(idx) = hovered {
+            let idx = *idx;
+            if idx < data.len() {
+                let val = data[idx];
+                let bar_w = (chart_w / data.len() as f32).max(2.0);
+                let bar_cx = pad + idx as f32 * bar_w + bar_w / 2.0;
+                let hours_ago = 24.0 * (1.0 - (idx as f64 + 0.5) / data.len() as f64);
+
+                // Show actual clock time for this bar
+                let bar_time = chrono::Local::now()
+                    - chrono::Duration::seconds((hours_ago * 3600.0) as i64);
+                let time_str = if is_system_24h() {
+                    bar_time.format("%H:%M").to_string()
+                } else {
+                    bar_time.format("%I:%M %p").to_string()
+                };
+                let tip_text = format!("{:.0}% | {}", val, time_str);
+                let tip_wide = wide(&tip_text);
+
+                let tip_w = self.sf(100);
+                let tip_h = self.sf(22);
+                let tip_x = (bar_cx - tip_w / 2.0).clamp(pad, pad + chart_w - tip_w);
+                let bar_h_px = (val / 100.0) * chart_h as f64;
+                let tip_y = (y + chart_h - bar_h_px as f32 - tip_h - self.sf(4)).max(y - tip_h);
+
+                // Tooltip background
+                let tip_bg = rt
+                    .CreateSolidColorBrush(&colorref_to_d2d(colors.surface) as *const _, None)
+                    .unwrap();
+                let tip_border_brush = rt
+                    .CreateSolidColorBrush(&colorref_to_d2d(colors.border) as *const _, None)
+                    .unwrap();
+                let tip_rect = D2D1_ROUNDED_RECT {
+                    rect: D2D_RECT_F {
+                        left: tip_x,
+                        top: tip_y,
+                        right: tip_x + tip_w,
+                        bottom: tip_y + tip_h,
+                    },
+                    radiusX: 4.0,
+                    radiusY: 4.0,
+                };
+                rt.FillRoundedRectangle(&tip_rect, &tip_bg);
+                rt.DrawRoundedRectangle(&tip_rect, &tip_border_brush, 1.0, None);
+
+                // Tooltip text
+                let tip_format = d2d.get_text_format(9, true, 2, 1).clone();
+                let tip_text_brush = rt
+                    .CreateSolidColorBrush(&colorref_to_d2d(colors.text_primary) as *const _, None)
+                    .unwrap();
+                rt.DrawText(
+                    &tip_wide[..tip_wide.len() - 1],
+                    &tip_format,
+                    &D2D_RECT_F {
+                        left: tip_x,
+                        top: tip_y,
+                        right: tip_x + tip_w,
+                        bottom: tip_y + tip_h,
+                    },
+                    &tip_text_brush,
+                    D2D1_DRAW_TEXT_OPTIONS_NONE,
+                    DWRITE_MEASURING_MODE_NATURAL,
+                );
+            }
+        }
+
         y += chart_h + self.sf(4);
 
         // X-axis labels
-        let labels = ["24h", "18h", "12h", "6h", "now"];
+        let labels = ["24h ago", "18h ago", "12h ago", "6h ago", "now"];
         for (i, label) in labels.iter().enumerate() {
             let lx = pad + (i as f32 * chart_w / 4.0);
             let text = wide(label);
@@ -1225,9 +1353,9 @@ impl PopupRenderer {
                 &text[..text.len() - 1],
                 &format,
                 &D2D_RECT_F {
-                    left: lx - self.sf(10),
+                    left: lx - self.sf(14),
                     top: y,
-                    right: lx + self.sf(20),
+                    right: lx + self.sf(30),
                     bottom: y + self.sf(14),
                 },
                 &brush,

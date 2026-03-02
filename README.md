@@ -83,7 +83,7 @@ Right-click the tray icon → check ✅ **"Start with Windows"**
 | 7-day weekly | Weekly usage cap with reset timer |
 | 7-day Sonnet | Sonnet-specific limit (shown if applicable) |
 | 7-day Opus | Opus-specific limit (Max plans only) |
-| Plan detection | Automatically detects Pro vs Max subscription |
+| Plan detection | Automatically detects Pro vs Max (incl. 5x/20x tiers) |
 | Future metrics | Any new API fields are auto-displayed |
 
 ### ChatGPT / Codex (Optional)
@@ -92,12 +92,25 @@ OpenAI does not provide a public API for checking ChatGPT Plus/Pro subscription 
 
 ### System Tray
 
-- **🟢🟡🔴 Dynamic icon** — color changes based on highest usage percentage
-- **💬 Rich tooltip** — hover to see all metrics at a glance
-- **📋 Context menu** — right-click for quick actions and links
+- **🔢 Dynamic % icon** — shows actual utilization number (e.g. "42") with color-coded background
+- **🟢🟡🔴 Color coding** — green (<50%), yellow (50-79%), red (>=80%), gray (no data)
+- **💬 Rich tooltip** — hover to see all metrics, reset times, and plan info
+- **📋 Context menu** — right-click for refresh, export CSV, settings, links
 - **📊 Dashboard** — left-click to open the detailed popup
+- **⚠ Blink on critical** — tray icon blinks when usage exceeds 90%
 
 <img src="screenshots/hover.png" alt="Tray tooltip on hover" width="280">
+
+### 📊 Dashboard
+
+- **Gradient progress bars** — smooth color gradients for each metric
+- **Animated bars** — bars fill smoothly on popup open (~60fps)
+- **Fade-in animation** — popup appears with smooth opacity transition
+- **24-hour usage chart** — with session reset lines and hover tooltips
+- **Chart hover** — hover any bar to see exact % and time
+- **Keyboard shortcuts** — ESC to close, F5 to refresh
+- **Auto-refresh** — automatically polls when data is older than 60 seconds
+- **Mica backdrop** — Windows 11 translucent effect (falls back gracefully on Win10)
 
 ### 🎨 Themes
 
@@ -117,7 +130,23 @@ OpenAI does not provide a public API for checking ChatGPT Plus/Pro subscription 
 
 ### 🔔 Smart Notifications
 
-Windows toast notifications when usage crosses configurable thresholds (50%, 75%, 90% by default).
+- Windows toast notifications at configurable thresholds (50%, 75%, 90% by default)
+- **Informative alerts** — shows metric name, current %, exceeded threshold, and reset countdown
+- **Sound alerts** — system notification sound (configurable on/off)
+- **Startup notification** — confirmation that ClaudeMeter is running in the tray
+- **Deduplication** — won't spam; resets when usage drops below threshold
+
+### 📤 Data Export
+
+- **CSV export** — right-click tray → "Export History (CSV)" to save full usage history
+- **SQLite database** — 30-day rolling history stored next to the .exe
+
+### ⚙ Smart Polling
+
+- **Idle detection** — pauses API polling when PC is idle for 5+ minutes
+- **Exponential backoff** — on API errors, interval doubles (2x, 4x, 8x) up to 10 min cap
+- **Rate-limit handling** — graceful 429 response parsing with retry-after
+- **Config validation** — sanitizes all values on load (polling interval 30-600s, thresholds 1-100%)
 
 ## ⚙ Configuration
 
@@ -139,6 +168,25 @@ Windows toast notifications when usage crosses configurable thresholds (50%, 75%
   "show_chatgpt_section": false
 }
 ```
+
+| Field | Default | Range | Description |
+|-------|---------|-------|-------------|
+| `polling_interval_seconds` | `120` | 30–600 | How often to check usage (validated on load) |
+| `notifications.enabled` | `true` | — | Enable/disable toast notifications |
+| `notifications.thresholds` | `[50,75,90]` | 1–100 | Usage % levels that trigger alerts |
+| `notifications.sound` | `true` | — | Play system sound with notifications |
+| `theme` | `"auto"` | auto/dark/light | Color theme |
+| `language` | `"auto"` | auto/en/uk/es/de/fr | UI language |
+| `compact_mode` | `false` | — | Compact dashboard layout |
+| `show_chatgpt_section` | `false` | — | Show ChatGPT quick-link panel |
+| `autostart` | `false` | — | Start with Windows |
+
+## ⌨ Keyboard Shortcuts
+
+| Key | Action |
+|-----|--------|
+| **ESC** | Close dashboard popup |
+| **F5** | Refresh usage data |
 
 ## 🔨 Building from Source
 

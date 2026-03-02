@@ -100,3 +100,14 @@ impl ThemeColors {
         }
     }
 }
+
+/// Lighten a D2D1_COLOR_F by mixing towards white.
+/// `amount` in 0.0..1.0 (0 = unchanged, 1 = white).
+pub fn lighten_d2d(c: &D2D1_COLOR_F, amount: f32) -> D2D1_COLOR_F {
+    D2D1_COLOR_F {
+        r: c.r + (1.0 - c.r) * amount,
+        g: c.g + (1.0 - c.g) * amount,
+        b: c.b + (1.0 - c.b) * amount,
+        a: c.a,
+    }
+}
