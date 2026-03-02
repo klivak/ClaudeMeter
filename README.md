@@ -36,11 +36,13 @@ ClaudeMeter is **purposefully built in Rust** to be as lightweight as physically
 
 | App | RAM Usage | Binary Size | Dependencies |
 |-----|-----------|-------------|-------------|
-| **ClaudeMeter (Rust)** | **3–8 MB** | **~3 MB** | **None** |
+| **ClaudeMeter (Rust)** | **~2 MB** | **~3 MB** | **None** |
 | Windows Notepad | ~10 MB | built-in | — |
 | Electron-based tray apps | 80–150 MB | ~80 MB | Chromium |
 | Python-based monitors | 25–45 MB | ~15 MB | Python runtime |
 | .NET-based monitors | 15–25 MB | ~1 MB | .NET runtime |
+
+<img src="screenshots/task-manager.png" alt="Task Manager — ClaudeMeter 1.9 MB RAM" width="540">
 
 **Single portable `.exe`** — no installation, no runtime, no .NET, no Java, no Python, no Node.js. Download → run → done.
 
