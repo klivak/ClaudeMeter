@@ -42,7 +42,10 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Refresh", "Refresh");
     m.insert("Usage Alert", "Usage Alert");
     m.insert("Usage Critical", "Usage Critical");
-    m.insert("Running in system tray. Click the icon for details.", "Running in system tray. Click the icon for details.");
+    m.insert(
+        "Running in system tray. Click the icon for details.",
+        "Running in system tray. Click the icon for details.",
+    );
     m.insert("Compact mode", "Compact mode");
     m.insert("Theme", "Theme");
     m.insert("Language", "Language");

@@ -21,9 +21,8 @@ use crate::notifications::{send_toast, NotificationTracker};
 use crate::providers::claude::{ClaudeClient, UsageResponse};
 use crate::theme::{resolve_theme, ThemeMode};
 use crate::tray::{
-    build_tooltip, TrayIcon, IDM_ABOUT, IDM_AUTOSTART, IDM_EXIT, IDM_EXPORT_CSV,
-    IDM_OPEN_CHATGPT, IDM_OPEN_CLAUDE, IDM_OPEN_DASHBOARD, IDM_REFRESH, IDM_SETTINGS,
-    WM_TRAY_ICON,
+    build_tooltip, TrayIcon, IDM_ABOUT, IDM_AUTOSTART, IDM_EXIT, IDM_EXPORT_CSV, IDM_OPEN_CHATGPT,
+    IDM_OPEN_CLAUDE, IDM_OPEN_DASHBOARD, IDM_REFRESH, IDM_SETTINGS, WM_TRAY_ICON,
 };
 use crate::ui::colors::colorref_to_d2d;
 use crate::ui::render::{draw_settings_panel, D2DResources, HoveredElement, PopupRenderer};
@@ -36,18 +35,17 @@ use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::System::Threading::CreateMutexW;
 use windows::Win32::UI::Controls::WM_MOUSELEAVE;
 use windows::Win32::UI::Input::KeyboardAndMouse::{TrackMouseEvent, TME_LEAVE, TRACKMOUSEEVENT};
+use windows::Win32::UI::WindowsAndMessaging::LWA_ALPHA;
 use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyMenu, DispatchMessageW,
-    GetCursorPos, LoadCursorW, LoadIconW, PeekMessageW, PostMessageW, PostQuitMessage,
-    RegisterClassExW, SetCursor, SetForegroundWindow, TrackPopupMenu, TranslateMessage,
-    CS_DROPSHADOW, CS_HREDRAW, CS_VREDRAW, GWL_EXSTYLE, HMENU, IDC_ARROW, IDC_HAND,
-    IDI_APPLICATION, MF_CHECKED, MF_SEPARATOR, MF_STRING, MF_UNCHECKED, MSG, PM_REMOVE,
-    SetLayeredWindowAttributes, SetWindowLongW, GetWindowLongW,
-    TPM_BOTTOMALIGN, TPM_LEFTALIGN, TPM_RETURNCMD, WM_COMMAND, WM_DESTROY, WM_KEYDOWN,
-    WM_KILLFOCUS, WM_LBUTTONUP, WM_MOUSEMOVE, WM_PAINT, WM_RBUTTONUP, WM_SETCURSOR, WM_TIMER,
-    WNDCLASSEXW, WS_EX_LAYERED, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
+    GetCursorPos, GetWindowLongW, LoadCursorW, LoadIconW, PeekMessageW, PostMessageW,
+    PostQuitMessage, RegisterClassExW, SetCursor, SetForegroundWindow, SetLayeredWindowAttributes,
+    SetWindowLongW, TrackPopupMenu, TranslateMessage, CS_DROPSHADOW, CS_HREDRAW, CS_VREDRAW,
+    GWL_EXSTYLE, HMENU, IDC_ARROW, IDC_HAND, IDI_APPLICATION, MF_CHECKED, MF_SEPARATOR, MF_STRING,
+    MF_UNCHECKED, MSG, PM_REMOVE, TPM_BOTTOMALIGN, TPM_LEFTALIGN, TPM_RETURNCMD, WM_COMMAND,
+    WM_DESTROY, WM_KEYDOWN, WM_KILLFOCUS, WM_LBUTTONUP, WM_MOUSEMOVE, WM_PAINT, WM_RBUTTONUP,
+    WM_SETCURSOR, WM_TIMER, WNDCLASSEXW, WS_EX_LAYERED, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
 };
-use windows::Win32::UI::WindowsAndMessaging::LWA_ALPHA;
 
 const WINDOW_CLASS: &str = "ClaudeMeterMain";
 const POPUP_CLASS: &str = "ClaudeMeterPopup";
@@ -247,7 +245,9 @@ unsafe fn run_message_loop(exe_dir: std::path::PathBuf, config_mgr: ConfigManage
         if state.config_mgr.config.notifications.enabled {
             send_toast(
                 "ClaudeMeter",
-                state.i18n.t("Running in system tray. Click the icon for details."),
+                state
+                    .i18n
+                    .t("Running in system tray. Click the icon for details."),
             );
         }
     }
@@ -471,10 +471,8 @@ unsafe extern "system" fn popup_wnd_proc(
                 if let Some(state) = APP_STATE.as_mut() {
                     if state.anim_active {
                         let mut all_done = true;
-                        for (cur, &tgt) in state
-                            .anim_current
-                            .iter_mut()
-                            .zip(state.anim_targets.iter())
+                        for (cur, &tgt) in
+                            state.anim_current.iter_mut().zip(state.anim_targets.iter())
                         {
                             let diff = tgt - *cur;
                             if diff.abs() < 0.5 {
@@ -484,14 +482,11 @@ unsafe extern "system" fn popup_wnd_proc(
                                 all_done = false;
                             }
                         }
-                        let _ = windows::Win32::Graphics::Gdi::InvalidateRect(
-                            hwnd, None, false,
-                        );
+                        let _ = windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, false);
                         if all_done {
                             state.anim_active = false;
                             let _ = windows::Win32::UI::WindowsAndMessaging::KillTimer(
-                                hwnd,
-                                TIMER_ANIM,
+                                hwnd, TIMER_ANIM,
                             );
                         }
                     }
@@ -510,9 +505,8 @@ unsafe extern "system" fn popup_wnd_proc(
                         // Fade complete — remove WS_EX_LAYERED for normal rendering
                         let ex = GetWindowLongW(hwnd, GWL_EXSTYLE);
                         SetWindowLongW(hwnd, GWL_EXSTYLE, ex & !(WS_EX_LAYERED.0 as i32));
-                        let _ = windows::Win32::UI::WindowsAndMessaging::KillTimer(
-                            hwnd, TIMER_FADE,
-                        );
+                        let _ =
+                            windows::Win32::UI::WindowsAndMessaging::KillTimer(hwnd, TIMER_FADE);
                     }
                 }
             }
@@ -565,9 +559,8 @@ unsafe extern "system" fn popup_wnd_proc(
                 {
                     let chart_w = state.chart_rect.right - state.chart_rect.left;
                     let rel_x = pt.x - state.chart_rect.left;
-                    let bar_idx =
-                        (rel_x as usize * state.chart_bar_count / chart_w as usize)
-                            .min(state.chart_bar_count - 1);
+                    let bar_idx = (rel_x as usize * state.chart_bar_count / chart_w as usize)
+                        .min(state.chart_bar_count - 1);
                     HoveredElement::ChartBar(bar_idx)
                 } else {
                     HoveredElement::None
@@ -718,8 +711,7 @@ unsafe extern "system" fn popup_wnd_proc(
                 // VK_F5 — refresh
                 if let Some(state) = APP_STATE.as_mut() {
                     state.last_updated = "...".to_string();
-                    let _ =
-                        windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, false);
+                    let _ = windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, false);
                     trigger_poll(state.main_hwnd);
                 }
             }
@@ -786,7 +778,11 @@ unsafe fn hide_popup(state: &mut AppState) {
     // Remove WS_EX_LAYERED if still set from fade
     let ex = GetWindowLongW(state.popup_hwnd, GWL_EXSTYLE);
     if ex & WS_EX_LAYERED.0 as i32 != 0 {
-        SetWindowLongW(state.popup_hwnd, GWL_EXSTYLE, ex & !(WS_EX_LAYERED.0 as i32));
+        SetWindowLongW(
+            state.popup_hwnd,
+            GWL_EXSTYLE,
+            ex & !(WS_EX_LAYERED.0 as i32),
+        );
     }
     let _ = windows::Win32::UI::WindowsAndMessaging::ShowWindow(
         state.popup_hwnd,
@@ -925,15 +921,10 @@ unsafe fn show_popup(_main_hwnd: HWND) {
         if state.blink_active {
             state.blink_active = false;
             state.blink_visible = true;
-            let _ = windows::Win32::UI::WindowsAndMessaging::KillTimer(
-                state.main_hwnd,
-                TIMER_BLINK,
-            );
+            let _ =
+                windows::Win32::UI::WindowsAndMessaging::KillTimer(state.main_hwnd, TIMER_BLINK);
             // Restore normal icon
-            let tooltip = build_tooltip(
-                &state.usage,
-                state.config_mgr.config.show_chatgpt_section,
-            );
+            let tooltip = build_tooltip(&state.usage, state.config_mgr.config.show_chatgpt_section);
             if let Some(tray) = &mut state.tray {
                 tray.update(&state.usage, &tooltip);
             }
@@ -1070,11 +1061,8 @@ unsafe fn handle_menu_command(hwnd: HWND, cmd: u32) {
                 match Database::open(&state.exe_dir) {
                     Ok(db) => match db.export_csv(&csv_path) {
                         Ok(count) => {
-                            let msg = format!(
-                                "{} rows exported to:\n{}",
-                                count,
-                                csv_path.display()
-                            );
+                            let msg =
+                                format!("{} rows exported to:\n{}", count, csv_path.display());
                             let _ = windows::Win32::UI::WindowsAndMessaging::MessageBoxW(
                                 hwnd,
                                 windows::core::PCWSTR(wide(&msg).as_ptr()),
@@ -1260,28 +1248,26 @@ unsafe fn on_poll_result(hwnd: HWND, usage: Option<UsageResponse>, error: Option
 
                         let (title, body) = if threshold >= 90 {
                             (
+                                format!("ClaudeMeter — {}", state.i18n.t("Usage Critical")),
                                 format!(
-                                    "ClaudeMeter — {}",
-                                    state.i18n.t("Usage Critical")
-                                ),
-                                format!(
-                                    "{}: {:.0}% ({} {}%){}", metric_name,
+                                    "{}: {:.0}% ({} {}%){}",
+                                    metric_name,
                                     metric.utilization,
                                     state.i18n.t("exceeded"),
-                                    threshold, reset_info
+                                    threshold,
+                                    reset_info
                                 ),
                             )
                         } else {
                             (
+                                format!("ClaudeMeter — {}", state.i18n.t("Usage Alert")),
                                 format!(
-                                    "ClaudeMeter — {}",
-                                    state.i18n.t("Usage Alert")
-                                ),
-                                format!(
-                                    "{}: {:.0}% ({} {}%){}", metric_name,
+                                    "{}: {:.0}% ({} {}%){}",
+                                    metric_name,
                                     metric.utilization,
                                     state.i18n.t("exceeded"),
-                                    threshold, reset_info
+                                    threshold,
+                                    reset_info
                                 ),
                             )
                         };

@@ -61,7 +61,9 @@ impl Config {
         self.polling_interval_seconds = self.polling_interval_seconds.clamp(30, 600);
 
         // Thresholds: keep only 1..=100, remove duplicates, sort
-        self.notifications.thresholds.retain(|&t| (1..=100).contains(&t));
+        self.notifications
+            .thresholds
+            .retain(|&t| (1..=100).contains(&t));
         self.notifications.thresholds.sort();
         self.notifications.thresholds.dedup();
         if self.notifications.thresholds.is_empty() {

@@ -389,9 +389,7 @@ impl PopupRenderer {
                         );
                     }
                     Some(u) => {
-                        y = self.draw_claude_section(
-                            &rt, d2d, w, y, u, colors, i18n, anim_values,
-                        );
+                        y = self.draw_claude_section(&rt, d2d, w, y, u, colors, i18n, anim_values);
                     }
                 }
 
@@ -770,8 +768,7 @@ impl PopupRenderer {
                         y: 0.0,
                     },
                 };
-                if let Ok(grad_brush) =
-                    rt.CreateLinearGradientBrush(&grad_props, None, &stop_coll)
+                if let Ok(grad_brush) = rt.CreateLinearGradientBrush(&grad_props, None, &stop_coll)
                 {
                     rt.FillRoundedRectangle(&fill_rect, &grad_brush);
                 }
@@ -1281,8 +1278,8 @@ impl PopupRenderer {
                 let hours_ago = 24.0 * (1.0 - (idx as f64 + 0.5) / data.len() as f64);
 
                 // Show actual clock time for this bar
-                let bar_time = chrono::Local::now()
-                    - chrono::Duration::seconds((hours_ago * 3600.0) as i64);
+                let bar_time =
+                    chrono::Local::now() - chrono::Duration::seconds((hours_ago * 3600.0) as i64);
                 let time_str = if is_system_24h() {
                     bar_time.format("%H:%M").to_string()
                 } else {

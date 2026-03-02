@@ -48,7 +48,10 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Refresh", "Оновити");
     m.insert("Usage Alert", "Попередження використання");
     m.insert("Usage Critical", "Критичне використання");
-    m.insert("Running in system tray. Click the icon for details.", "Працює в системному треї. Натисніть на іконку для деталей.");
+    m.insert(
+        "Running in system tray. Click the icon for details.",
+        "Працює в системному треї. Натисніть на іконку для деталей.",
+    );
     m.insert("Compact mode", "Компактний режим");
     m.insert("Theme", "Тема");
     m.insert("Language", "Мова");

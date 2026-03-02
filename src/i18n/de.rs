@@ -48,7 +48,10 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Refresh", "Aktualisieren");
     m.insert("Usage Alert", "Nutzungswarnung");
     m.insert("Usage Critical", "Kritische Nutzung");
-    m.insert("Running in system tray. Click the icon for details.", "Läuft im Infobereich. Klicken Sie auf das Symbol für Details.");
+    m.insert(
+        "Running in system tray. Click the icon for details.",
+        "Läuft im Infobereich. Klicken Sie auf das Symbol für Details.",
+    );
     m.insert("Compact mode", "Kompaktmodus");
     m.insert("Theme", "Thema");
     m.insert("Language", "Sprache");

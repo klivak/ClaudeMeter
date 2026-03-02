@@ -107,9 +107,8 @@ impl Database {
              FROM usage_history ORDER BY timestamp DESC",
         )?;
 
-        let mut file = std::fs::File::create(path).map_err(|e| {
-            rusqlite::Error::ToSqlConversionFailure(Box::new(e))
-        })?;
+        let mut file = std::fs::File::create(path)
+            .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
 
         let _ = writeln!(file, "timestamp,provider,metric,utilization,resets_at");
         let mut count = 0usize;
@@ -126,7 +125,11 @@ impl Database {
 
         for (ts, provider, metric, util, resets) in rows.flatten() {
             let resets_str = resets.unwrap_or_default();
-            let _ = writeln!(file, "{},{},{},{:.2},{}", ts, provider, metric, util, resets_str);
+            let _ = writeln!(
+                file,
+                "{},{},{},{:.2},{}",
+                ts, provider, metric, util, resets_str
+            );
             count += 1;
         }
 

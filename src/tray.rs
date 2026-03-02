@@ -225,8 +225,7 @@ fn create_number_icon(value: u32, color: ColorRef, text_color: u32) -> Option<HI
             ..Default::default()
         };
         let mut mask_bits: *mut std::ffi::c_void = std::ptr::null_mut();
-        let hbm_mask =
-            CreateDIBSection(dc, &mask_bmi, DIB_RGB_COLORS, &mut mask_bits, None, 0);
+        let hbm_mask = CreateDIBSection(dc, &mask_bmi, DIB_RGB_COLORS, &mut mask_bits, None, 0);
         if hbm_mask.is_err() {
             let _ = DeleteObject(hbm_color);
             let _ = DeleteDC(dc);
@@ -306,7 +305,9 @@ impl TrayIcon {
             if let Some(dyn_icon) = create_number_icon(pct.round() as u32, color_ref, text_cr) {
                 // Destroy previous dynamic icon
                 if let Some(old) = self.dynamic_icon.take() {
-                    unsafe { let _ = DestroyIcon(old); }
+                    unsafe {
+                        let _ = DestroyIcon(old);
+                    }
                 }
                 self.dynamic_icon = Some(dyn_icon);
                 dyn_icon

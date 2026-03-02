@@ -145,7 +145,11 @@ pub fn format_reset_target(resets_at: &str) -> Option<String> {
     if reset_local.date_naive() == now_local.date_naive() {
         Some(format!("({})", reset_local.format(time_fmt)))
     } else {
-        Some(format!("({} {})", reset_local.format("%a"), reset_local.format(time_fmt)))
+        Some(format!(
+            "({} {})",
+            reset_local.format("%a"),
+            reset_local.format(time_fmt)
+        ))
     }
 }
 
