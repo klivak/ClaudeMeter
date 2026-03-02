@@ -478,11 +478,7 @@ unsafe extern "system" fn popup_wnd_proc(
 
             if let Some(state) = APP_STATE.as_mut() {
                 if crate::popup::point_in_rect(pt, state.close_rect) {
-                    state.popup_visible = false;
-                    let _ = windows::Win32::UI::WindowsAndMessaging::ShowWindow(
-                        hwnd,
-                        windows::Win32::UI::WindowsAndMessaging::SW_HIDE,
-                    );
+                    hide_popup(state);
                 } else if state.popup_in_settings
                     && crate::popup::point_in_rect(pt, state.back_rect)
                 {
@@ -582,14 +578,8 @@ unsafe extern "system" fn popup_wnd_proc(
         // Close popup when clicking outside (WM_KILLFOCUS)
         WM_KILLFOCUS => {
             if let Some(state) = APP_STATE.as_mut() {
-                state.hovered_element = HoveredElement::None;
-                state.mouse_tracking = false;
                 if state.popup_visible {
-                    state.popup_visible = false;
-                    let _ = windows::Win32::UI::WindowsAndMessaging::ShowWindow(
-                        hwnd,
-                        windows::Win32::UI::WindowsAndMessaging::SW_HIDE,
-                    );
+                    hide_popup(state);
                 }
             }
             LRESULT(0)
@@ -623,14 +613,40 @@ unsafe fn apply_dwm_dark_mode(hwnd: HWND, is_dark: bool) {
     );
 }
 
+/// Hide the popup and release D2D resources to reclaim memory.
+unsafe fn hide_popup(state: &mut AppState) {
+    state.popup_visible = false;
+    state.hovered_element = HoveredElement::None;
+    state.mouse_tracking = false;
+    let _ = windows::Win32::UI::WindowsAndMessaging::ShowWindow(
+        state.popup_hwnd,
+        windows::Win32::UI::WindowsAndMessaging::SW_HIDE,
+    );
+    if let Some(d2d) = state.d2d.as_mut() {
+        d2d.release();
+    }
+    trim_working_set();
+}
+
+/// Ask Windows to trim the process working set so freed memory is returned to the OS.
+fn trim_working_set() {
+    extern "system" {
+        fn SetProcessWorkingSetSize(
+            hProcess: *mut core::ffi::c_void,
+            dwMinimumWorkingSetSize: usize,
+            dwMaximumWorkingSetSize: usize,
+        ) -> i32;
+    }
+    unsafe {
+        let process = windows::Win32::System::Threading::GetCurrentProcess();
+        SetProcessWorkingSetSize(process.0, usize::MAX, usize::MAX);
+    }
+}
+
 unsafe fn toggle_popup(main_hwnd: HWND) {
     if let Some(state) = APP_STATE.as_mut() {
         if state.popup_visible {
-            state.popup_visible = false;
-            let _ = windows::Win32::UI::WindowsAndMessaging::ShowWindow(
-                state.popup_hwnd,
-                windows::Win32::UI::WindowsAndMessaging::SW_HIDE,
-            );
+            hide_popup(state);
         } else {
             show_popup(main_hwnd);
         }
@@ -751,7 +767,7 @@ unsafe fn show_context_menu(hwnd: HWND) {
             PCWSTR(autostart_text.as_ptr()),
         );
         append_menu_sep(menu);
-        append_menu_str(menu, IDM_ABOUT, "ClaudeMeter v1.0.0");
+        append_menu_str(menu, IDM_ABOUT, "ClaudeMeter v1.1.0");
         append_menu_str(menu, IDM_EXIT, state.i18n.t("Exit"));
 
         let mut pt = POINT::default();
@@ -822,7 +838,7 @@ unsafe fn handle_menu_command(hwnd: HWND, cmd: u32) {
             // Show simple about message
             let _ = windows::Win32::UI::WindowsAndMessaging::MessageBoxW(
                 hwnd,
-                windows::core::PCWSTR(wide("ClaudeMeter v1.0.0\nby klivak\nhttps://github.com/klivak/claudemeter\n\nMIT License").as_ptr()),
+                windows::core::PCWSTR(wide("ClaudeMeter v1.1.0\nby klivak\nhttps://github.com/klivak/claudemeter\n\nMIT License").as_ptr()),
                 windows::core::PCWSTR(wide("About ClaudeMeter").as_ptr()),
                 windows::Win32::UI::WindowsAndMessaging::MB_ICONINFORMATION | windows::Win32::UI::WindowsAndMessaging::MB_OK,
             );

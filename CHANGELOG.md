@@ -5,6 +5,21 @@ All notable changes to ClaudeMeter will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-03-02
+
+### Added
+- Direct2D + DirectWrite hardware-accelerated rendering (replaces GDI)
+- DWM dark title bar integration
+- Session reset lines (dashed vertical) on 24h usage chart
+- Tooltip spacing between metric values
+- Screenshots in README (dashboard, tooltip, settings)
+
+### Fixed
+- DPI scaling at 125%/150% — popup no longer clips content
+- Memory reclaimed when popup is closed (D2D resources released + working set trimmed)
+- Settings gear and close button visibility at non-100% DPI
+- Credential error display improvements
+
 ## [1.0.0] - 2026-02-25
 
 ### Added

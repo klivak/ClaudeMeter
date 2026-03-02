@@ -150,6 +150,12 @@ impl D2DResources {
         self.render_target = None;
     }
 
+    /// Release all GPU/COM resources to reclaim memory when popup is hidden.
+    pub fn release(&mut self) {
+        self.render_target = None;
+        self.text_formats.clear();
+    }
+
     fn get_text_format(
         &mut self,
         size_pt: i32,

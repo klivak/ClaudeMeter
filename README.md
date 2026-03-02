@@ -18,6 +18,10 @@ Track your Claude Pro/Max limits without opening a browser.
 
 [Download](#-quick-start) · [Features](#-features) · [Usage](#-how-to-use) · [FAQ](#-faq)
 
+<br>
+
+<img src="screenshots/main.png" alt="ClaudeMeter Dashboard" width="360">
+
 </div>
 
 ---
@@ -91,11 +95,15 @@ OpenAI does not provide a public API for checking ChatGPT Plus/Pro subscription 
 - **📋 Context menu** — right-click for quick actions and links
 - **📊 Dashboard** — left-click to open the detailed popup
 
+<img src="screenshots/hover.png" alt="Tray tooltip on hover" width="280">
+
 ### 🎨 Themes
 
 - **Dark** — easy on the eyes (Catppuccin Mocha palette)
 - **Light** — for bright environments (Catppuccin Latte palette)
 - **Auto** (default) — follows your Windows system theme automatically
+
+<img src="screenshots/settings.png" alt="Settings panel" width="360">
 
 ### 🌐 Languages
 
