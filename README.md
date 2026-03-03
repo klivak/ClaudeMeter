@@ -15,6 +15,7 @@ Track your Claude Pro/Max limits without opening a browser.
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Windows](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?logo=windows)](https://github.com/klivak/claudemeter/releases)
 [![RAM](https://img.shields.io/badge/RAM-under%2010MB-brightgreen)](#-why-rust)
+[![VirusTotal](https://img.shields.io/badge/VirusTotal-scanned-4CAF50?logo=virustotal&logoColor=white)](https://github.com/klivak/claudemeter/releases/latest)
 
 [Download](#-quick-start) · [Features](#-features) · [Usage](#-how-to-use) · [FAQ](#-faq)
 
@@ -238,7 +239,7 @@ A: ClaudeMeter launches but shows a "Credentials not found" message with a link 
 A: Typically **3–8 MB**. Built in Rust with native Win32 API — no Electron, no browser engine.
 
 **Q: Is it safe? Does it send my data anywhere?**
-A: ClaudeMeter is fully open source. It only communicates with `api.anthropic.com` to fetch YOUR usage data using YOUR existing OAuth token. Zero telemetry.
+A: ClaudeMeter is fully open source. It only communicates with `api.anthropic.com` to fetch YOUR usage data using YOUR existing OAuth token. Zero telemetry. Every release binary is automatically scanned by [VirusTotal](https://www.virustotal.com/) (60+ antivirus engines) — check the scan link in each [release](https://github.com/klivak/claudemeter/releases/latest).
 
 **Q: Why isn't ChatGPT tracking automatic?**
 A: OpenAI deliberately does not expose ChatGPT subscription usage via any public API.
