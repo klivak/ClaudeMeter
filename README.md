@@ -122,7 +122,7 @@ OpenAI does not provide a public API for checking ChatGPT Plus/Pro subscription 
 
 <img src="screenshots/settings.png" alt="ClaudeMeter settings — theme, language, notifications, icon style" width="360">
 
-### 🌐 Languages (15)
+### 🌐 Languages (20)
 
 - 🇬🇧 English (default)
 - 🇺🇦 Українська
@@ -136,6 +136,11 @@ OpenAI does not provide a public API for checking ChatGPT Plus/Pro subscription 
 - 🇳🇱 Nederlands
 - 🇵🇱 Polski
 - 🇻🇳 Tiếng Việt
+- 🇷🇺 Русский
+- 🇹🇭 ภาษาไทย
+- 🇮🇩 Bahasa Indonesia
+- 🇸🇪 Svenska
+- 🇨🇿 Čeština
 - 🇯🇵 日本語
 - 🇰🇷 한국어
 - 🇨🇳 简体中文
@@ -214,7 +219,7 @@ OpenAI does not provide a public API for checking ChatGPT Plus/Pro subscription 
 | `notifications.thresholds` | `[50,75,90]` | 1–100 | Usage % levels that trigger alerts |
 | `notifications.sound` | `true` | — | Play system sound with notifications |
 | `theme` | `"auto"` | auto/dark/light | Color theme |
-| `language` | `"auto"` | auto/en/uk/.../zh | UI language (15 languages) |
+| `language` | `"auto"` | auto/en/uk/.../zh | UI language (20 languages) |
 | `compact_mode` | `false` | — | Compact dashboard layout |
 | `show_chatgpt_section` | `false` | — | Show ChatGPT quick-link panel |
 | `autostart` | `false` | — | Start with Windows |
@@ -299,7 +304,7 @@ A: Claude enforces a rolling 5-hour usage window. ClaudeMeter shows your current
 A: Yes. It's a single portable `.exe` with zero dependencies. No installation, no registry changes, no AppData folders. Just copy and run.
 
 **Q: Does it support multiple languages?**
-A: Yes — 15 languages: English, Ukrainian, Spanish, German, French, Portuguese, Italian, Hindi, Turkish, Dutch, Polish, Vietnamese, Japanese, Korean, and Chinese (Simplified).
+A: Yes — 20 languages: English, Ukrainian, Spanish, German, French, Portuguese, Italian, Hindi, Turkish, Dutch, Polish, Vietnamese, Russian, Thai, Indonesian, Swedish, Czech, Japanese, Korean, and Chinese (Simplified).
 
 ## 📄 License
 

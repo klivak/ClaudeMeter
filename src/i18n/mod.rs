@@ -1,14 +1,19 @@
+mod cs;
 mod de;
 mod en;
 mod es;
 mod fr;
 mod hi;
+mod id;
 mod it;
 mod ja;
 mod ko;
 mod nl;
 mod pl;
 mod pt;
+mod ru;
+mod sv;
+mod th;
 mod tr;
 mod uk;
 mod vi;
@@ -33,6 +38,11 @@ pub enum Locale {
     Nl,
     Pl,
     Vi,
+    Ru,
+    Th,
+    Id,
+    Sv,
+    Cs,
 }
 
 impl Locale {
@@ -53,11 +63,15 @@ impl Locale {
             "nl" => Some(Self::Nl),
             "pl" => Some(Self::Pl),
             "vi" => Some(Self::Vi),
+            "ru" => Some(Self::Ru),
+            "th" => Some(Self::Th),
+            "id" => Some(Self::Id),
+            "sv" => Some(Self::Sv),
+            "cs" => Some(Self::Cs),
             _ => None,
         }
     }
 
-    #[allow(dead_code)]
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::En => "en",
@@ -75,6 +89,11 @@ impl Locale {
             Self::Nl => "nl",
             Self::Pl => "pl",
             Self::Vi => "vi",
+            Self::Ru => "ru",
+            Self::Th => "th",
+            Self::Id => "id",
+            Self::Sv => "sv",
+            Self::Cs => "cs",
         }
     }
 
@@ -98,39 +117,38 @@ impl Locale {
             Self::Nl => "Nederlands",
             Self::Pl => "Polski",
             Self::Vi => "Ti\u{1ebf}ng Vi\u{1ec7}t",
+            Self::Ru => "\u{0420}\u{0443}\u{0441}\u{0441}\u{043a}\u{0438}\u{0439}",
+            Self::Th => "\u{0e20}\u{0e32}\u{0e29}\u{0e32}\u{0e44}\u{0e17}\u{0e22}",
+            Self::Id => "Bahasa Indonesia",
+            Self::Sv => "Svenska",
+            Self::Cs => "\u{010c}e\u{0161}tina",
         }
     }
 
-    /// All available locales in order.
+    /// All available locales sorted alphabetically by display name.
     pub fn all() -> &'static [Self] {
         &[
-            Self::En,
-            Self::Uk,
-            Self::Es,
-            Self::De,
-            Self::Fr,
-            Self::Pt,
-            Self::It,
-            Self::Hi,
-            Self::Tr,
-            Self::Nl,
-            Self::Pl,
-            Self::Vi,
-            Self::Ja,
-            Self::Ko,
-            Self::Zh,
+            Self::Id, // Bahasa Indonesia
+            Self::Cs, // Čeština
+            Self::De, // Deutsch
+            Self::En, // English
+            Self::Es, // Español
+            Self::Fr, // Français
+            Self::It, // Italiano
+            Self::Nl, // Nederlands
+            Self::Pl, // Polski
+            Self::Pt, // Português
+            Self::Sv, // Svenska
+            Self::Tr, // Türkçe
+            Self::Vi, // Tiếng Việt
+            Self::Uk, // Українська
+            Self::Hi, // हिन्दी
+            Self::Th, // ภาษาไทย
+            Self::Ru, // Русский
+            Self::Ja, // 日本語
+            Self::Ko, // 한국어
+            Self::Zh, // 中文
         ]
-    }
-
-    /// Next locale in cycling order (for settings).
-    pub fn next(&self) -> Option<Self> {
-        let all = Self::all();
-        let idx = all.iter().position(|l| l == self)?;
-        if idx + 1 < all.len() {
-            Some(all[idx + 1])
-        } else {
-            None // wraps to "auto"
-        }
     }
 
     /// Detect locale from Windows UI language (LANGID).
@@ -154,6 +172,11 @@ impl Locale {
             0x13 => Self::Nl, // Dutch
             0x15 => Self::Pl, // Polish
             0x2A => Self::Vi, // Vietnamese
+            0x19 => Self::Ru, // Russian
+            0x1E => Self::Th, // Thai
+            0x21 => Self::Id, // Indonesian
+            0x1D => Self::Sv, // Swedish
+            0x05 => Self::Cs, // Czech
             _ => Self::En,
         }
     }
@@ -184,6 +207,11 @@ impl I18n {
             Locale::Nl => nl::strings(),
             Locale::Pl => pl::strings(),
             Locale::Vi => vi::strings(),
+            Locale::Ru => ru::strings(),
+            Locale::Th => th::strings(),
+            Locale::Id => id::strings(),
+            Locale::Sv => sv::strings(),
+            Locale::Cs => cs::strings(),
         };
         let fallback = en::strings();
         Self {

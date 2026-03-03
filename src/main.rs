@@ -32,6 +32,7 @@ use chrono::Local;
 use windows::core::PCWSTR;
 use windows::Win32::Foundation::{GetLastError, HWND, LPARAM, LRESULT, POINT, RECT, WPARAM};
 use windows::Win32::Graphics::Dwm::DwmSetWindowAttribute;
+use windows::Win32::Graphics::Gdi::ClientToScreen;
 use windows::Win32::Graphics::Gdi::{BeginPaint, EndPaint, PAINTSTRUCT};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::System::Threading::CreateMutexW;
@@ -49,6 +50,10 @@ use windows::Win32::UI::WindowsAndMessaging::{
     WM_MOUSEMOVE, WM_PAINT, WM_RBUTTONUP, WM_SETCURSOR, WM_TIMER, WNDCLASSEXW, WS_EX_LAYERED,
     WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
 };
+
+// Language popup menu IDs
+const IDM_LANG_AUTO: u32 = 5000;
+const IDM_LANG_BASE: u32 = 5001;
 
 const WINDOW_CLASS: &str = "ClaudeMeterMain";
 const POPUP_CLASS: &str = "ClaudeMeterPopup";
@@ -703,19 +708,8 @@ unsafe extern "system" fn popup_wnd_proc(
                 } else if state.popup_in_settings
                     && crate::popup::point_in_rect(pt, state.setting_rects[1])
                 {
-                    // Language: cycle auto → en → uk → es → de → fr → pt → it → ja → ko → zh → auto
-                    let next = if state.config_mgr.config.language == "auto" {
-                        "en".to_string()
-                    } else {
-                        crate::i18n::Locale::from_str(&state.config_mgr.config.language)
-                            .and_then(|l| l.next())
-                            .map(|l| l.as_str().to_string())
-                            .unwrap_or_else(|| "auto".to_string())
-                    };
-                    state.config_mgr.config.language = next;
-                    state.i18n = I18n::from_config(&state.config_mgr.config.language);
-                    state.config_mgr.save();
-                    let _ = windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, true);
+                    // Language: show popup menu with all languages
+                    show_language_popup(hwnd, pt, state);
                 } else if state.popup_in_settings
                     && crate::popup::point_in_rect(pt, state.setting_rects[2])
                 {
@@ -1076,6 +1070,78 @@ unsafe fn show_popup(_main_hwnd: HWND) {
     }
 }
 
+unsafe fn show_language_popup(hwnd: HWND, client_pt: POINT, state: &mut AppState) {
+    let menu = CreatePopupMenu().unwrap();
+    let current_lang = &state.config_mgr.config.language;
+
+    // "Auto (detected)" option
+    let auto_flag = if current_lang == "auto" {
+        MF_STRING | MF_CHECKED
+    } else {
+        MF_STRING | MF_UNCHECKED
+    };
+    let auto_label = state.i18n.t("Auto (English)");
+    let auto_wide = wide(auto_label);
+    let _ = AppendMenuW(
+        menu,
+        auto_flag,
+        IDM_LANG_AUTO as usize,
+        PCWSTR(auto_wide.as_ptr()),
+    );
+    append_menu_sep(menu);
+
+    // All locales sorted alphabetically by display name
+    for (i, locale) in crate::i18n::Locale::all().iter().enumerate() {
+        let flag = if current_lang == locale.as_str() {
+            MF_STRING | MF_CHECKED
+        } else {
+            MF_STRING | MF_UNCHECKED
+        };
+        let label_wide = wide(locale.display_name());
+        let _ = AppendMenuW(
+            menu,
+            flag,
+            (IDM_LANG_BASE + i as u32) as usize,
+            PCWSTR(label_wide.as_ptr()),
+        );
+    }
+
+    // Convert client coords to screen coords for TrackPopupMenu
+    let mut screen_pt = client_pt;
+    let _ = ClientToScreen(hwnd, &mut screen_pt);
+
+    let _ = SetForegroundWindow(hwnd);
+    let cmd = TrackPopupMenu(
+        menu,
+        TPM_LEFTALIGN | TPM_RETURNCMD,
+        screen_pt.x,
+        screen_pt.y,
+        0,
+        hwnd,
+        None,
+    );
+    let _ = DestroyMenu(menu);
+
+    if cmd.as_bool() {
+        let cmd_id = cmd.0 as u32;
+        let new_lang = if cmd_id == IDM_LANG_AUTO {
+            "auto".to_string()
+        } else {
+            let idx = (cmd_id - IDM_LANG_BASE) as usize;
+            let locales = crate::i18n::Locale::all();
+            if idx < locales.len() {
+                locales[idx].as_str().to_string()
+            } else {
+                return;
+            }
+        };
+        state.config_mgr.config.language = new_lang;
+        state.i18n = I18n::from_config(&state.config_mgr.config.language);
+        state.config_mgr.save();
+        let _ = windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, true);
+    }
+}
+
 unsafe fn show_context_menu(hwnd: HWND) {
     if let Some(state) = APP_STATE.as_ref() {
         let menu = CreatePopupMenu().unwrap();
@@ -1111,7 +1177,8 @@ unsafe fn show_context_menu(hwnd: HWND) {
             PCWSTR(autostart_text.as_ptr()),
         );
         append_menu_sep(menu);
-        append_menu_str(menu, IDM_ABOUT, "ClaudeMeter v1.2.0");
+        let about_label = format!("ClaudeMeter v{}", env!("CARGO_PKG_VERSION"));
+        append_menu_str(menu, IDM_ABOUT, &about_label);
         append_menu_str(menu, IDM_EXIT, state.i18n.t("Exit"));
 
         let mut pt = POINT::default();
@@ -1222,7 +1289,7 @@ unsafe fn handle_menu_command(hwnd: HWND, cmd: u32) {
             // Show simple about message
             let _ = windows::Win32::UI::WindowsAndMessaging::MessageBoxW(
                 hwnd,
-                windows::core::PCWSTR(wide("ClaudeMeter v1.2.0\nby klivak\nhttps://github.com/klivak/claudemeter\n\nMIT License").as_ptr()),
+                windows::core::PCWSTR(wide(&format!("ClaudeMeter v{}\nby klivak\nhttps://github.com/klivak/claudemeter\n\nMIT License", env!("CARGO_PKG_VERSION"))).as_ptr()),
                 windows::core::PCWSTR(wide("About ClaudeMeter").as_ptr()),
                 windows::Win32::UI::WindowsAndMessaging::MB_ICONINFORMATION | windows::Win32::UI::WindowsAndMessaging::MB_OK,
             );

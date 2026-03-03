@@ -2130,7 +2130,10 @@ pub unsafe fn draw_settings_panel(
     );
 
     let fy = footer_y + 6.0;
-    let footer_text1 = wide("ClaudeMeter v1.0.0 by klivak");
+    let footer_text1 = wide(&format!(
+        "ClaudeMeter v{} by klivak",
+        env!("CARGO_PKG_VERSION")
+    ));
     let footer_format = d2d.get_text_format(10, false, 0, 0).clone();
     let footer_brush = rt
         .CreateSolidColorBrush(&colorref_to_d2d(colors.text_secondary) as *const _, None)

@@ -5,6 +5,20 @@ All notable changes to ClaudeMeter will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2026-03-03
+
+### Added
+- **5 new languages** — Russian, Thai, Indonesian, Swedish, Czech (20 languages total)
+- **Popup language picker** — click Language in settings to open a popup menu with all 20 languages instead of cycling through them one by one
+- **Widget hover tooltip** — hover the mini-widget to see full usage breakdown (all metrics, reset times, plan info)
+
+### Changed
+- Widget now shows 5-hour session utilization instead of max across all metrics (fixes misleading orange color)
+- Version strings now use `CARGO_PKG_VERSION` — no more hardcoded version numbers in source code
+
+### Fixed
+- Widget color mismatch — widget showed orange (high %) when only the weekly limit was high, even though the 5-hour session was low
+
 ## [1.6.1] - 2026-03-03
 
 ### Fixed

@@ -638,8 +638,8 @@ impl Drop for TrayIcon {
     }
 }
 
-/// Build the tooltip string from usage data (max 127 chars).
-pub fn build_tooltip(usage: &Option<UsageResponse>, show_chatgpt: bool) -> String {
+/// Build full tooltip text without truncation (used by widget tooltip).
+pub fn build_tooltip_full(usage: &Option<UsageResponse>, show_chatgpt: bool) -> String {
     use crate::i18n::format_duration;
     use crate::providers::claude::format_metric_name;
 
@@ -669,7 +669,11 @@ pub fn build_tooltip(usage: &Option<UsageResponse>, show_chatgpt: bool) -> Strin
         lines.push("ChatGPT: click to open usage".to_string());
     }
 
-    // Join and truncate to 127 chars
-    let full = lines.join("\n");
+    lines.join("\n")
+}
+
+/// Build the tray tooltip string (truncated to 127 chars for Win32 szTip limit).
+pub fn build_tooltip(usage: &Option<UsageResponse>, show_chatgpt: bool) -> String {
+    let full = build_tooltip_full(usage, show_chatgpt);
     full.chars().take(127).collect()
 }
