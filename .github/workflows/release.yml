@@ -55,7 +55,7 @@ jobs:
         run: |
           CURRENT_BODY=$(gh release view "${{ steps.version.outputs.VERSION }}" --json body -q .body)
           VT_ANALYSIS="${{ steps.virustotal.outputs.analysis }}"
-          VT_URL=$(echo "$VT_ANALYSIS" | sed 's|=.*||')
+          VT_URL=$(echo "$VT_ANALYSIS" | sed 's|.*=||')
           gh release edit "${{ steps.version.outputs.VERSION }}" \
             --notes "${CURRENT_BODY}
 
