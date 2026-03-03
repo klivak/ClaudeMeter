@@ -2,10 +2,10 @@
 
 # ⚡ ClaudeMeter
 
-**Real-time Claude AI subscription usage monitor for Windows**
+**Real-time Claude AI usage monitor for Windows — track your subscription limits from the system tray**
 
-Ultra-lightweight system tray app built in Rust.
-Track your Claude Pro/Max limits without opening a browser.
+Ultra-lightweight Rust app that monitors Claude Pro & Max usage caps in real time.
+See your 5-hour session, weekly limits, Sonnet & Opus quotas — without opening a browser.
 
 **🦀 Purposefully built in Rust — uses under 10 MB RAM. Less than Notepad.**
 
@@ -21,7 +21,7 @@ Track your Claude Pro/Max limits without opening a browser.
 
 <br>
 
-<img src="screenshots/main.png" alt="ClaudeMeter Dashboard" width="360"> <img src="screenshots/main2.png" alt="ClaudeMeter Dashboard" width="360">
+<img src="screenshots/main.png" alt="ClaudeMeter dashboard showing Claude AI usage bars and reset timers" width="360"> <img src="screenshots/main2.png" alt="ClaudeMeter light theme with usage history chart" width="360">
 
 </div>
 
@@ -29,7 +29,7 @@ Track your Claude Pro/Max limits without opening a browser.
 
 ## 🤔 Why ClaudeMeter?
 
-Tired of hitting Claude usage limits mid-conversation? ClaudeMeter sits quietly in your Windows system tray and shows you **exactly** how much quota you have left — 5-hour session, weekly limits, Sonnet and Opus caps — all without opening a browser tab.
+Tired of hitting Claude AI rate limits mid-conversation? ClaudeMeter sits quietly in your Windows system tray and shows you **exactly** how much of your Anthropic subscription quota remains — 5-hour session utilization, weekly usage caps, Sonnet and Opus limits — all without opening a browser tab or checking the Claude dashboard manually.
 
 ## 🦀 Why Rust?
 
@@ -43,7 +43,7 @@ ClaudeMeter is **purposefully built in Rust** to be as lightweight as physically
 | Python-based monitors | 25–45 MB | ~15 MB | Python runtime |
 | .NET-based monitors | 15–25 MB | ~1 MB | .NET runtime |
 
-<img src="screenshots/task-manager.png" alt="Task Manager — ClaudeMeter 1.9 MB RAM" width="540">
+<img src="screenshots/task-manager.png" alt="Windows Task Manager showing ClaudeMeter using only 1.9 MB RAM" width="540">
 
 **Single portable `.exe`** — no installation, no runtime, no .NET, no Java, no Python, no Node.js. Download → run → done.
 
@@ -101,7 +101,7 @@ OpenAI does not provide a public API for checking ChatGPT Plus/Pro subscription 
 - **📊 Dashboard** — left-click to open the detailed popup
 - **⚠ Blink on critical** — tray icon blinks when usage exceeds 90%
 
-<img src="screenshots/hover.png" alt="Tray tooltip on hover" width="280">
+<img src="screenshots/hover.png" alt="ClaudeMeter system tray tooltip showing Claude usage percentages and reset times" width="280">
 
 ### 📊 Dashboard
 
@@ -120,7 +120,7 @@ OpenAI does not provide a public API for checking ChatGPT Plus/Pro subscription 
 - **Light** — for bright environments (Catppuccin Latte palette)
 - **Auto** (default) — follows your Windows system theme automatically
 
-<img src="screenshots/settings.png" alt="Settings panel" width="360">
+<img src="screenshots/settings.png" alt="ClaudeMeter settings — theme, language, notifications, icon style" width="360">
 
 ### 🌐 Languages (15)
 
@@ -167,7 +167,7 @@ OpenAI does not provide a public API for checking ChatGPT Plus/Pro subscription 
 - **Startup notification** — confirmation that ClaudeMeter is running in the tray
 - **Deduplication** — won't spam; resets when usage drops below threshold
 
-<img src="screenshots/notification.png" alt="Usage alert notification" width="360">
+<img src="screenshots/notification.png" alt="ClaudeMeter Windows toast notification warning about Claude usage threshold" width="360">
 
 ### 📤 Data Export
 
@@ -286,6 +286,21 @@ A: ClaudeMeter is fully open source. It only communicates with `api.anthropic.co
 **Q: Why isn't ChatGPT tracking automatic?**
 A: OpenAI deliberately does not expose ChatGPT subscription usage via any public API.
 
+**Q: How do I check my Claude usage limits?**
+A: Just run ClaudeMeter — it reads your Claude Code OAuth token and shows all your limits (5-hour session, weekly cap, Sonnet/Opus quotas) in a system tray popup. No manual checking needed.
+
+**Q: Does it work with Claude Pro, Max 5x, and Max 20x plans?**
+A: Yes. ClaudeMeter auto-detects your plan tier and displays the correct limits for Pro, Max, Max 5x, and Max 20x subscriptions.
+
+**Q: What is the Claude 5-hour session limit?**
+A: Claude enforces a rolling 5-hour usage window. ClaudeMeter shows your current utilization percentage and a countdown to when it resets.
+
+**Q: Can I run ClaudeMeter from a USB drive?**
+A: Yes. It's a single portable `.exe` with zero dependencies. No installation, no registry changes, no AppData folders. Just copy and run.
+
+**Q: Does it support multiple languages?**
+A: Yes — 15 languages: English, Ukrainian, Spanish, German, French, Portuguese, Italian, Hindi, Turkish, Dutch, Polish, Vietnamese, Japanese, Korean, and Chinese (Simplified).
+
 ## 📄 License
 
 [MIT](LICENSE) — free for personal and commercial use.
@@ -303,5 +318,3 @@ Made by [klivak](https://github.com/klivak)
 *ClaudeMeter is an independent open-source project with no official affiliation.*
 
 </div>
-
-<!-- SEO keywords: claude usage monitor, claude ai usage tracker, claude limits monitor windows, claude pro usage limits tracker, claude max usage monitor, anthropic claude usage, claude code usage monitor windows, claude subscription limits, claude tray app windows, rust windows tray application -->
