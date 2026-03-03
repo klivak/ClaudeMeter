@@ -247,6 +247,241 @@ fn create_text_icon(text: &str, font_size: i32, color: ColorRef, text_color: u32
     }
 }
 
+/// Create a 16x16 icon with a circular progress ring.
+/// Ring fills clockwise from 12 o'clock based on percentage.
+fn create_ring_icon(pct: f64, color: ColorRef, bg_color: u32) -> Option<HICON> {
+    const SIZE: i32 = 16;
+
+    unsafe {
+        let dc = CreateCompatibleDC(None);
+        if dc.is_invalid() {
+            return None;
+        }
+
+        let bmi = BITMAPINFO {
+            bmiHeader: BITMAPINFOHEADER {
+                biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
+                biWidth: SIZE,
+                biHeight: -SIZE,
+                biPlanes: 1,
+                biBitCount: 32,
+                biCompression: BI_RGB.0,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let mut bits: *mut std::ffi::c_void = std::ptr::null_mut();
+        let hbm_color = CreateDIBSection(dc, &bmi, DIB_RGB_COLORS, &mut bits, None, 0);
+        if hbm_color.is_err() {
+            let _ = DeleteDC(dc);
+            return None;
+        }
+        let hbm_color = hbm_color.unwrap();
+
+        let pixels = std::slice::from_raw_parts_mut(bits as *mut u32, (SIZE * SIZE) as usize);
+
+        // Background color (ARGB)
+        let bg_r = (bg_color >> 16) & 0xFF;
+        let bg_g = (bg_color >> 8) & 0xFF;
+        let bg_b = bg_color & 0xFF;
+        let bg_pixel = 0xFF000000 | (bg_r << 16) | (bg_g << 8) | bg_b;
+
+        // Ring color from ColorRef (0x00BBGGRR)
+        let cr = color.0;
+        let ring_r = cr & 0xFF;
+        let ring_g = (cr >> 8) & 0xFF;
+        let ring_b = (cr >> 16) & 0xFF;
+        let ring_pixel = 0xFF000000 | (ring_r << 16) | (ring_g << 8) | ring_b;
+
+        // Track color (dim version of bg)
+        let track_pixel = 0xFF000000 | (0x50 << 16) | (0x50 << 8) | 0x50;
+
+        let cx = 7.5_f64;
+        let cy = 7.5_f64;
+        let outer_r = 7.0_f64;
+        let inner_r = 4.0_f64;
+        let fill_angle = (pct / 100.0) * 360.0;
+
+        for row in 0..SIZE {
+            for col in 0..SIZE {
+                let dx = col as f64 - cx;
+                let dy = row as f64 - cy;
+                let dist = (dx * dx + dy * dy).sqrt();
+
+                if dist >= inner_r && dist <= outer_r {
+                    // In the ring area — check angle
+                    // atan2: 0 = right, PI/2 = down; we want 0 = top, clockwise
+                    let mut angle = (dx.atan2(-dy)).to_degrees();
+                    if angle < 0.0 {
+                        angle += 360.0;
+                    }
+
+                    if angle <= fill_angle {
+                        pixels[(row * SIZE + col) as usize] = ring_pixel;
+                    } else {
+                        pixels[(row * SIZE + col) as usize] = track_pixel;
+                    }
+                } else {
+                    pixels[(row * SIZE + col) as usize] = bg_pixel;
+                }
+            }
+        }
+
+        // Create mask bitmap
+        let mask_bmi = BITMAPINFO {
+            bmiHeader: BITMAPINFOHEADER {
+                biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
+                biWidth: SIZE,
+                biHeight: -SIZE,
+                biPlanes: 1,
+                biBitCount: 32,
+                biCompression: BI_RGB.0,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let mut mask_bits: *mut std::ffi::c_void = std::ptr::null_mut();
+        let hbm_mask = CreateDIBSection(dc, &mask_bmi, DIB_RGB_COLORS, &mut mask_bits, None, 0);
+        if hbm_mask.is_err() {
+            let _ = DeleteObject(hbm_color);
+            let _ = DeleteDC(dc);
+            return None;
+        }
+        let hbm_mask = hbm_mask.unwrap();
+
+        let icon_info = ICONINFO {
+            fIcon: true.into(),
+            xHotspot: 0,
+            yHotspot: 0,
+            hbmMask: hbm_mask,
+            hbmColor: hbm_color,
+        };
+
+        let icon = CreateIconIndirect(&icon_info).ok();
+
+        let _ = DeleteObject(hbm_color);
+        let _ = DeleteObject(hbm_mask);
+        let _ = DeleteDC(dc);
+
+        icon
+    }
+}
+
+/// Create a 16x16 icon with a vertical progress bar that fills upward.
+fn create_bar_icon(pct: f64, color: ColorRef, bg_color: u32) -> Option<HICON> {
+    const SIZE: i32 = 16;
+
+    unsafe {
+        let dc = CreateCompatibleDC(None);
+        if dc.is_invalid() {
+            return None;
+        }
+
+        let bmi = BITMAPINFO {
+            bmiHeader: BITMAPINFOHEADER {
+                biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
+                biWidth: SIZE,
+                biHeight: -SIZE,
+                biPlanes: 1,
+                biBitCount: 32,
+                biCompression: BI_RGB.0,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let mut bits: *mut std::ffi::c_void = std::ptr::null_mut();
+        let hbm_color = CreateDIBSection(dc, &bmi, DIB_RGB_COLORS, &mut bits, None, 0);
+        if hbm_color.is_err() {
+            let _ = DeleteDC(dc);
+            return None;
+        }
+        let hbm_color = hbm_color.unwrap();
+
+        let pixels = std::slice::from_raw_parts_mut(bits as *mut u32, (SIZE * SIZE) as usize);
+
+        // Background color (ARGB)
+        let bg_r = (bg_color >> 16) & 0xFF;
+        let bg_g = (bg_color >> 8) & 0xFF;
+        let bg_b = bg_color & 0xFF;
+        let bg_pixel = 0xFF000000 | (bg_r << 16) | (bg_g << 8) | bg_b;
+
+        // Bar color from ColorRef (0x00BBGGRR)
+        let cr = color.0;
+        let bar_r = cr & 0xFF;
+        let bar_g = (cr >> 8) & 0xFF;
+        let bar_b = (cr >> 16) & 0xFF;
+        let bar_pixel = 0xFF000000 | (bar_r << 16) | (bar_g << 8) | bar_b;
+
+        // Track color
+        let track_pixel = 0xFF000000 | (0x50 << 16) | (0x50 << 8) | 0x50;
+
+        // Bar area: x=2..14 (12px wide), y=1..15 (14px tall)
+        let bar_left = 2;
+        let bar_right = 14;
+        let bar_top = 1;
+        let bar_bottom = 15;
+        let bar_height = (bar_bottom - bar_top) as f64;
+        let fill_height = ((pct / 100.0) * bar_height).round() as i32;
+
+        for row in 0..SIZE {
+            for col in 0..SIZE {
+                let idx = (row * SIZE + col) as usize;
+                if col >= bar_left && col < bar_right && row >= bar_top && row < bar_bottom {
+                    // Inside bar area
+                    let row_from_bottom = bar_bottom - 1 - row;
+                    if row_from_bottom < fill_height {
+                        pixels[idx] = bar_pixel;
+                    } else {
+                        pixels[idx] = track_pixel;
+                    }
+                } else {
+                    pixels[idx] = bg_pixel;
+                }
+            }
+        }
+
+        // Create mask bitmap
+        let mask_bmi = BITMAPINFO {
+            bmiHeader: BITMAPINFOHEADER {
+                biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
+                biWidth: SIZE,
+                biHeight: -SIZE,
+                biPlanes: 1,
+                biBitCount: 32,
+                biCompression: BI_RGB.0,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let mut mask_bits: *mut std::ffi::c_void = std::ptr::null_mut();
+        let hbm_mask = CreateDIBSection(dc, &mask_bmi, DIB_RGB_COLORS, &mut mask_bits, None, 0);
+        if hbm_mask.is_err() {
+            let _ = DeleteObject(hbm_color);
+            let _ = DeleteDC(dc);
+            return None;
+        }
+        let hbm_mask = hbm_mask.unwrap();
+
+        let icon_info = ICONINFO {
+            fIcon: true.into(),
+            xHotspot: 0,
+            yHotspot: 0,
+            hbmMask: hbm_mask,
+            hbmColor: hbm_color,
+        };
+
+        let icon = CreateIconIndirect(&icon_info).ok();
+
+        let _ = DeleteObject(hbm_color);
+        let _ = DeleteObject(hbm_mask);
+        let _ = DeleteDC(dc);
+
+        icon
+    }
+}
+
 impl TrayIcon {
     pub fn new(hwnd: HWND) -> Result<Self, String> {
         let fallback = unsafe { LoadIconW(None, IDI_APPLICATION).map_err(|e| e.to_string())? };
@@ -288,7 +523,7 @@ impl TrayIcon {
         Ok(())
     }
 
-    pub fn update(&mut self, usage: &Option<UsageResponse>, tooltip: &str) {
+    pub fn update(&mut self, usage: &Option<UsageResponse>, tooltip: &str, icon_style: &str) {
         let max_util = usage.as_ref().and_then(|u| u.max_utilization());
         let color = TrayIconColor::from_utilization(max_util);
 
@@ -301,17 +536,26 @@ impl TrayIcon {
         let icon = if max_util.is_some() {
             let color_ref = color.to_colorref();
             let text_cr = color.text_colorref();
-            let dyn_icon = if let Some(session_pct) = session_util {
-                let value = session_pct.round() as u32;
-                let text = if value >= 100 {
-                    "!!".to_string()
-                } else {
-                    format!("{}", value)
-                };
-                let font_size = if value >= 10 { 9 } else { 11 };
-                create_text_icon(&text, font_size, color_ref, text_cr)
-            } else {
-                create_text_icon("...", 8, color_ref, text_cr)
+            let bg_color: u32 = 0x2e2e2e;
+            let pct = session_util.unwrap_or(max_util.unwrap_or(0.0));
+            let dyn_icon = match icon_style {
+                "ring" => create_ring_icon(pct, color_ref, bg_color),
+                "bar" => create_bar_icon(pct, color_ref, bg_color),
+                _ => {
+                    // "number" style (default)
+                    if let Some(session_pct) = session_util {
+                        let value = session_pct.round() as u32;
+                        let text = if value >= 100 {
+                            "!!".to_string()
+                        } else {
+                            format!("{}", value)
+                        };
+                        let font_size = if value >= 10 { 9 } else { 11 };
+                        create_text_icon(&text, font_size, color_ref, text_cr)
+                    } else {
+                        create_text_icon("...", 8, color_ref, text_cr)
+                    }
+                }
             };
             if let Some(dyn_icon) = dyn_icon {
                 // Destroy previous dynamic icon

@@ -103,5 +103,9 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
         "is available. Click to download.",
         "mevcut. \u{0130}ndirmek i\u{00e7}in t\u{0131}klay\u{0131}n.",
     );
+    m.insert("Icon style", "Simge stili");
+    m.insert("Number", "Say\u{0131}");
+    m.insert("Ring", "Halka");
+    m.insert("Bar", "\u{00c7}ubuk");
     m
 }

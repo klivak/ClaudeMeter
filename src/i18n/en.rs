@@ -85,5 +85,9 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
         "is available. Click to download.",
         "is available. Click to download.",
     );
+    m.insert("Icon style", "Icon style");
+    m.insert("Number", "Number");
+    m.insert("Ring", "Ring");
+    m.insert("Bar", "Bar");
     m
 }

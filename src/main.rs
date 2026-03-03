@@ -84,7 +84,7 @@ struct AppState {
     chatgpt_link_rect: RECT,
     status_link_rect: RECT,
     back_rect: RECT,
-    setting_rects: [RECT; 8],
+    setting_rects: [RECT; 9],
     notification_tracker: NotificationTracker,
     exe_dir: std::path::PathBuf,
     chart_data: Vec<f64>,
@@ -222,7 +222,7 @@ unsafe fn run_message_loop(exe_dir: std::path::PathBuf, config_mgr: ConfigManage
         chatgpt_link_rect: RECT::default(),
         status_link_rect: RECT::default(),
         back_rect: RECT::default(),
-        setting_rects: [RECT::default(); 8],
+        setting_rects: [RECT::default(); 9],
         notification_tracker: NotificationTracker::new(),
         exe_dir,
         chart_data: Vec::new(),
@@ -392,14 +392,15 @@ unsafe extern "system" fn main_wnd_proc(
                 if let Some(state) = APP_STATE.as_mut() {
                     state.blink_visible = !state.blink_visible;
                     if let Some(tray) = &mut state.tray {
+                        let style = &state.config_mgr.config.tray_icon_style.clone();
                         if state.blink_visible {
                             let tooltip = build_tooltip(
                                 &state.usage,
                                 state.config_mgr.config.show_chatgpt_section,
                             );
-                            tray.update(&state.usage, &tooltip);
+                            tray.update(&state.usage, &tooltip, style);
                         } else {
-                            tray.update(&None, "ClaudeMeter");
+                            tray.update(&None, "ClaudeMeter", style);
                         }
                     }
                 }
@@ -773,6 +774,24 @@ unsafe extern "system" fn popup_wnd_proc(
                         !state.config_mgr.config.accessibility_patterns;
                     state.config_mgr.save();
                     let _ = windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, true);
+                } else if state.popup_in_settings
+                    && crate::popup::point_in_rect(pt, state.setting_rects[8])
+                {
+                    // Icon style: cycle number → ring → bar → number
+                    let next = match state.config_mgr.config.tray_icon_style.as_str() {
+                        "number" => "ring",
+                        "ring" => "bar",
+                        _ => "number",
+                    };
+                    state.config_mgr.config.tray_icon_style = next.to_string();
+                    state.config_mgr.save();
+                    // Immediately update tray icon with new style
+                    let tooltip =
+                        build_tooltip(&state.usage, state.config_mgr.config.show_chatgpt_section);
+                    if let Some(tray) = &mut state.tray {
+                        tray.update(&state.usage, &tooltip, next);
+                    }
+                    let _ = windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, true);
                 } else if crate::popup::point_in_rect(pt, state.settings_rect) {
                     state.popup_in_settings = !state.popup_in_settings;
                     let h = if state.popup_in_settings {
@@ -926,7 +945,7 @@ unsafe fn toggle_popup(main_hwnd: HWND) {
 fn settings_panel_height() -> i32 {
     let header_h = 40;
     let row_h = 38;
-    let num_rows = 8;
+    let num_rows = 9;
     let legend_h = 8 + 1 + 8 + 20 + (4 * 18); // sep + gap + title + 4 icon items
     let footer_h = 44;
     header_h + 8 + (num_rows * row_h) + legend_h + footer_h
@@ -1029,7 +1048,8 @@ unsafe fn show_popup(_main_hwnd: HWND) {
             // Restore normal icon
             let tooltip = build_tooltip(&state.usage, state.config_mgr.config.show_chatgpt_section);
             if let Some(tray) = &mut state.tray {
-                tray.update(&state.usage, &tooltip);
+                let style = &state.config_mgr.config.tray_icon_style.clone();
+                tray.update(&state.usage, &tooltip, style);
             }
         }
 
@@ -1442,7 +1462,8 @@ unsafe fn on_poll_result(hwnd: HWND, usage: Option<UsageResponse>, error: Option
         // Update tray
         let tooltip = build_tooltip(&state.usage, state.config_mgr.config.show_chatgpt_section);
         if let Some(tray) = &mut state.tray {
-            tray.update(&state.usage, &tooltip);
+            let style = &state.config_mgr.config.tray_icon_style.clone();
+            tray.update(&state.usage, &tooltip, style);
         }
 
         // Refresh popup if visible (resize + repaint)

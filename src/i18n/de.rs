@@ -91,5 +91,9 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
         "is available. Click to download.",
         "ist verf\u{00fc}gbar. Klicken zum Herunterladen.",
     );
+    m.insert("Icon style", "Icon-Stil");
+    m.insert("Number", "Zahl");
+    m.insert("Ring", "Ring");
+    m.insert("Bar", "Balken");
     m
 }

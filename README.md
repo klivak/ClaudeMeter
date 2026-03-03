@@ -94,6 +94,7 @@ OpenAI does not provide a public API for checking ChatGPT Plus/Pro subscription 
 ### System Tray
 
 - **🔢 Dynamic % icon** — shows actual utilization number (e.g. "42") with color-coded background
+- **⭕ Icon styles** — choose between Number (default), Ring (circular progress), or Bar (vertical fill) in Settings
 - **🟢🟡🔴 Color coding** — green (<50%), yellow (50-79%), red (>=80%), gray (no data)
 - **💬 Rich tooltip** — hover to see all metrics, reset times, and plan info
 - **📋 Context menu** — right-click for refresh, export CSV, settings, links
@@ -201,6 +202,7 @@ OpenAI does not provide a public API for checking ChatGPT Plus/Pro subscription 
   "show_widget": false,
   "check_updates": true,
   "accessibility_patterns": false,
+  "tray_icon_style": "number",
   "custom_colors": {}
 }
 ```
@@ -218,6 +220,7 @@ OpenAI does not provide a public API for checking ChatGPT Plus/Pro subscription 
 | `autostart` | `false` | — | Start with Windows |
 | `show_widget` | `false` | — | Show floating mini-widget |
 | `check_updates` | `true` | — | Check for updates on startup |
+| `tray_icon_style` | `"number"` | number/ring/bar | Tray icon style: number (%), ring (circular), bar (vertical) |
 | `accessibility_patterns` | `false` | — | Colorblind overlay patterns on progress bars |
 | `custom_colors` | `{}` | hex strings | Override theme colors (e.g. `{"green": "#00ff00"}`) |
 

@@ -5,6 +5,16 @@ All notable changes to ClaudeMeter will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-03-03
+
+### Added
+- **Configurable tray icon style** — choose between Number (default), Ring (circular progress), or Bar (vertical fill) via Settings or `tray_icon_style` in config.json
+- **i18n for icon style** — "Icon style", "Number", "Ring", "Bar" translated in all 15 languages
+- **Missing i18n keys for Ukrainian** — added Show widget, Check for updates, Accessibility patterns, Update available translations
+
+### Changed
+- Settings panel expanded from 8 to 9 rows (added icon style selector)
+
 ## [1.5.0] - 2026-03-03
 
 ### Added

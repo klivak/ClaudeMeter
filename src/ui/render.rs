@@ -1726,7 +1726,7 @@ pub unsafe fn draw_settings_panel(
     config: &crate::config::Config,
     back_rect: &mut RECT,
     close_rect: &mut RECT,
-    setting_rects: &mut [RECT; 8],
+    setting_rects: &mut [RECT; 9],
     hovered: &HoveredElement,
 ) {
     let Some(rt) = d2d.render_target.clone() else {
@@ -1945,6 +1945,10 @@ pub unsafe fn draw_settings_panel(
                 check_off
             })
             .to_string(),
+        ),
+        (
+            i18n.t("Icon style").to_string(),
+            i18n.t(&capitalize(&config.tray_icon_style)).to_string(),
         ),
     ];
 

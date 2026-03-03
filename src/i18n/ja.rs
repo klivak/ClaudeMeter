@@ -142,5 +142,12 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
         "\u{30a2}\u{30c3}\u{30d7}\u{30c7}\u{30fc}\u{30c8}\u{5229}\u{7528}\u{53ef}\u{80fd}",
     );
     m.insert("is available. Click to download.", "\u{304c}\u{5229}\u{7528}\u{53ef}\u{80fd}\u{3067}\u{3059}\u{3002}\u{30af}\u{30ea}\u{30c3}\u{30af}\u{3057}\u{3066}\u{30c0}\u{30a6}\u{30f3}\u{30ed}\u{30fc}\u{30c9}\u{3002}");
+    m.insert(
+        "Icon style",
+        "\u{30a2}\u{30a4}\u{30b3}\u{30f3}\u{30b9}\u{30bf}\u{30a4}\u{30eb}",
+    );
+    m.insert("Number", "\u{6570}\u{5b57}");
+    m.insert("Ring", "\u{30ea}\u{30f3}\u{30b0}");
+    m.insert("Bar", "\u{30d0}\u{30fc}");
     m
 }

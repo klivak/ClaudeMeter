@@ -54,8 +54,14 @@ pub struct Config {
     pub check_updates: bool,
     #[serde(default)]
     pub accessibility_patterns: bool,
+    #[serde(default = "default_icon_style")]
+    pub tray_icon_style: String,
     #[serde(default)]
     pub custom_colors: CustomColors,
+}
+
+fn default_icon_style() -> String {
+    "number".to_string()
 }
 
 fn default_true() -> bool {
@@ -78,6 +84,7 @@ impl Default for Config {
             show_widget: false,
             check_updates: true,
             accessibility_patterns: false,
+            tray_icon_style: "number".to_string(),
             custom_colors: CustomColors::default(),
         }
     }
@@ -105,6 +112,11 @@ impl Config {
         // Validate theme
         if !["auto", "dark", "light"].contains(&self.theme.as_str()) {
             self.theme = "auto".to_string();
+        }
+
+        // Validate tray icon style
+        if !["number", "ring", "bar"].contains(&self.tray_icon_style.as_str()) {
+            self.tray_icon_style = "number".to_string();
         }
 
         // Validate language

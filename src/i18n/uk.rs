@@ -83,5 +83,17 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert(">= 80% usage", "\u{2265} 80% використання");
     m.insert("No data", "Немає даних");
     m.insert("exceeded", "перевищено");
+    m.insert("Show widget", "Показати віджет");
+    m.insert("Check for updates", "Перевіряти оновлення");
+    m.insert("Accessibility patterns", "Патерни доступності");
+    m.insert("Update available", "Доступне оновлення");
+    m.insert(
+        "is available. Click to download.",
+        "доступна. Натисніть для завантаження.",
+    );
+    m.insert("Icon style", "Стиль іконки");
+    m.insert("Number", "Число");
+    m.insert("Ring", "Кільце");
+    m.insert("Bar", "Смужка");
     m
 }
