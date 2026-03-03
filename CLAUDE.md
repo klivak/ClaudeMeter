@@ -53,7 +53,9 @@ cargo audit
 - `src/notifications.rs` — Windows toast notifications (PowerShell-based)
 - `src/autostart.rs` — Registry-based auto-start
 - `src/theme.rs` — Dark/Light/Auto theme detection from Windows registry
-- `src/i18n/` — Localization: en, uk, es, de, fr (HashMap-based, compiled in)
+- `src/i18n/` — Localization: en, uk, es, de, fr, pt, ja, ko, zh, it (HashMap-based, compiled in)
+- `src/widget.rs` — Mini floating always-on-top widget (Win32 API, GDI)
+- `src/updater.rs` — Auto-update checker (GitHub Releases API)
 - `src/providers/claude.rs` — Anthropic OAuth Usage API client
 - `src/ui/` — Rendering logic, colors, progress bars
 

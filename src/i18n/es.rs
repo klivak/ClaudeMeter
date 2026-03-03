@@ -83,5 +83,13 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert(">= 80% usage", "\u{2265} 80% uso");
     m.insert("No data", "Sin datos");
     m.insert("exceeded", "superado");
+    m.insert("Show widget", "Mostrar widget");
+    m.insert("Check for updates", "Buscar actualizaciones");
+    m.insert("Accessibility patterns", "Patrones de accesibilidad");
+    m.insert("Update available", "Actualizaci\u{00f3}n disponible");
+    m.insert(
+        "is available. Click to download.",
+        "est\u{00e1} disponible. Haz clic para descargar.",
+    );
     m
 }

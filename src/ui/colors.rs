@@ -56,6 +56,37 @@ impl ThemeColors {
         }
     }
 
+    /// Apply custom color overrides from config.
+    pub fn with_overrides(mut self, custom: &crate::config::CustomColors) -> Self {
+        fn apply(target: &mut ColorRef, value: &Option<String>) {
+            if let Some(h) = value {
+                let h = h.trim_start_matches('#');
+                if h.len() == 6 {
+                    if let (Ok(r), Ok(g), Ok(b)) = (
+                        u8::from_str_radix(&h[0..2], 16),
+                        u8::from_str_radix(&h[2..4], 16),
+                        u8::from_str_radix(&h[4..6], 16),
+                    ) {
+                        *target = super::colors::rgb(r, g, b);
+                    }
+                }
+            }
+        }
+        apply(&mut self.background, &custom.background);
+        apply(&mut self.surface, &custom.surface);
+        apply(&mut self.text_primary, &custom.text_primary);
+        apply(&mut self.text_secondary, &custom.text_secondary);
+        apply(&mut self.progress_bg, &custom.progress_bg);
+        apply(&mut self.green, &custom.green);
+        apply(&mut self.yellow, &custom.yellow);
+        apply(&mut self.red, &custom.red);
+        apply(&mut self.accent, &custom.accent);
+        apply(&mut self.separator, &custom.separator);
+        apply(&mut self.hover, &custom.hover);
+        apply(&mut self.border, &custom.border);
+        self
+    }
+
     fn dark() -> Self {
         Self {
             background: hex("1e1e2e"),

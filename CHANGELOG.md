@@ -5,6 +5,20 @@ All notable changes to ClaudeMeter will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-03-03
+
+### Added
+- **5 new languages** — Portuguese, Japanese, Korean, Chinese (Simplified), Italian (10 languages total)
+- **Better language picker** — settings panel shows full native language name (e.g. "Português", "日本語") instead of language code
+- **Mini floating widget** — always-on-top PiP window showing current usage % with color-coded background. Draggable, click to open dashboard. Disabled by default; enable in Settings
+- **Auto-update checker** — checks GitHub Releases on startup for newer versions, shows balloon notification if available. Enabled by default; toggle in Settings
+- **Accessibility patterns** — colorblind-friendly overlays on progress bars: dots (green), diagonal stripes (yellow), cross-hatch (red). Disabled by default; enable in Settings
+- **Custom color themes** — override any theme color via `custom_colors` in config.json (hex values like `"#ff0000"`)
+
+### Changed
+- Settings panel expanded from 5 to 8 rows (added widget toggle, update checker toggle, accessibility patterns toggle)
+- Language cycling now covers all 10 languages in order
+
 ## [1.3.6] - 2026-03-03
 
 ### Added

@@ -20,6 +20,22 @@ impl Default for NotificationConfig {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct CustomColors {
+    pub background: Option<String>,
+    pub surface: Option<String>,
+    pub text_primary: Option<String>,
+    pub text_secondary: Option<String>,
+    pub progress_bg: Option<String>,
+    pub green: Option<String>,
+    pub yellow: Option<String>,
+    pub red: Option<String>,
+    pub accent: Option<String>,
+    pub separator: Option<String>,
+    pub hover: Option<String>,
+    pub border: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
     pub version: String,
@@ -32,6 +48,18 @@ pub struct Config {
     pub show_chatgpt_section: bool,
     pub chatgpt_usage_url: String,
     pub claude_install_url: String,
+    #[serde(default)]
+    pub show_widget: bool,
+    #[serde(default = "default_true")]
+    pub check_updates: bool,
+    #[serde(default)]
+    pub accessibility_patterns: bool,
+    #[serde(default)]
+    pub custom_colors: CustomColors,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 impl Default for Config {
@@ -47,6 +75,10 @@ impl Default for Config {
             show_chatgpt_section: false,
             chatgpt_usage_url: "https://chatgpt.com/codex/settings/usage".to_string(),
             claude_install_url: "https://claude.ai/download".to_string(),
+            show_widget: false,
+            check_updates: true,
+            accessibility_patterns: false,
+            custom_colors: CustomColors::default(),
         }
     }
 }
@@ -76,7 +108,11 @@ impl Config {
         }
 
         // Validate language
-        if !["auto", "en", "uk", "es", "de", "fr"].contains(&self.language.as_str()) {
+        if ![
+            "auto", "en", "uk", "es", "de", "fr", "pt", "ja", "ko", "zh", "it",
+        ]
+        .contains(&self.language.as_str())
+        {
             self.language = "auto".to_string();
         }
     }

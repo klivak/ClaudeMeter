@@ -13,6 +13,8 @@ mod providers;
 mod theme;
 mod tray;
 mod ui;
+mod updater;
+mod widget;
 
 use crate::config::ConfigManager;
 use crate::db::Database;
@@ -40,11 +42,12 @@ use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyMenu, DispatchMessageW,
     GetCursorPos, GetWindowLongW, LoadCursorW, LoadIconW, PeekMessageW, PostMessageW,
     PostQuitMessage, RegisterClassExW, SetCursor, SetForegroundWindow, SetLayeredWindowAttributes,
-    SetWindowLongW, TrackPopupMenu, TranslateMessage, CS_DROPSHADOW, CS_HREDRAW, CS_VREDRAW,
-    GWL_EXSTYLE, HMENU, IDC_ARROW, IDC_HAND, IDI_APPLICATION, MF_CHECKED, MF_SEPARATOR, MF_STRING,
-    MF_UNCHECKED, MSG, PM_REMOVE, TPM_BOTTOMALIGN, TPM_LEFTALIGN, TPM_RETURNCMD, WM_COMMAND,
-    WM_DESTROY, WM_KEYDOWN, WM_KILLFOCUS, WM_LBUTTONUP, WM_MOUSEMOVE, WM_PAINT, WM_RBUTTONUP,
-    WM_SETCURSOR, WM_TIMER, WNDCLASSEXW, WS_EX_LAYERED, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
+    SetWindowLongW, ShowWindow, TrackPopupMenu, TranslateMessage, CS_DROPSHADOW, CS_HREDRAW,
+    CS_VREDRAW, GWL_EXSTYLE, HMENU, IDC_ARROW, IDC_HAND, IDI_APPLICATION, MF_CHECKED, MF_SEPARATOR,
+    MF_STRING, MF_UNCHECKED, MSG, PM_REMOVE, SW_HIDE, SW_SHOWNOACTIVATE, TPM_BOTTOMALIGN,
+    TPM_LEFTALIGN, TPM_RETURNCMD, WM_COMMAND, WM_DESTROY, WM_KEYDOWN, WM_KILLFOCUS, WM_LBUTTONUP,
+    WM_MOUSEMOVE, WM_PAINT, WM_RBUTTONUP, WM_SETCURSOR, WM_TIMER, WNDCLASSEXW, WS_EX_LAYERED,
+    WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
 };
 
 const WINDOW_CLASS: &str = "ClaudeMeterMain";
@@ -59,6 +62,7 @@ const BLINK_INTERVAL_MS: u32 = 500;
 const FADE_INTERVAL_MS: u32 = 16;
 const IDLE_TIMEOUT_MS: u32 = 5 * 60 * 1000; // 5 minutes
 const WM_POLL_RESULT: u32 = 0x0400 + 20; // WM_USER + 20
+const WM_UPDATE_AVAILABLE: u32 = 0x0400 + 21; // WM_USER + 21
 
 /// Shared application state accessible from the window proc.
 struct AppState {
@@ -80,7 +84,7 @@ struct AppState {
     chatgpt_link_rect: RECT,
     status_link_rect: RECT,
     back_rect: RECT,
-    setting_rects: [RECT; 5],
+    setting_rects: [RECT; 8],
     notification_tracker: NotificationTracker,
     exe_dir: std::path::PathBuf,
     chart_data: Vec<f64>,
@@ -105,6 +109,8 @@ struct AppState {
     d2d: Option<D2DResources>,
     hovered_element: HoveredElement,
     mouse_tracking: bool,
+    // Mini-widget window
+    widget_hwnd: Option<HWND>,
 }
 
 // Safety: AppState is accessed only from the main thread via raw pointer.
@@ -216,7 +222,7 @@ unsafe fn run_message_loop(exe_dir: std::path::PathBuf, config_mgr: ConfigManage
         chatgpt_link_rect: RECT::default(),
         status_link_rect: RECT::default(),
         back_rect: RECT::default(),
-        setting_rects: [RECT::default(); 5],
+        setting_rects: [RECT::default(); 8],
         notification_tracker: NotificationTracker::new(),
         exe_dir,
         chart_data: Vec::new(),
@@ -234,6 +240,7 @@ unsafe fn run_message_loop(exe_dir: std::path::PathBuf, config_mgr: ConfigManage
         d2d,
         hovered_element: HoveredElement::None,
         mouse_tracking: false,
+        widget_hwnd: None,
     });
 
     // Create tray icon
@@ -254,6 +261,42 @@ unsafe fn run_message_loop(exe_dir: std::path::PathBuf, config_mgr: ConfigManage
                 );
             }
         }
+    }
+
+    // Register and create mini-widget window
+    widget::register_widget_class();
+    if let Some(state) = APP_STATE.as_mut() {
+        if let Some(w) = widget::create_widget_window() {
+            state.widget_hwnd = Some(w);
+            if state.config_mgr.config.show_widget {
+                let _ = ShowWindow(w, SW_SHOWNOACTIVATE);
+            }
+        }
+    }
+
+    // Auto-update check (background thread)
+    if APP_STATE
+        .as_ref()
+        .is_some_and(|s| s.config_mgr.config.check_updates)
+    {
+        let hwnd_raw = main_hwnd.0 as usize;
+        std::thread::spawn(move || {
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap();
+            if let Some((tag, url)) = rt.block_on(updater::check_for_update()) {
+                // Post update notification back to main thread
+                let data = Box::new((tag, url));
+                let hwnd = HWND(hwnd_raw as *mut _);
+                let _ = PostMessageW(
+                    hwnd,
+                    WM_UPDATE_AVAILABLE,
+                    WPARAM(Box::into_raw(data) as usize),
+                    LPARAM(0),
+                );
+            }
+        });
     }
 
     // Initial poll (async via tokio)
@@ -380,6 +423,26 @@ unsafe extern "system" fn main_wnd_proc(
             }
             LRESULT(0)
         }
+        WM_UPDATE_AVAILABLE => {
+            // Auto-update notification from background thread
+            let data_ptr = wparam.0 as *mut (String, String);
+            if !data_ptr.is_null() {
+                let (tag, url) = *Box::from_raw(data_ptr);
+                if let Some(state) = APP_STATE.as_ref() {
+                    if let Some(tray) = &state.tray {
+                        let title = state.i18n.t("Update available");
+                        let body = format!(
+                            "{} {}",
+                            tag,
+                            state.i18n.t("is available. Click to download.")
+                        );
+                        tray.show_balloon(title, &body);
+                    }
+                }
+                log::info!("Update available: {} — {}", tag, url);
+            }
+            LRESULT(0)
+        }
         WM_DESTROY => {
             PostQuitMessage(0);
             LRESULT(0)
@@ -406,7 +469,8 @@ unsafe extern "system" fn popup_wnd_proc(
                 state.config_mgr.reload_if_changed();
                 let theme_mode = ThemeMode::from_str(&state.config_mgr.config.theme);
                 let resolved = resolve_theme(theme_mode);
-                let colors = crate::ui::colors::ThemeColors::for_theme(resolved);
+                let colors = crate::ui::colors::ThemeColors::for_theme(resolved)
+                    .with_overrides(&state.config_mgr.config.custom_colors);
 
                 // Apply DWM dark mode based on theme
                 apply_dwm_dark_mode(hwnd, matches!(resolved, crate::theme::ResolvedTheme::Dark));
@@ -638,16 +702,16 @@ unsafe extern "system" fn popup_wnd_proc(
                 } else if state.popup_in_settings
                     && crate::popup::point_in_rect(pt, state.setting_rects[1])
                 {
-                    // Language: cycle auto → en → uk → es → de → fr → auto
-                    let next = match state.config_mgr.config.language.as_str() {
-                        "auto" => "en",
-                        "en" => "uk",
-                        "uk" => "es",
-                        "es" => "de",
-                        "de" => "fr",
-                        _ => "auto",
+                    // Language: cycle auto → en → uk → es → de → fr → pt → it → ja → ko → zh → auto
+                    let next = if state.config_mgr.config.language == "auto" {
+                        "en".to_string()
+                    } else {
+                        crate::i18n::Locale::from_str(&state.config_mgr.config.language)
+                            .and_then(|l| l.next())
+                            .map(|l| l.as_str().to_string())
+                            .unwrap_or_else(|| "auto".to_string())
                     };
-                    state.config_mgr.config.language = next.to_string();
+                    state.config_mgr.config.language = next;
                     state.i18n = I18n::from_config(&state.config_mgr.config.language);
                     state.config_mgr.save();
                     let _ = windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, true);
@@ -677,6 +741,36 @@ unsafe extern "system" fn popup_wnd_proc(
                         .to_string_lossy()
                         .to_string();
                     let _ = autostart::set_autostart(state.config_mgr.config.autostart, &exe_path);
+                    state.config_mgr.save();
+                    let _ = windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, true);
+                } else if state.popup_in_settings
+                    && crate::popup::point_in_rect(pt, state.setting_rects[5])
+                {
+                    // Show widget: toggle
+                    state.config_mgr.config.show_widget = !state.config_mgr.config.show_widget;
+                    state.config_mgr.save();
+                    // Toggle widget visibility
+                    if state.config_mgr.config.show_widget {
+                        if let Some(w) = state.widget_hwnd {
+                            let _ = ShowWindow(w, SW_SHOWNOACTIVATE);
+                        }
+                    } else if let Some(w) = state.widget_hwnd {
+                        let _ = ShowWindow(w, SW_HIDE);
+                    }
+                    let _ = windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, true);
+                } else if state.popup_in_settings
+                    && crate::popup::point_in_rect(pt, state.setting_rects[6])
+                {
+                    // Check for updates: toggle
+                    state.config_mgr.config.check_updates = !state.config_mgr.config.check_updates;
+                    state.config_mgr.save();
+                    let _ = windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, true);
+                } else if state.popup_in_settings
+                    && crate::popup::point_in_rect(pt, state.setting_rects[7])
+                {
+                    // Accessibility patterns: toggle
+                    state.config_mgr.config.accessibility_patterns =
+                        !state.config_mgr.config.accessibility_patterns;
                     state.config_mgr.save();
                     let _ = windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, true);
                 } else if crate::popup::point_in_rect(pt, state.settings_rect) {
@@ -832,7 +926,7 @@ unsafe fn toggle_popup(main_hwnd: HWND) {
 fn settings_panel_height() -> i32 {
     let header_h = 40;
     let row_h = 38;
-    let num_rows = 5;
+    let num_rows = 8;
     let legend_h = 8 + 1 + 8 + 20 + (4 * 18); // sep + gap + title + 4 icon items
     let footer_h = 44;
     header_h + 8 + (num_rows * row_h) + legend_h + footer_h
@@ -1363,6 +1457,11 @@ unsafe fn on_poll_result(hwnd: HWND, usage: Option<UsageResponse>, error: Option
             let _ = windows::Win32::Graphics::Gdi::InvalidateRect(state.popup_hwnd, None, true);
         } else if state.popup_visible {
             let _ = windows::Win32::Graphics::Gdi::InvalidateRect(state.popup_hwnd, None, true);
+        }
+
+        // Refresh mini-widget
+        if let Some(w) = state.widget_hwnd {
+            widget::invalidate_widget(w);
         }
     }
 }

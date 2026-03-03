@@ -59,6 +59,115 @@ pub enum HoveredElement {
     ChartBar(usize),
 }
 
+/// Draw accessibility overlay pattern on a progress bar fill.
+/// - Green (<50%): fine dots
+/// - Yellow (50-79%): diagonal stripes ///
+/// - Red (>=80%): cross-hatch
+unsafe fn draw_accessibility_pattern(
+    rt: &ID2D1HwndRenderTarget,
+    left: f32,
+    top: f32,
+    right: f32,
+    bottom: f32,
+    utilization: f64,
+) {
+    if right - left < 2.0 {
+        return;
+    }
+    let pattern_color = D2D1_COLOR_F {
+        r: 1.0,
+        g: 1.0,
+        b: 1.0,
+        a: 0.35,
+    };
+    let Ok(brush) = rt.CreateSolidColorBrush(&pattern_color as *const _, None) else {
+        return;
+    };
+    // Push clip to keep patterns inside the bar
+    rt.PushAxisAlignedClip(
+        &D2D_RECT_F {
+            left,
+            top,
+            right,
+            bottom,
+        },
+        windows::Win32::Graphics::Direct2D::D2D1_ANTIALIAS_MODE_PER_PRIMITIVE,
+    );
+    let h = bottom - top;
+    if utilization >= 80.0 {
+        // Cross-hatch: two sets of diagonal lines
+        let spacing = h * 0.6;
+        let span = right - left + h;
+        let n = (span / spacing) as i32 + 1;
+        for i in 0..n {
+            let offset = left - h + i as f32 * spacing;
+            rt.DrawLine(
+                D2D_POINT_2F {
+                    x: offset,
+                    y: bottom,
+                },
+                D2D_POINT_2F {
+                    x: offset + h,
+                    y: top,
+                },
+                &brush,
+                1.0,
+                None,
+            );
+            rt.DrawLine(
+                D2D_POINT_2F { x: offset, y: top },
+                D2D_POINT_2F {
+                    x: offset + h,
+                    y: bottom,
+                },
+                &brush,
+                1.0,
+                None,
+            );
+        }
+    } else if utilization >= 50.0 {
+        // Diagonal stripes
+        let spacing = h * 0.8;
+        let span = right - left + h;
+        let n = (span / spacing) as i32 + 1;
+        for i in 0..n {
+            let offset = left - h + i as f32 * spacing;
+            rt.DrawLine(
+                D2D_POINT_2F {
+                    x: offset,
+                    y: bottom,
+                },
+                D2D_POINT_2F {
+                    x: offset + h,
+                    y: top,
+                },
+                &brush,
+                1.0,
+                None,
+            );
+        }
+    } else {
+        // Fine dots for green
+        let dot_spacing = h * 0.7;
+        let mut dx = left + dot_spacing / 2.0;
+        let mut row = 0;
+        while dx < right {
+            let cy = top + h / 2.0 + if row % 2 == 0 { -h * 0.15 } else { h * 0.15 };
+            rt.FillEllipse(
+                &D2D1_ELLIPSE {
+                    point: D2D_POINT_2F { x: dx, y: cy },
+                    radiusX: 1.0,
+                    radiusY: 1.0,
+                },
+                &brush,
+            );
+            dx += dot_spacing;
+            row += 1;
+        }
+    }
+    rt.PopAxisAlignedClip();
+}
+
 // --- Text format cache key ---
 
 #[derive(Hash, Eq, PartialEq, Clone)]
@@ -819,6 +928,13 @@ impl PopupRenderer {
                     rt.FillRoundedRectangle(&fill_rect, &grad_brush);
                 }
             }
+            // Accessibility overlay pattern
+            if crate::APP_STATE
+                .as_ref()
+                .is_some_and(|s| s.config_mgr.config.accessibility_patterns)
+            {
+                draw_accessibility_pattern(rt, pad, y, pad + fill_w, y + bar_h, utilization);
+            }
         }
 
         y += bar_h + self.sf(4);
@@ -962,6 +1078,13 @@ impl PopupRenderer {
                     },
                     &fill_brush,
                 );
+                // Accessibility overlay pattern
+                if crate::APP_STATE
+                    .as_ref()
+                    .is_some_and(|s| s.config_mgr.config.accessibility_patterns)
+                {
+                    draw_accessibility_pattern(rt, pad, y, pad + fill_w, y + bar_h, *utilization);
+                }
             }
             y += bar_h + self.sf(ITEM_GAP);
         }
@@ -1603,7 +1726,7 @@ pub unsafe fn draw_settings_panel(
     config: &crate::config::Config,
     back_rect: &mut RECT,
     close_rect: &mut RECT,
-    setting_rects: &mut [RECT; 5],
+    setting_rects: &mut [RECT; 8],
     hovered: &HoveredElement,
 ) {
     let Some(rt) = d2d.render_target.clone() else {
@@ -1753,15 +1876,22 @@ pub unsafe fn draw_settings_panel(
     // Settings rows
     let check_on = "\u{2611}"; // ☑
     let check_off = "\u{2610}"; // ☐
+                                // Build language display: "Auto (English)" or "English", "Українська", etc.
+    let lang_display = if config.language == "auto" {
+        let detected = crate::i18n::Locale::detect_from_windows();
+        format!("{} ({})", i18n.t("Auto"), detected.display_name())
+    } else {
+        crate::i18n::Locale::from_str(&config.language)
+            .map(|l| l.display_name().to_string())
+            .unwrap_or_else(|| config.language.to_uppercase())
+    };
+
     let rows: Vec<(String, String)> = vec![
         (
             i18n.t("Theme").to_string(),
             i18n.t(&capitalize(&config.theme)).to_string(),
         ),
-        (
-            i18n.t("Language").to_string(),
-            config.language.to_uppercase(),
-        ),
+        (i18n.t("Language").to_string(), lang_display),
         (
             i18n.t("Compact mode").to_string(),
             (if config.compact_mode {
@@ -1783,6 +1913,33 @@ pub unsafe fn draw_settings_panel(
         (
             i18n.t("Start with Windows").to_string(),
             (if config.autostart {
+                check_on
+            } else {
+                check_off
+            })
+            .to_string(),
+        ),
+        (
+            i18n.t("Show widget").to_string(),
+            (if config.show_widget {
+                check_on
+            } else {
+                check_off
+            })
+            .to_string(),
+        ),
+        (
+            i18n.t("Check for updates").to_string(),
+            (if config.check_updates {
+                check_on
+            } else {
+                check_off
+            })
+            .to_string(),
+        ),
+        (
+            i18n.t("Accessibility patterns").to_string(),
+            (if config.accessibility_patterns {
                 check_on
             } else {
                 check_off

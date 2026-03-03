@@ -2,7 +2,12 @@ mod de;
 mod en;
 mod es;
 mod fr;
+mod it;
+mod ja;
+mod ko;
+mod pt;
 mod uk;
+mod zh;
 
 use std::collections::HashMap;
 
@@ -13,6 +18,11 @@ pub enum Locale {
     Es,
     De,
     Fr,
+    Pt,
+    Ja,
+    Ko,
+    Zh,
+    It,
 }
 
 impl Locale {
@@ -23,6 +33,11 @@ impl Locale {
             "es" => Some(Self::Es),
             "de" => Some(Self::De),
             "fr" => Some(Self::Fr),
+            "pt" => Some(Self::Pt),
+            "ja" => Some(Self::Ja),
+            "ko" => Some(Self::Ko),
+            "zh" => Some(Self::Zh),
+            "it" => Some(Self::It),
             _ => None,
         }
     }
@@ -35,6 +50,56 @@ impl Locale {
             Self::Es => "es",
             Self::De => "de",
             Self::Fr => "fr",
+            Self::Pt => "pt",
+            Self::Ja => "ja",
+            Self::Ko => "ko",
+            Self::Zh => "zh",
+            Self::It => "it",
+        }
+    }
+
+    /// Human-readable name for display in settings.
+    pub fn display_name(&self) -> &'static str {
+        match self {
+            Self::En => "English",
+            Self::Uk => {
+                "\u{0423}\u{043a}\u{0440}\u{0430}\u{0457}\u{043d}\u{0441}\u{044c}\u{043a}\u{0430}"
+            }
+            Self::Es => "Espa\u{00f1}ol",
+            Self::De => "Deutsch",
+            Self::Fr => "Fran\u{00e7}ais",
+            Self::Pt => "Portugu\u{00ea}s",
+            Self::Ja => "\u{65e5}\u{672c}\u{8a9e}",
+            Self::Ko => "\u{d55c}\u{ad6d}\u{c5b4}",
+            Self::Zh => "\u{4e2d}\u{6587}",
+            Self::It => "Italiano",
+        }
+    }
+
+    /// All available locales in order.
+    pub fn all() -> &'static [Self] {
+        &[
+            Self::En,
+            Self::Uk,
+            Self::Es,
+            Self::De,
+            Self::Fr,
+            Self::Pt,
+            Self::It,
+            Self::Ja,
+            Self::Ko,
+            Self::Zh,
+        ]
+    }
+
+    /// Next locale in cycling order (for settings).
+    pub fn next(&self) -> Option<Self> {
+        let all = Self::all();
+        let idx = all.iter().position(|l| l == self)?;
+        if idx + 1 < all.len() {
+            Some(all[idx + 1])
+        } else {
+            None // wraps to "auto"
         }
     }
 
@@ -49,6 +114,11 @@ impl Locale {
             0x0A => Self::Es, // Spanish
             0x07 => Self::De, // German
             0x0C => Self::Fr, // French
+            0x16 => Self::Pt, // Portuguese
+            0x11 => Self::Ja, // Japanese
+            0x12 => Self::Ko, // Korean
+            0x04 => Self::Zh, // Chinese
+            0x10 => Self::It, // Italian
             _ => Self::En,
         }
     }
@@ -69,6 +139,11 @@ impl I18n {
             Locale::Es => es::strings(),
             Locale::De => de::strings(),
             Locale::Fr => fr::strings(),
+            Locale::Pt => pt::strings(),
+            Locale::Ja => ja::strings(),
+            Locale::Ko => ko::strings(),
+            Locale::Zh => zh::strings(),
+            Locale::It => it::strings(),
         };
         let fallback = en::strings();
         Self {

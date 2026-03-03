@@ -121,13 +121,37 @@ OpenAI does not provide a public API for checking ChatGPT Plus/Pro subscription 
 
 <img src="screenshots/settings.png" alt="Settings panel" width="360">
 
-### 🌐 Languages
+### 🌐 Languages (10)
 
 - 🇬🇧 English (default)
 - 🇺🇦 Українська
 - 🇪🇸 Español
 - 🇩🇪 Deutsch
 - 🇫🇷 Français
+- 🇵🇹 Português
+- 🇮🇹 Italiano
+- 🇯🇵 日本語
+- 🇰🇷 한국어
+- 🇨🇳 简体中文
+
+### 🧩 Mini Widget
+
+- **Floating PiP window** — always-on-top 52x28px window showing current usage %
+- **Color-coded** — green/yellow/red background matching usage level
+- **Draggable** — drag anywhere on screen
+- **Click to open** — click the widget to open the full dashboard
+- **Disabled by default** — enable in Settings → "Show widget"
+
+### ♿ Accessibility
+
+- **Colorblind patterns** — progress bars show pattern overlays: dots (green), diagonal stripes (yellow), cross-hatch (red)
+- **Disabled by default** — enable in Settings → "Accessibility patterns"
+
+### 🔄 Auto-Update
+
+- **Checks GitHub Releases** on startup for newer versions
+- **Balloon notification** — shows a tray balloon if a new version is available
+- **Enabled by default** — toggle in Settings → "Check for updates"
 
 ### 🔔 Smart Notifications
 
@@ -166,7 +190,11 @@ OpenAI does not provide a public API for checking ChatGPT Plus/Pro subscription 
   "compact_mode": false,
   "theme": "auto",
   "language": "auto",
-  "show_chatgpt_section": false
+  "show_chatgpt_section": false,
+  "show_widget": false,
+  "check_updates": true,
+  "accessibility_patterns": false,
+  "custom_colors": {}
 }
 ```
 
@@ -177,10 +205,14 @@ OpenAI does not provide a public API for checking ChatGPT Plus/Pro subscription 
 | `notifications.thresholds` | `[50,75,90]` | 1–100 | Usage % levels that trigger alerts |
 | `notifications.sound` | `true` | — | Play system sound with notifications |
 | `theme` | `"auto"` | auto/dark/light | Color theme |
-| `language` | `"auto"` | auto/en/uk/es/de/fr | UI language |
+| `language` | `"auto"` | auto/en/uk/.../zh | UI language (10 languages) |
 | `compact_mode` | `false` | — | Compact dashboard layout |
 | `show_chatgpt_section` | `false` | — | Show ChatGPT quick-link panel |
 | `autostart` | `false` | — | Start with Windows |
+| `show_widget` | `false` | — | Show floating mini-widget |
+| `check_updates` | `true` | — | Check for updates on startup |
+| `accessibility_patterns` | `false` | — | Colorblind overlay patterns on progress bars |
+| `custom_colors` | `{}` | hex strings | Override theme colors (e.g. `{"green": "#00ff00"}`) |
 
 ## ⌨ Keyboard Shortcuts
 
