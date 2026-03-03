@@ -17,7 +17,7 @@ mod ui;
 use crate::config::ConfigManager;
 use crate::db::Database;
 use crate::i18n::{format_duration, I18n};
-use crate::notifications::{send_toast, NotificationTracker};
+use crate::notifications::NotificationTracker;
 use crate::providers::claude::{ClaudeClient, UsageResponse};
 use crate::theme::{resolve_theme, ThemeMode};
 use crate::tray::{
@@ -78,6 +78,7 @@ struct AppState {
     refresh_rect: RECT,
     install_rect: RECT,
     chatgpt_link_rect: RECT,
+    status_link_rect: RECT,
     back_rect: RECT,
     setting_rects: [RECT; 5],
     notification_tracker: NotificationTracker,
@@ -213,6 +214,7 @@ unsafe fn run_message_loop(exe_dir: std::path::PathBuf, config_mgr: ConfigManage
         refresh_rect: RECT::default(),
         install_rect: RECT::default(),
         chatgpt_link_rect: RECT::default(),
+        status_link_rect: RECT::default(),
         back_rect: RECT::default(),
         setting_rects: [RECT::default(); 5],
         notification_tracker: NotificationTracker::new(),
@@ -241,14 +243,16 @@ unsafe fn run_message_loop(exe_dir: std::path::PathBuf, config_mgr: ConfigManage
             Err(e) => log::error!("Failed to create tray icon: {e}"),
         }
 
-        // Startup notification
+        // Startup notification (balloon tip from tray icon)
         if state.config_mgr.config.notifications.enabled {
-            send_toast(
-                "ClaudeMeter",
-                state
-                    .i18n
-                    .t("Running in system tray. Click the icon for details."),
-            );
+            if let Some(tray) = &state.tray {
+                tray.show_balloon(
+                    "ClaudeMeter",
+                    state
+                        .i18n
+                        .t("Running in system tray. Click the icon for details."),
+                );
+            }
         }
     }
 
@@ -450,6 +454,7 @@ unsafe extern "system" fn popup_wnd_proc(
                                     &mut state.refresh_rect,
                                     &mut state.install_rect,
                                     &mut state.chatgpt_link_rect,
+                                    &mut state.status_link_rect,
                                     &mut state.chart_rect,
                                     &mut state.chart_bar_count,
                                 );
@@ -554,6 +559,8 @@ unsafe extern "system" fn popup_wnd_proc(
                     HoveredElement::InstallButton
                 } else if crate::popup::point_in_rect(pt, state.chatgpt_link_rect) {
                     HoveredElement::ChatGptLink
+                } else if crate::popup::point_in_rect(pt, state.status_link_rect) {
+                    HoveredElement::StatusLink
                 } else if crate::popup::point_in_rect(pt, state.chart_rect)
                     && state.chart_bar_count > 0
                 {
@@ -696,6 +703,8 @@ unsafe extern "system" fn popup_wnd_proc(
                 } else if crate::popup::point_in_rect(pt, state.chatgpt_link_rect) {
                     let url = state.config_mgr.config.chatgpt_usage_url.clone();
                     let _ = open::that(&url);
+                } else if crate::popup::point_in_rect(pt, state.status_link_rect) {
+                    let _ = open::that("https://status.claude.com/");
                 }
             }
             LRESULT(0)
@@ -1189,6 +1198,10 @@ unsafe fn on_poll_result(hwnd: HWND, usage: Option<UsageResponse>, error: Option
             // Store to DB (best effort)
             if let Ok(db) = Database::open(&state.exe_dir) {
                 for (key, metric) in u.all_metrics() {
+                    // Skip five_hour when no active session (resets_at is None)
+                    if key == "five_hour" && metric.resets_at.is_none() {
+                        continue;
+                    }
                     let _ = db.insert(
                         "claude",
                         &key,
@@ -1271,7 +1284,9 @@ unsafe fn on_poll_result(hwnd: HWND, usage: Option<UsageResponse>, error: Option
                                 ),
                             )
                         };
-                        send_toast(&title, &body);
+                        if let Some(tray) = &state.tray {
+                            tray.show_balloon(&title, &body);
+                        }
 
                         // Play notification sound
                         if state.config_mgr.config.notifications.sound {

@@ -40,6 +40,7 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Exit", "Exit");
     m.insert("Last updated:", "Last updated:");
     m.insert("Refresh", "Refresh");
+    m.insert("Status", "Status");
     m.insert("Usage Alert", "Usage Alert");
     m.insert("Usage Critical", "Usage Critical");
     m.insert(

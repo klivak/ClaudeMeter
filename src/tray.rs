@@ -8,7 +8,7 @@ use windows::Win32::Graphics::Gdi::{
     DT_VCENTER, FF_DONTCARE, FW_BOLD, OUT_DEFAULT_PRECIS, PROOF_QUALITY, TRANSPARENT,
 };
 use windows::Win32::UI::Shell::{
-    Shell_NotifyIconW, NIF_ICON, NIF_MESSAGE, NIF_TIP, NIM_ADD, NIM_DELETE, NIM_MODIFY,
+    Shell_NotifyIconW, NIF_ICON, NIF_INFO, NIF_MESSAGE, NIF_TIP, NIM_ADD, NIM_DELETE, NIM_MODIFY,
     NOTIFYICONDATAW,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
@@ -62,8 +62,8 @@ impl TrayIconColor {
     /// Text color for the tray icon number (GDI COLORREF format: 0x00BBGGRR)
     fn text_colorref(self) -> u32 {
         match self {
-            Self::Green | Self::Yellow => 0x00000000, // black text on bright backgrounds
-            Self::Red | Self::Gray => 0x00FFFFFF,     // white text on dark backgrounds
+            Self::Yellow => 0x00000000, // black text on yellow
+            Self::Green | Self::Red | Self::Gray => 0x00FFFFFF, // white text on others
         }
     }
 }
@@ -101,8 +101,8 @@ fn load_icon_from_resource(resource_id: u16) -> Result<HICON, String> {
     }
 }
 
-/// Create a 16x16 icon with a percentage number rendered on a colored background.
-fn create_number_icon(value: u32, color: ColorRef, text_color: u32) -> Option<HICON> {
+/// Create a 16x16 icon with text rendered on a colored background.
+fn create_text_icon(text: &str, font_size: i32, color: ColorRef, text_color: u32) -> Option<HICON> {
     const SIZE: i32 = 16;
 
     unsafe {
@@ -149,14 +149,8 @@ fn create_number_icon(value: u32, color: ColorRef, text_color: u32) -> Option<HI
         }
 
         // Draw text
-        let text = if value >= 100 {
-            "!!".to_string()
-        } else {
-            format!("{}", value)
-        };
         let text_wide: Vec<u16> = text.encode_utf16().chain(std::iter::once(0)).collect();
 
-        let font_size = if value >= 10 { 9 } else { 11 };
         let font_name: Vec<u16> = "Segoe UI"
             .encode_utf16()
             .chain(std::iter::once(0))
@@ -298,11 +292,28 @@ impl TrayIcon {
         let max_util = usage.as_ref().and_then(|u| u.max_utilization());
         let color = TrayIconColor::from_utilization(max_util);
 
-        // Try dynamic icon with % number, fall back to static icons
-        let icon = if let Some(pct) = max_util {
+        // If active session (five_hour with resets_at), show its %; otherwise show "..."
+        let session_util = usage
+            .as_ref()
+            .and_then(|u| u.five_hour.as_ref())
+            .filter(|m| m.resets_at.is_some())
+            .map(|m| m.utilization);
+        let icon = if max_util.is_some() {
             let color_ref = color.to_colorref();
             let text_cr = color.text_colorref();
-            if let Some(dyn_icon) = create_number_icon(pct.round() as u32, color_ref, text_cr) {
+            let dyn_icon = if let Some(session_pct) = session_util {
+                let value = session_pct.round() as u32;
+                let text = if value >= 100 {
+                    "!!".to_string()
+                } else {
+                    format!("{}", value)
+                };
+                let font_size = if value >= 10 { 9 } else { 11 };
+                create_text_icon(&text, font_size, color_ref, text_cr)
+            } else {
+                create_text_icon("...", 8, color_ref, text_cr)
+            };
+            if let Some(dyn_icon) = dyn_icon {
                 // Destroy previous dynamic icon
                 if let Some(old) = self.dynamic_icon.take() {
                     unsafe {
@@ -340,6 +351,24 @@ impl TrayIcon {
             TrayIconColor::Yellow => self.icon_yellow,
             TrayIconColor::Red => self.icon_red,
             TrayIconColor::Gray => self.icon_gray,
+        }
+    }
+
+    /// Show a balloon notification from the tray icon.
+    pub fn show_balloon(&self, title: &str, body: &str) {
+        let mut nid = self.make_nid();
+        nid.uFlags = NIF_INFO;
+
+        let title_wide: Vec<u16> = title.encode_utf16().chain(std::iter::once(0)).collect();
+        let copy_len = title_wide.len().min(63);
+        nid.szInfoTitle[..copy_len].copy_from_slice(&title_wide[..copy_len]);
+
+        let body_wide: Vec<u16> = body.encode_utf16().chain(std::iter::once(0)).collect();
+        let copy_len = body_wide.len().min(255);
+        nid.szInfo[..copy_len].copy_from_slice(&body_wide[..copy_len]);
+
+        unsafe {
+            let _ = Shell_NotifyIconW(NIM_MODIFY, &nid);
         }
     }
 

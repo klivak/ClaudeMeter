@@ -53,6 +53,7 @@ pub enum HoveredElement {
     RefreshButton,
     InstallButton,
     ChatGptLink,
+    StatusLink,
     BackButton,
     SettingRow(usize),
     ChartBar(usize),
@@ -343,6 +344,7 @@ impl PopupRenderer {
         refresh_rect: &mut RECT,
         install_rect: &mut RECT,
         chatgpt_link_rect: &mut RECT,
+        status_link_rect: &mut RECT,
         chart_rect_out: &mut RECT,
         chart_bar_count_out: &mut usize,
     ) {
@@ -389,7 +391,18 @@ impl PopupRenderer {
                         );
                     }
                     Some(u) => {
-                        y = self.draw_claude_section(&rt, d2d, w, y, u, colors, i18n, anim_values);
+                        y = self.draw_claude_section(
+                            &rt,
+                            d2d,
+                            w,
+                            y,
+                            u,
+                            colors,
+                            i18n,
+                            anim_values,
+                            hovered,
+                            status_link_rect,
+                        );
                     }
                 }
 
@@ -430,6 +443,7 @@ impl PopupRenderer {
                 i18n,
                 hovered,
                 refresh_rect,
+                status_link_rect,
             );
 
             // 1px border
@@ -591,6 +605,8 @@ impl PopupRenderer {
         colors: &ThemeColors,
         i18n: &I18n,
         anim_values: &[f64],
+        hovered: &HoveredElement,
+        status_link_rect: &mut RECT,
     ) -> f32 {
         let pad = self.sf(PADDING);
 
@@ -615,13 +631,43 @@ impl PopupRenderer {
             &D2D_RECT_F {
                 left: pad,
                 top: y,
-                right: w - pad,
+                right: w - pad - self.sf(60),
                 bottom: y + self.sf(20),
             },
             &brush,
             D2D1_DRAW_TEXT_OPTIONS_NONE,
             DWRITE_MEASURING_MODE_NATURAL,
         );
+
+        // "Status ↗" link (right-aligned on header line)
+        let status_str = format!("{} \u{2197}", i18n.t("Status"));
+        let status_text = wide(&status_str);
+        let status_format = d2d.get_text_format(10, false, 1, 1).clone();
+        let is_status_hovered = matches!(hovered, HoveredElement::StatusLink);
+        let status_color = if is_status_hovered {
+            lighten_d2d(&colorref_to_d2d(colors.accent), 0.3)
+        } else {
+            colorref_to_d2d(colors.accent)
+        };
+        let status_brush = rt
+            .CreateSolidColorBrush(&status_color as *const _, None)
+            .unwrap();
+        let sr = D2D_RECT_F {
+            left: w - pad - self.sf(56),
+            top: y,
+            right: w - pad,
+            bottom: y + self.sf(20),
+        };
+        *status_link_rect = to_win32_rect(&sr);
+        rt.DrawText(
+            &status_text[..status_text.len() - 1],
+            &status_format,
+            &sr,
+            &status_brush,
+            D2D1_DRAW_TEXT_OPTIONS_NONE,
+            DWRITE_MEASURING_MODE_NATURAL,
+        );
+
         y += self.sf(24);
 
         for (i, (key, metric)) in usage.all_metrics().iter().enumerate() {
@@ -1377,6 +1423,7 @@ impl PopupRenderer {
         i18n: &I18n,
         hovered: &HoveredElement,
         refresh_rect: &mut RECT,
+        _status_link_rect: &mut RECT,
     ) {
         let h = self.sf(FOOTER_H);
         let pad = self.sf(PADDING);

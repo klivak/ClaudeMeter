@@ -35,50 +35,6 @@ impl NotificationTracker {
     }
 }
 
-/// Send a Windows toast notification.
-///
-/// Uses a simple PowerShell-based notification as a fallback that
-/// works without the winrt-notification dependency complexities.
-pub fn send_toast(title: &str, body: &str) {
-    let title = title.replace('"', "'");
-    let body = body.replace('"', "'");
-
-    // Use PowerShell to show a toast notification (works on Windows 10/11)
-    let script = format!(
-        r#"
-$title = "{title}"
-$body = "{body}"
-[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] | Out-Null
-[Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime] | Out-Null
-$template = [Windows.UI.Notifications.ToastTemplateType]::ToastText02
-$xml = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent($template)
-$xml.GetElementsByTagName("text")[0].AppendChild($xml.CreateTextNode($title)) | Out-Null
-$xml.GetElementsByTagName("text")[1].AppendChild($xml.CreateTextNode($body)) | Out-Null
-$toast = [Windows.UI.Notifications.ToastNotification]::new($xml)
-$notifier = [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier("ClaudeMeter")
-$notifier.Show($toast)
-"#
-    );
-
-    #[cfg(target_os = "windows")]
-    const CREATE_NO_WINDOW: u32 = 0x08000000;
-
-    let mut cmd = std::process::Command::new("powershell");
-    cmd.args([
-        "-WindowStyle",
-        "Hidden",
-        "-NonInteractive",
-        "-Command",
-        &script,
-    ]);
-    #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(CREATE_NO_WINDOW);
-    }
-    let _ = cmd.spawn();
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

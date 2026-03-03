@@ -54,6 +54,11 @@ impl Database {
             "DELETE FROM usage_history WHERE timestamp < datetime('now', '-30 days')",
             [],
         )?;
+        // Remove five_hour records with no active session (resets_at is NULL)
+        self.conn.execute(
+            "DELETE FROM usage_history WHERE metric = 'five_hour' AND resets_at IS NULL",
+            [],
+        )?;
         Ok(())
     }
 
@@ -82,6 +87,7 @@ impl Database {
              FROM usage_history
              WHERE provider = 'claude'
                AND metric = 'five_hour'
+               AND resets_at IS NOT NULL
                AND timestamp > datetime('now', '-24 hours')
              GROUP BY CAST((julianday('now') - julianday(timestamp)) * 48 AS INTEGER)
              ORDER BY hours_ago DESC",
