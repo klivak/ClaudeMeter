@@ -2,11 +2,16 @@ mod de;
 mod en;
 mod es;
 mod fr;
+mod hi;
 mod it;
 mod ja;
 mod ko;
+mod nl;
+mod pl;
 mod pt;
+mod tr;
 mod uk;
+mod vi;
 mod zh;
 
 use std::collections::HashMap;
@@ -23,6 +28,11 @@ pub enum Locale {
     Ko,
     Zh,
     It,
+    Hi,
+    Tr,
+    Nl,
+    Pl,
+    Vi,
 }
 
 impl Locale {
@@ -38,6 +48,11 @@ impl Locale {
             "ko" => Some(Self::Ko),
             "zh" => Some(Self::Zh),
             "it" => Some(Self::It),
+            "hi" => Some(Self::Hi),
+            "tr" => Some(Self::Tr),
+            "nl" => Some(Self::Nl),
+            "pl" => Some(Self::Pl),
+            "vi" => Some(Self::Vi),
             _ => None,
         }
     }
@@ -55,6 +70,11 @@ impl Locale {
             Self::Ko => "ko",
             Self::Zh => "zh",
             Self::It => "it",
+            Self::Hi => "hi",
+            Self::Tr => "tr",
+            Self::Nl => "nl",
+            Self::Pl => "pl",
+            Self::Vi => "vi",
         }
     }
 
@@ -73,6 +93,11 @@ impl Locale {
             Self::Ko => "\u{d55c}\u{ad6d}\u{c5b4}",
             Self::Zh => "\u{4e2d}\u{6587}",
             Self::It => "Italiano",
+            Self::Hi => "\u{0939}\u{093f}\u{0928}\u{094d}\u{0926}\u{0940}",
+            Self::Tr => "T\u{00fc}rk\u{00e7}e",
+            Self::Nl => "Nederlands",
+            Self::Pl => "Polski",
+            Self::Vi => "Ti\u{1ebf}ng Vi\u{1ec7}t",
         }
     }
 
@@ -86,6 +111,11 @@ impl Locale {
             Self::Fr,
             Self::Pt,
             Self::It,
+            Self::Hi,
+            Self::Tr,
+            Self::Nl,
+            Self::Pl,
+            Self::Vi,
             Self::Ja,
             Self::Ko,
             Self::Zh,
@@ -119,6 +149,11 @@ impl Locale {
             0x12 => Self::Ko, // Korean
             0x04 => Self::Zh, // Chinese
             0x10 => Self::It, // Italian
+            0x39 => Self::Hi, // Hindi
+            0x1F => Self::Tr, // Turkish
+            0x13 => Self::Nl, // Dutch
+            0x15 => Self::Pl, // Polish
+            0x2A => Self::Vi, // Vietnamese
             _ => Self::En,
         }
     }
@@ -144,6 +179,11 @@ impl I18n {
             Locale::Ko => ko::strings(),
             Locale::Zh => zh::strings(),
             Locale::It => it::strings(),
+            Locale::Hi => hi::strings(),
+            Locale::Tr => tr::strings(),
+            Locale::Nl => nl::strings(),
+            Locale::Pl => pl::strings(),
+            Locale::Vi => vi::strings(),
         };
         let fallback = en::strings();
         Self {

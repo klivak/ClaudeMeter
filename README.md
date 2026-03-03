@@ -121,7 +121,7 @@ OpenAI does not provide a public API for checking ChatGPT Plus/Pro subscription 
 
 <img src="screenshots/settings.png" alt="Settings panel" width="360">
 
-### 🌐 Languages (10)
+### 🌐 Languages (15)
 
 - 🇬🇧 English (default)
 - 🇺🇦 Українська
@@ -130,6 +130,11 @@ OpenAI does not provide a public API for checking ChatGPT Plus/Pro subscription 
 - 🇫🇷 Français
 - 🇵🇹 Português
 - 🇮🇹 Italiano
+- 🇮🇳 हिन्दी
+- 🇹🇷 Türkçe
+- 🇳🇱 Nederlands
+- 🇵🇱 Polski
+- 🇻🇳 Tiếng Việt
 - 🇯🇵 日本語
 - 🇰🇷 한국어
 - 🇨🇳 简体中文
@@ -207,7 +212,7 @@ OpenAI does not provide a public API for checking ChatGPT Plus/Pro subscription 
 | `notifications.thresholds` | `[50,75,90]` | 1–100 | Usage % levels that trigger alerts |
 | `notifications.sound` | `true` | — | Play system sound with notifications |
 | `theme` | `"auto"` | auto/dark/light | Color theme |
-| `language` | `"auto"` | auto/en/uk/.../zh | UI language (10 languages) |
+| `language` | `"auto"` | auto/en/uk/.../zh | UI language (15 languages) |
 | `compact_mode` | `false` | — | Compact dashboard layout |
 | `show_chatgpt_section` | `false` | — | Show ChatGPT quick-link panel |
 | `autostart` | `false` | — | Start with Windows |
