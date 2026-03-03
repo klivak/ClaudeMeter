@@ -28,7 +28,7 @@ use crate::tray::{
 };
 use crate::ui::colors::colorref_to_d2d;
 use crate::ui::render::{draw_settings_panel, D2DResources, HoveredElement, PopupRenderer};
-use chrono::Local;
+use chrono::{Local, Timelike};
 use windows::core::PCWSTR;
 use windows::Win32::Foundation::{GetLastError, HWND, LPARAM, LRESULT, POINT, RECT, WPARAM};
 use windows::Win32::Graphics::Dwm::DwmSetWindowAttribute;
@@ -54,6 +54,11 @@ use windows::Win32::UI::WindowsAndMessaging::{
 // Language popup menu IDs
 const IDM_LANG_AUTO: u32 = 5000;
 const IDM_LANG_BASE: u32 = 5001;
+
+// Theme popup menu IDs
+const IDM_THEME_AUTO: u32 = 5100;
+const IDM_THEME_DARK: u32 = 5101;
+const IDM_THEME_LIGHT: u32 = 5102;
 
 const WINDOW_CLASS: &str = "ClaudeMeterMain";
 const POPUP_CLASS: &str = "ClaudeMeterPopup";
@@ -696,15 +701,8 @@ unsafe extern "system" fn popup_wnd_proc(
                 } else if state.popup_in_settings
                     && crate::popup::point_in_rect(pt, state.setting_rects[0])
                 {
-                    // Theme: cycle auto → dark → light → auto
-                    let next = match state.config_mgr.config.theme.as_str() {
-                        "auto" => "dark",
-                        "dark" => "light",
-                        _ => "auto",
-                    };
-                    state.config_mgr.config.theme = next.to_string();
-                    state.config_mgr.save();
-                    let _ = windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, true);
+                    // Theme: show popup menu
+                    show_theme_popup(hwnd, pt, state);
                 } else if state.popup_in_settings
                     && crate::popup::point_in_rect(pt, state.setting_rects[1])
                 {
@@ -1070,6 +1068,53 @@ unsafe fn show_popup(_main_hwnd: HWND) {
     }
 }
 
+unsafe fn show_theme_popup(hwnd: HWND, client_pt: POINT, state: &mut AppState) {
+    let menu = CreatePopupMenu().unwrap();
+    let current = &state.config_mgr.config.theme;
+
+    let themes = [
+        (IDM_THEME_AUTO, "auto", "Auto"),
+        (IDM_THEME_DARK, "dark", "Dark"),
+        (IDM_THEME_LIGHT, "light", "Light"),
+    ];
+
+    for (id, value, i18n_key) in &themes {
+        let flag = if current == *value {
+            MF_STRING | MF_CHECKED
+        } else {
+            MF_STRING | MF_UNCHECKED
+        };
+        let label = wide(state.i18n.t(i18n_key));
+        let _ = AppendMenuW(menu, flag, *id as usize, PCWSTR(label.as_ptr()));
+    }
+
+    let mut screen_pt = client_pt;
+    let _ = ClientToScreen(hwnd, &mut screen_pt);
+
+    let _ = SetForegroundWindow(hwnd);
+    let cmd = TrackPopupMenu(
+        menu,
+        TPM_LEFTALIGN | TPM_RETURNCMD,
+        screen_pt.x,
+        screen_pt.y,
+        0,
+        hwnd,
+        None,
+    );
+    let _ = DestroyMenu(menu);
+
+    if cmd.as_bool() {
+        let new_theme = match cmd.0 as u32 {
+            IDM_THEME_DARK => "dark",
+            IDM_THEME_LIGHT => "light",
+            _ => "auto",
+        };
+        state.config_mgr.config.theme = new_theme.to_string();
+        state.config_mgr.save();
+        let _ = windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, true);
+    }
+}
+
 unsafe fn show_language_popup(hwnd: HWND, client_pt: POINT, state: &mut AppState) {
     let menu = CreatePopupMenu().unwrap();
     let current_lang = &state.config_mgr.config.language;
@@ -1390,9 +1435,9 @@ unsafe fn on_poll_result(hwnd: HWND, usage: Option<UsageResponse>, error: Option
                         metric.resets_at.as_deref(),
                     );
                 }
-                // Load chart data
-                if let Ok(points) = db.query_24h_chart() {
-                    state.chart_data = points.iter().map(|p| p.utilization).collect();
+                // Load chart data (fixed 48-slot array, oldest first)
+                if let Ok(slots) = db.query_24h_chart() {
+                    state.chart_data = slots;
                 }
             }
 
@@ -1411,9 +1456,10 @@ unsafe fn on_poll_result(hwnd: HWND, usage: Option<UsageResponse>, error: Option
                 }
             }
 
-            // Check notifications
+            // Check notifications (skip during quiet hours)
             let thresholds = state.config_mgr.config.notifications.thresholds.clone();
-            if state.config_mgr.config.notifications.enabled {
+            let in_quiet = is_in_quiet_hours(&state.config_mgr.config.quiet_hours);
+            if state.config_mgr.config.notifications.enabled && !in_quiet {
                 for (key, metric) in u.all_metrics() {
                     let fired =
                         state
@@ -1574,6 +1620,40 @@ fn ensure_single_instance() -> bool {
 
 fn wide(s: &str) -> Vec<u16> {
     s.encode_utf16().chain(std::iter::once(0)).collect()
+}
+
+/// Check if current local time falls within the quiet hours window.
+fn is_in_quiet_hours(qh: &crate::config::QuietHoursConfig) -> bool {
+    if !qh.enabled {
+        return false;
+    }
+    let parse_hm = |s: &str| -> Option<(u32, u32)> {
+        let parts: Vec<&str> = s.split(':').collect();
+        if parts.len() == 2 {
+            Some((parts[0].parse().ok()?, parts[1].parse().ok()?))
+        } else {
+            None
+        }
+    };
+    let (sh, sm) = match parse_hm(&qh.start) {
+        Some(v) => v,
+        None => return false,
+    };
+    let (eh, em) = match parse_hm(&qh.end) {
+        Some(v) => v,
+        None => return false,
+    };
+    let now = chrono::Local::now();
+    let now_mins = now.hour() * 60 + now.minute();
+    let start_mins = sh * 60 + sm;
+    let end_mins = eh * 60 + em;
+    if start_mins <= end_mins {
+        // Same-day range (e.g., 08:00 → 18:00)
+        now_mins >= start_mins && now_mins < end_mins
+    } else {
+        // Overnight range (e.g., 22:00 → 08:00)
+        now_mins >= start_mins || now_mins < end_mins
+    }
 }
 
 /// Check if the user has been idle for more than `timeout_ms` milliseconds.

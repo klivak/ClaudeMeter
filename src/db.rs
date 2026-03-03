@@ -17,14 +17,6 @@ pub struct UsageRecord {
     pub resets_at: Option<String>,
 }
 
-#[derive(Debug, Clone)]
-#[allow(dead_code)]
-pub struct ChartPoint {
-    /// Hours ago from now (0 = now, 24 = 24h ago)
-    pub bucket_hours_ago: f64,
-    pub utilization: f64,
-}
-
 impl Database {
     pub fn open(exe_dir: &Path) -> SqlResult<Self> {
         let db_path = exe_dir.join("claudemeter.db");
@@ -78,32 +70,34 @@ impl Database {
     }
 
     /// Query last 24 hours of `five_hour` metric, bucketed into 30-minute intervals.
-    /// Returns up to 48 points ordered by time (oldest first).
-    pub fn query_24h_chart(&self) -> SqlResult<Vec<ChartPoint>> {
+    /// Always returns exactly 48 elements (oldest first: index 0 = 24h ago, index 47 = now).
+    /// Missing slots are filled with 0.0.
+    pub fn query_24h_chart(&self) -> SqlResult<Vec<f64>> {
         let mut stmt = self.conn.prepare(
             "SELECT
-                (julianday('now') - julianday(timestamp)) * 24.0 AS hours_ago,
+                CAST((julianday('now') - julianday(timestamp)) * 48 AS INTEGER) AS bucket,
                 AVG(utilization) AS avg_util
              FROM usage_history
              WHERE provider = 'claude'
                AND metric = 'five_hour'
                AND resets_at IS NOT NULL
                AND timestamp > datetime('now', '-24 hours')
-             GROUP BY CAST((julianday('now') - julianday(timestamp)) * 48 AS INTEGER)
-             ORDER BY hours_ago DESC",
+             GROUP BY bucket",
         )?;
 
-        let points = stmt
-            .query_map([], |row| {
-                Ok(ChartPoint {
-                    bucket_hours_ago: row.get::<_, f64>(0)?,
-                    utilization: row.get::<_, f64>(1)?,
-                })
-            })?
-            .filter_map(|r| r.ok())
-            .collect();
+        let mut slots = vec![0.0f64; 48];
 
-        Ok(points)
+        let rows = stmt.query_map([], |row| Ok((row.get::<_, i64>(0)?, row.get::<_, f64>(1)?)))?;
+
+        for row in rows.flatten() {
+            let (bucket, util) = row;
+            // bucket 0 = now, bucket 47 = ~24h ago
+            // We want index 0 = oldest, index 47 = newest
+            let idx = 47 - bucket.clamp(0, 47) as usize;
+            slots[idx] = util;
+        }
+
+        Ok(slots)
     }
 
     /// Export all usage history to a CSV file. Returns the number of rows written.

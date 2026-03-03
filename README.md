@@ -208,7 +208,12 @@ OpenAI does not provide a public API for checking ChatGPT Plus/Pro subscription 
   "check_updates": true,
   "accessibility_patterns": false,
   "tray_icon_style": "number",
-  "custom_colors": {}
+  "custom_colors": {},
+  "quiet_hours": {
+    "enabled": false,
+    "start": "22:00",
+    "end": "08:00"
+  }
 }
 ```
 
@@ -228,6 +233,9 @@ OpenAI does not provide a public API for checking ChatGPT Plus/Pro subscription 
 | `tray_icon_style` | `"number"` | number/ring/bar | Tray icon style: number (%), ring (circular), bar (vertical) |
 | `accessibility_patterns` | `false` | — | Colorblind overlay patterns on progress bars |
 | `custom_colors` | `{}` | hex strings | Override theme colors (e.g. `{"green": "#00ff00"}`) |
+| `quiet_hours.enabled` | `false` | — | Suppress notifications during quiet hours |
+| `quiet_hours.start` | `"22:00"` | HH:MM | Quiet hours start time |
+| `quiet_hours.end` | `"08:00"` | HH:MM | Quiet hours end time |
 
 ## ⌨ Keyboard Shortcuts
 

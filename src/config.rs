@@ -20,6 +20,23 @@ impl Default for NotificationConfig {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QuietHoursConfig {
+    pub enabled: bool,
+    pub start: String,
+    pub end: String,
+}
+
+impl Default for QuietHoursConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            start: "22:00".to_string(),
+            end: "08:00".to_string(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct CustomColors {
     pub background: Option<String>,
@@ -58,6 +75,8 @@ pub struct Config {
     pub tray_icon_style: String,
     #[serde(default)]
     pub custom_colors: CustomColors,
+    #[serde(default)]
+    pub quiet_hours: QuietHoursConfig,
 }
 
 fn default_icon_style() -> String {
@@ -86,6 +105,7 @@ impl Default for Config {
             accessibility_patterns: false,
             tray_icon_style: "number".to_string(),
             custom_colors: CustomColors::default(),
+            quiet_hours: QuietHoursConfig::default(),
         }
     }
 }
@@ -122,7 +142,7 @@ impl Config {
         // Validate language
         if ![
             "auto", "en", "uk", "es", "de", "fr", "pt", "ja", "ko", "zh", "it", "hi", "tr", "nl",
-            "pl", "vi",
+            "pl", "vi", "ru", "th", "id", "sv", "cs",
         ]
         .contains(&self.language.as_str())
         {

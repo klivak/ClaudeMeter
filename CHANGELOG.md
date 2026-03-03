@@ -5,6 +5,16 @@ All notable changes to ClaudeMeter will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.1] - 2026-03-03
+
+### Added
+- **Quiet hours** — suppress notifications during configurable time window (default 22:00–08:00, disabled by default). Set `quiet_hours.enabled: true` in config.json
+- **Theme popup picker** — click Theme in settings to choose from a popup menu instead of cycling through options
+
+### Fixed
+- **Chart time alignment** — 24h usage chart now always renders 48 fixed 30-minute slots aligned with x-axis labels. Previously, sparse data was stretched across the full chart width, misaligning bars with time labels
+- **Config language validation** — added 5 missing languages (ru, th, id, sv, cs) to validator; previously selecting these languages via config.json would reset to "auto" on next load
+
 ## [1.7.0] - 2026-03-03
 
 ### Added
