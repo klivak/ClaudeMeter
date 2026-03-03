@@ -1,9 +1,13 @@
+mod ar;
 mod cs;
+mod da;
 mod de;
 mod en;
 mod es;
+mod fi;
 mod fr;
 mod hi;
+mod hu;
 mod id;
 mod it;
 mod ja;
@@ -11,6 +15,7 @@ mod ko;
 mod nl;
 mod pl;
 mod pt;
+mod ro;
 mod ru;
 mod sv;
 mod th;
@@ -43,6 +48,11 @@ pub enum Locale {
     Id,
     Sv,
     Cs,
+    Ar,
+    Ro,
+    Da,
+    Fi,
+    Hu,
 }
 
 impl Locale {
@@ -68,6 +78,11 @@ impl Locale {
             "id" => Some(Self::Id),
             "sv" => Some(Self::Sv),
             "cs" => Some(Self::Cs),
+            "ar" => Some(Self::Ar),
+            "ro" => Some(Self::Ro),
+            "da" => Some(Self::Da),
+            "fi" => Some(Self::Fi),
+            "hu" => Some(Self::Hu),
             _ => None,
         }
     }
@@ -94,6 +109,11 @@ impl Locale {
             Self::Id => "id",
             Self::Sv => "sv",
             Self::Cs => "cs",
+            Self::Ar => "ar",
+            Self::Ro => "ro",
+            Self::Da => "da",
+            Self::Fi => "fi",
+            Self::Hu => "hu",
         }
     }
 
@@ -122,6 +142,11 @@ impl Locale {
             Self::Id => "Bahasa Indonesia",
             Self::Sv => "Svenska",
             Self::Cs => "\u{010c}e\u{0161}tina",
+            Self::Ar => "\u{0627}\u{0644}\u{0639}\u{0631}\u{0628}\u{064a}\u{0629}",
+            Self::Ro => "Rom\u{00e2}n\u{0103}",
+            Self::Da => "Dansk",
+            Self::Fi => "Suomi",
+            Self::Hu => "Magyar",
         }
     }
 
@@ -130,20 +155,25 @@ impl Locale {
         &[
             Self::Id, // Bahasa Indonesia
             Self::Cs, // Čeština
+            Self::Da, // Dansk
             Self::De, // Deutsch
             Self::En, // English
             Self::Es, // Español
             Self::Fr, // Français
             Self::It, // Italiano
+            Self::Hu, // Magyar
             Self::Nl, // Nederlands
             Self::Pl, // Polski
             Self::Pt, // Português
+            Self::Ro, // Română
+            Self::Fi, // Suomi
             Self::Sv, // Svenska
             Self::Tr, // Türkçe
             Self::Vi, // Tiếng Việt
             Self::Uk, // Українська
             Self::Hi, // हिन्दी
             Self::Th, // ภาษาไทย
+            Self::Ar, // العربية
             Self::Ru, // Русский
             Self::Ja, // 日本語
             Self::Ko, // 한국어
@@ -177,6 +207,11 @@ impl Locale {
             0x21 => Self::Id, // Indonesian
             0x1D => Self::Sv, // Swedish
             0x05 => Self::Cs, // Czech
+            0x01 => Self::Ar, // Arabic
+            0x18 => Self::Ro, // Romanian
+            0x06 => Self::Da, // Danish
+            0x0B => Self::Fi, // Finnish
+            0x0E => Self::Hu, // Hungarian
             _ => Self::En,
         }
     }
@@ -212,6 +247,11 @@ impl I18n {
             Locale::Id => id::strings(),
             Locale::Sv => sv::strings(),
             Locale::Cs => cs::strings(),
+            Locale::Ar => ar::strings(),
+            Locale::Ro => ro::strings(),
+            Locale::Da => da::strings(),
+            Locale::Fi => fi::strings(),
+            Locale::Hu => hu::strings(),
         };
         let fallback = en::strings();
         Self {

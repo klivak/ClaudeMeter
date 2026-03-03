@@ -525,7 +525,6 @@ impl TrayIcon {
 
     pub fn update(&mut self, usage: &Option<UsageResponse>, tooltip: &str, icon_style: &str) {
         let max_util = usage.as_ref().and_then(|u| u.max_utilization());
-        let color = TrayIconColor::from_utilization(max_util);
 
         // If active session (five_hour with resets_at), show its %; otherwise show "..."
         let session_util = usage
@@ -533,6 +532,11 @@ impl TrayIcon {
             .and_then(|u| u.five_hour.as_ref())
             .filter(|m| m.resets_at.is_some())
             .map(|m| m.utilization);
+
+        // Icon color matches the displayed value: session % when active, max otherwise
+        let displayed_util = session_util.or(max_util);
+        let color = TrayIconColor::from_utilization(displayed_util);
+
         let icon = if max_util.is_some() {
             let color_ref = color.to_colorref();
             let text_cr = color.text_colorref();

@@ -142,7 +142,7 @@ impl Config {
         // Validate language
         if ![
             "auto", "en", "uk", "es", "de", "fr", "pt", "ja", "ko", "zh", "it", "hi", "tr", "nl",
-            "pl", "vi", "ru", "th", "id", "sv", "cs",
+            "pl", "vi", "ru", "th", "id", "sv", "cs", "ar", "ro", "da", "fi", "hu",
         ]
         .contains(&self.language.as_str())
         {
