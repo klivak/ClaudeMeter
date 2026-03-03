@@ -109,8 +109,8 @@ impl Config {
 
         // Validate language
         if ![
-            "auto", "en", "uk", "es", "de", "fr", "pt", "ja", "ko", "zh", "it", "hi", "tr",
-            "nl", "pl", "vi",
+            "auto", "en", "uk", "es", "de", "fr", "pt", "ja", "ko", "zh", "it", "hi", "tr", "nl",
+            "pl", "vi",
         ]
         .contains(&self.language.as_str())
         {

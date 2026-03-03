@@ -12,7 +12,10 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Pro", "Pro");
     m.insert("Max", "Max");
     m.insert("Claude Code not detected", "Claude Code bulunamad\u{0131}");
-    m.insert("credentials_not_found", "Kimlik bilgileri bulunamad\u{0131}");
+    m.insert(
+        "credentials_not_found",
+        "Kimlik bilgileri bulunamad\u{0131}",
+    );
     m.insert(
         "run_claude_login_desc",
         "Claude Code y\u{00fc}kl\u{00fc} ancak giri\u{015f} yap\u{0131}lmam\u{0131}\u{015f}. Terminalinizde `claude login` komutunu \u{00e7}al\u{0131}\u{015f}t\u{0131}r\u{0131}n.",
@@ -39,7 +42,10 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     );
     m.insert("Refresh Now", "\u{015e}imdi Yenile");
     m.insert("Open Dashboard", "Paneli A\u{00e7}");
-    m.insert("Export History (CSV)", "Ge\u{00e7}mi\u{015f}i D\u{0131}\u{015f}a Aktar (CSV)");
+    m.insert(
+        "Export History (CSV)",
+        "Ge\u{00e7}mi\u{015f}i D\u{0131}\u{015f}a Aktar (CSV)",
+    );
     m.insert("Settings", "Ayarlar");
     m.insert("Start with Windows", "Windows ile ba\u{015f}lat");
     m.insert("About", "Hakk\u{0131}nda");
@@ -60,7 +66,10 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Dark", "Koyu");
     m.insert("Light", "A\u{00e7}\u{0131}k");
     m.insert("Auto", "Otomatik");
-    m.insert("Show ChatGPT section", "ChatGPT b\u{00f6}l\u{00fc}m\u{00fc}n\u{00fc} g\u{00f6}ster");
+    m.insert(
+        "Show ChatGPT section",
+        "ChatGPT b\u{00f6}l\u{00fc}m\u{00fc}n\u{00fc} g\u{00f6}ster",
+    );
     m.insert("Enabled", "Etkin");
     m.insert("Sound", "Ses");
     m.insert("Thresholds", "E\u{015f}ikler");
@@ -73,7 +82,10 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("ClaudeMeter", "ClaudeMeter");
     m.insert("CLAUDE", "CLAUDE");
     m.insert("CHATGPT / CODEX", "CHATGPT / CODEX");
-    m.insert("Usage History (24h)", "Kullan\u{0131}m Ge\u{00e7}mi\u{015f}i (24s)");
+    m.insert(
+        "Usage History (24h)",
+        "Kullan\u{0131}m Ge\u{00e7}mi\u{015f}i (24s)",
+    );
     m.insert("Auto (English)", "Otomatik (T\u{00fc}rk\u{00e7}e)");
     m.insert("at", "saat");
     m.insert("Resets in", "S\u{0131}f\u{0131}rlanma");
