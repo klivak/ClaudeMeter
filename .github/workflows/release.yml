@@ -28,16 +28,6 @@ jobs:
         shell: bash
         run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
-        with:
-          name: ClaudeMeter ${{ steps.version.outputs.VERSION }}
-          draft: false
-          prerelease: false
-          generate_release_notes: true
-          files: |
-            target/release/claudemeter.exe
-
       - name: VirusTotal Scan
         if: env.VT_API_KEY != ''
         uses: crazy-max/ghaction-virustotal@v4
@@ -47,18 +37,31 @@ jobs:
           files: |
             target/release/claudemeter.exe
 
-      - name: Add VirusTotal link to Release
-        if: steps.virustotal.outcome == 'success'
+      - name: Prepare release body
+        id: body
         shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          CURRENT_BODY=$(gh release view "${{ steps.version.outputs.VERSION }}" --json body -q .body)
           VT_ANALYSIS="${{ steps.virustotal.outputs.analysis }}"
-          VT_URL=$(echo "$VT_ANALYSIS" | sed 's|.*=||')
-          gh release edit "${{ steps.version.outputs.VERSION }}" \
-            --notes "${CURRENT_BODY}
+          if [ -n "$VT_ANALYSIS" ]; then
+            VT_URL=$(echo "$VT_ANALYSIS" | sed 's|.*=||')
+            echo "vt_section<<EOF" >> $GITHUB_OUTPUT
+            echo "" >> $GITHUB_OUTPUT
+            echo "---" >> $GITHUB_OUTPUT
+            echo "" >> $GITHUB_OUTPUT
+            echo "🛡️ **VirusTotal Scan:** [View full report](${VT_URL})" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            echo "vt_section=" >> $GITHUB_OUTPUT
+          fi
 
-          ---
-
-          🛡️ **VirusTotal Scan:** [View full report](${VT_URL})"
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ClaudeMeter ${{ steps.version.outputs.VERSION }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          append_body: true
+          body: ${{ steps.body.outputs.vt_section }}
+          files: |
+            target/release/claudemeter.exe
