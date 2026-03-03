@@ -161,6 +161,8 @@ OpenAI does not provide a public API for checking ChatGPT Plus/Pro subscription 
 - **Startup notification** — confirmation that ClaudeMeter is running in the tray
 - **Deduplication** — won't spam; resets when usage drops below threshold
 
+<img src="screenshots/notification.png" alt="Usage alert notification" width="360">
+
 ### 📤 Data Export
 
 - **CSV export** — right-click tray → "Export History (CSV)" to save full usage history
