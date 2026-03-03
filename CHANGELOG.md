@@ -5,14 +5,11 @@ All notable changes to ClaudeMeter will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.3.2] - 2026-03-03
+## [1.3.3] - 2026-03-03
 
 ### Added
 - **VirusTotal scanning** — every release binary is automatically scanned by VirusTotal (60+ antivirus engines) with a link to the full report in release notes
 - **VirusTotal badge** in README for transparency and trust
-
-### Fixed
-- VirusTotal scan step condition in CI workflow
 
 ## [1.3.0] - 2026-03-03
 
