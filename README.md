@@ -20,7 +20,7 @@ Track your Claude Pro/Max limits without opening a browser.
 
 <br>
 
-<img src="screenshots/main.png" alt="ClaudeMeter Dashboard" width="360">
+<img src="screenshots/main.png" alt="ClaudeMeter Dashboard" width="360"> <img src="screenshots/main2.png" alt="ClaudeMeter Dashboard" width="360">
 
 </div>
 
