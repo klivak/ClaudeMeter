@@ -29,8 +29,14 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
         "openai_no_api",
         "OpenAI nu ofer\u{0103} un API pentru a urm\u{0103}ri utilizarea abonamentului ChatGPT.",
     );
-    m.insert("Check your usage manually:", "Verific\u{0103} utilizarea manual:");
-    m.insert("Open ChatGPT Usage \u{2192}", "Deschide utilizarea ChatGPT \u{2192}");
+    m.insert(
+        "Check your usage manually:",
+        "Verific\u{0103} utilizarea manual:",
+    );
+    m.insert(
+        "Open ChatGPT Usage \u{2192}",
+        "Deschide utilizarea ChatGPT \u{2192}",
+    );
     m.insert("Refresh Now", "Actualizeaz\u{0103} acum");
     m.insert("Open Dashboard", "Deschide panoul");
     m.insert("Export History (CSV)", "Export\u{0103} istoricul (CSV)");
@@ -54,7 +60,10 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Dark", "\u{00ce}ntunecat");
     m.insert("Light", "Luminos");
     m.insert("Auto", "Auto");
-    m.insert("Show ChatGPT section", "Arat\u{0103} sec\u{021b}iunea ChatGPT");
+    m.insert(
+        "Show ChatGPT section",
+        "Arat\u{0103} sec\u{021b}iunea ChatGPT",
+    );
     m.insert("Enabled", "Activat");
     m.insert("Sound", "Sunet");
     m.insert("Thresholds", "Praguri");

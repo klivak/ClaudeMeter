@@ -3,16 +3,25 @@ use std::collections::HashMap;
 pub fn strings() -> HashMap<&'static str, &'static str> {
     let mut m = HashMap::new();
     m.insert("5-hour session", "5 tunnin istunto");
-    m.insert("Weekly (7-day)", "Viikoittainen (7 p\u{00e4}iv\u{00e4}\u{00e4})");
+    m.insert(
+        "Weekly (7-day)",
+        "Viikoittainen (7 p\u{00e4}iv\u{00e4}\u{00e4})",
+    );
     m.insert("Opus (7-day)", "Opus (7 p\u{00e4}iv\u{00e4}\u{00e4})");
     m.insert("Sonnet (7-day)", "Sonnet (7 p\u{00e4}iv\u{00e4}\u{00e4})");
-    m.insert("OAuth Apps (7-day)", "OAuth Apps (7 p\u{00e4}iv\u{00e4}\u{00e4})");
+    m.insert(
+        "OAuth Apps (7-day)",
+        "OAuth Apps (7 p\u{00e4}iv\u{00e4}\u{00e4})",
+    );
     m.insert("resets in", "nollautuu");
     m.insert("Plan", "Tilaus");
     m.insert("Pro", "Pro");
     m.insert("Max", "Max");
     m.insert("Claude Code not detected", "Claude Codea ei havaittu");
-    m.insert("credentials_not_found", "Tunnistetietoja ei l\u{00f6}ytynyt");
+    m.insert(
+        "credentials_not_found",
+        "Tunnistetietoja ei l\u{00f6}ytynyt",
+    );
     m.insert(
         "run_claude_login_desc",
         "Claude Code on asennettu, mutta sis\u{00e4}\u{00e4}nkirjautumista ei ole tehty. Suorita `claude login` terminaalissa yhdist\u{00e4}\u{00e4}ksesi tilisi.",
@@ -29,13 +38,22 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
         "openai_no_api",
         "OpenAI ei tarjoa rajapintaa ChatGPT-tilauksen k\u{00e4}yt\u{00f6}n seurantaan.",
     );
-    m.insert("Check your usage manually:", "Tarkista k\u{00e4}ytt\u{00f6}si manuaalisesti:");
-    m.insert("Open ChatGPT Usage \u{2192}", "Avaa ChatGPT-k\u{00e4}ytt\u{00f6} \u{2192}");
+    m.insert(
+        "Check your usage manually:",
+        "Tarkista k\u{00e4}ytt\u{00f6}si manuaalisesti:",
+    );
+    m.insert(
+        "Open ChatGPT Usage \u{2192}",
+        "Avaa ChatGPT-k\u{00e4}ytt\u{00f6} \u{2192}",
+    );
     m.insert("Refresh Now", "P\u{00e4}ivit\u{00e4} nyt");
     m.insert("Open Dashboard", "Avaa hallintapaneeli");
     m.insert("Export History (CSV)", "Vie historia (CSV)");
     m.insert("Settings", "Asetukset");
-    m.insert("Start with Windows", "K\u{00e4}ynnist\u{00e4} Windowsin kanssa");
+    m.insert(
+        "Start with Windows",
+        "K\u{00e4}ynnist\u{00e4} Windowsin kanssa",
+    );
     m.insert("About", "Tietoja");
     m.insert("Exit", "Poistu");
     m.insert("Last updated:", "Viimeksi p\u{00e4}ivitetty:");
@@ -71,7 +89,10 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Auto (English)", "Auto (Suomi)");
     m.insert("at", "klo");
     m.insert("Resets in", "Nollautuu");
-    m.insert("Tray icon colors:", "Ilmaisinalueen kuvakkeen v\u{00e4}rit:");
+    m.insert(
+        "Tray icon colors:",
+        "Ilmaisinalueen kuvakkeen v\u{00e4}rit:",
+    );
     m.insert("< 50% usage", "< 50% k\u{00e4}ytt\u{00f6}");
     m.insert("50-79% usage", "50\u{2013}79% k\u{00e4}ytt\u{00f6}");
     m.insert(">= 80% usage", "\u{2265} 80% k\u{00e4}ytt\u{00f6}");

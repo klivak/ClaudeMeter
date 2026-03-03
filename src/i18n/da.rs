@@ -12,7 +12,10 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Pro", "Pro");
     m.insert("Max", "Max");
     m.insert("Claude Code not detected", "Claude Code ikke fundet");
-    m.insert("credentials_not_found", "Legitimationsoplysninger ikke fundet");
+    m.insert(
+        "credentials_not_found",
+        "Legitimationsoplysninger ikke fundet",
+    );
     m.insert(
         "run_claude_login_desc",
         "Claude Code er installeret, men ikke logget ind. K\u{00f8}r `claude login` i din terminal for at forbinde din konto.",
@@ -30,7 +33,10 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
         "OpenAI tilbyder ikke en API til at spore ChatGPT-abonnementsforbrug.",
     );
     m.insert("Check your usage manually:", "Tjek dit forbrug manuelt:");
-    m.insert("Open ChatGPT Usage \u{2192}", "\u{00c5}bn ChatGPT-forbrug \u{2192}");
+    m.insert(
+        "Open ChatGPT Usage \u{2192}",
+        "\u{00c5}bn ChatGPT-forbrug \u{2192}",
+    );
     m.insert("Refresh Now", "Opdater nu");
     m.insert("Open Dashboard", "\u{00c5}bn dashboard");
     m.insert("Export History (CSV)", "Eksporter historik (CSV)");
@@ -79,7 +85,10 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("exceeded", "overskredet");
     m.insert("Show widget", "Vis widget");
     m.insert("Check for updates", "S\u{00f8}g efter opdateringer");
-    m.insert("Accessibility patterns", "Tilg\u{00e6}ngelighedsm\u{00f8}nstre");
+    m.insert(
+        "Accessibility patterns",
+        "Tilg\u{00e6}ngelighedsm\u{00f8}nstre",
+    );
     m.insert("Update available", "Opdatering tilg\u{00e6}ngelig");
     m.insert(
         "is available. Click to download.",
