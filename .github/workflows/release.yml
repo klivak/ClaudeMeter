@@ -28,6 +28,10 @@ jobs:
         shell: bash
         run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
 
+      - name: Rename binary with version
+        shell: bash
+        run: cp target/release/claudemeter.exe "target/release/claudemeter-${{ steps.version.outputs.VERSION }}.exe"
+
       - name: VirusTotal Scan
         if: env.VT_API_KEY != ''
         uses: crazy-max/ghaction-virustotal@v4
@@ -35,7 +39,7 @@ jobs:
         with:
           vt_api_key: ${{ secrets.VT_API_KEY }}
           files: |
-            target/release/claudemeter.exe
+            target/release/claudemeter-${{ steps.version.outputs.VERSION }}.exe
 
       - name: Prepare release body
         id: body
@@ -43,7 +47,7 @@ jobs:
         run: |
           VT_ANALYSIS="${{ steps.virustotal.outputs.analysis }}"
           if [ -n "$VT_ANALYSIS" ]; then
-            VT_URL=$(echo "$VT_ANALYSIS" | sed 's|.*=||')
+            VT_URL=$(echo "$VT_ANALYSIS" | cut -d'=' -f2-)
             echo "vt_section<<EOF" >> $GITHUB_OUTPUT
             echo "" >> $GITHUB_OUTPUT
             echo "---" >> $GITHUB_OUTPUT
@@ -64,4 +68,4 @@ jobs:
           append_body: true
           body: ${{ steps.body.outputs.vt_section }}
           files: |
-            target/release/claudemeter.exe
+            target/release/claudemeter-${{ steps.version.outputs.VERSION }}.exe
