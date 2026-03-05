@@ -711,22 +711,19 @@ pub fn build_tooltip_full(
 }
 
 /// Build the tray tooltip string (truncated to 127 chars for Win32 szTip limit).
-/// Uses a compact format without empty lines to fit more metrics.
 pub fn build_tooltip(
     usage: &Option<UsageResponse>,
     _show_chatgpt: bool,
     last_error: &Option<String>,
 ) -> String {
+    use crate::i18n::format_duration;
     use crate::providers::claude::format_metric_name;
 
-    let header = match (&usage, last_error) {
-        (Some(_), Some(_)) => "ClaudeMeter \u{26a0}",
-        _ => "ClaudeMeter",
-    };
-    let mut lines = vec![header.to_string()];
+    let mut lines: Vec<String> = Vec::new();
 
     match usage {
         None => {
+            lines.push("ClaudeMeter".to_string());
             if let Some(err) = last_error {
                 lines.push(error_tooltip_label(err).to_string());
             } else {
@@ -734,10 +731,36 @@ pub fn build_tooltip(
             }
         }
         Some(u) => {
-            lines.push(format!("Claude ({})", u.detected_plan()));
-            for (key, metric) in u.all_metrics() {
-                let name = format_metric_name(&key);
-                lines.push(format!("{}: {:.0}%", name, metric.utilization));
+            let header = if last_error.is_some() {
+                format!("Claude ({}) \u{26a0}", u.detected_plan())
+            } else {
+                format!("Claude ({})", u.detected_plan())
+            };
+            lines.push(header);
+
+            let all = u.all_metrics();
+            let known_count = all.iter().filter(|(k, _)| !u.extra.contains_key(k)).count();
+            let extra_count = all.len() - known_count;
+
+            for (key, metric) in &all {
+                // For extra metrics beyond known ones, just show summary
+                if u.extra.contains_key(key) {
+                    continue;
+                }
+                let name = format_metric_name(key);
+                let reset_str = metric
+                    .resets_at
+                    .as_deref()
+                    .and_then(crate::i18n::seconds_until)
+                    .map(|s| format!(" | {}", format_duration(s)))
+                    .unwrap_or_default();
+                lines.push(String::new());
+                lines.push(format!("{}: {:.0}%{}", name, metric.utilization, reset_str));
+            }
+
+            if extra_count > 0 {
+                lines.push(String::new());
+                lines.push(format!("+{} extra", extra_count));
             }
         }
     }
