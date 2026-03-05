@@ -5,6 +5,15 @@ All notable changes to ClaudeMeter will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.3] - 2026-03-05
+
+### Added
+- **Cached data on startup** — last known usage data is loaded from the local database at launch, so the dashboard shows data immediately even if the first API poll fails (e.g. rate limited)
+
+### Fixed
+- **Popup clipping on error screen** — the "Status ↗" link added in v1.8.0 was cut off because the popup height calculation didn't account for it
+- **Concurrent poll requests** — multiple simultaneous API requests (e.g. from timer + manual refresh) could trigger 429 rate limits; added a guard to prevent overlapping polls
+
 ## [1.8.2] - 2026-03-05
 
 ### Fixed

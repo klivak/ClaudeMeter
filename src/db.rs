@@ -100,6 +100,31 @@ impl Database {
         Ok(slots)
     }
 
+    /// Query the most recent utilization value for each metric.
+    /// Returns a list of (metric_name, utilization, resets_at) tuples.
+    pub fn query_latest(&self) -> SqlResult<Vec<(String, f64, Option<String>)>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT metric, utilization, resets_at
+             FROM usage_history
+             WHERE provider = 'claude'
+               AND id IN (
+                   SELECT MAX(id) FROM usage_history
+                   WHERE provider = 'claude'
+                   GROUP BY metric
+               )",
+        )?;
+
+        let rows = stmt.query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, f64>(1)?,
+                row.get::<_, Option<String>>(2)?,
+            ))
+        })?;
+
+        Ok(rows.flatten().collect())
+    }
+
     /// Export all usage history to a CSV file. Returns the number of rows written.
     pub fn export_csv(&self, path: &Path) -> SqlResult<usize> {
         let mut stmt = self.conn.prepare(

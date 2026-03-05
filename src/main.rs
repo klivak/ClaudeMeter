@@ -113,6 +113,8 @@ struct AppState {
     blink_visible: bool,
     // Retry backoff
     consecutive_failures: u32,
+    // Guard against concurrent polls
+    poll_in_progress: bool,
     // Last poll timestamp for auto-refresh
     last_poll_time: Option<std::time::Instant>,
     // Direct2D resources
@@ -246,6 +248,7 @@ unsafe fn run_message_loop(exe_dir: std::path::PathBuf, config_mgr: ConfigManage
         blink_active: false,
         blink_visible: true,
         consecutive_failures: 0,
+        poll_in_progress: false,
         last_poll_time: None,
         d2d,
         hovered_element: HoveredElement::None,
@@ -307,6 +310,53 @@ unsafe fn run_message_loop(exe_dir: std::path::PathBuf, config_mgr: ConfigManage
                 );
             }
         });
+    }
+
+    // Load cached data from DB so we have something to show before first poll
+    if let Some(state) = APP_STATE.as_mut() {
+        if let Ok(db) = Database::open(&state.exe_dir) {
+            if let Ok(latest) = db.query_latest() {
+                if !latest.is_empty() {
+                    use providers::claude::UsageMetric;
+                    let mut resp = providers::claude::UsageResponse {
+                        five_hour: None,
+                        seven_day: None,
+                        seven_day_sonnet: None,
+                        seven_day_opus: None,
+                        seven_day_oauth_apps: None,
+                        extra: std::collections::HashMap::new(),
+                        subscription_type: None,
+                        rate_limit_tier: None,
+                    };
+                    for (key, util, resets) in &latest {
+                        let metric = UsageMetric {
+                            utilization: *util,
+                            resets_at: resets.clone(),
+                        };
+                        match key.as_str() {
+                            "five_hour" => resp.five_hour = Some(metric),
+                            "seven_day" => resp.seven_day = Some(metric),
+                            "seven_day_sonnet" => resp.seven_day_sonnet = Some(metric),
+                            "seven_day_opus" => resp.seven_day_opus = Some(metric),
+                            "seven_day_oauth_apps" => resp.seven_day_oauth_apps = Some(metric),
+                            other => {
+                                resp.extra.insert(other.to_string(), metric);
+                            }
+                        }
+                    }
+                    // Load credentials info for plan detection
+                    if let Ok(cred) = credentials::read_claude_token() {
+                        resp.subscription_type = cred.subscription_type;
+                        resp.rate_limit_tier = cred.rate_limit_tier;
+                    }
+                    state.usage = Some(resp);
+                    state.last_updated = "(cached)".to_string();
+                }
+            }
+            if let Ok(slots) = db.query_24h_chart() {
+                state.chart_data = slots;
+            }
+        }
     }
 
     // Initial poll (async via tokio)
@@ -1352,6 +1402,14 @@ unsafe fn handle_menu_command(hwnd: HWND, cmd: u32) {
 
 /// Spawn async poll task. Result is posted back to main hwnd via WM_USER+20.
 unsafe fn trigger_poll(hwnd: HWND) {
+    // Prevent concurrent polls (avoids 429 rate limiting)
+    if let Some(state) = APP_STATE.as_mut() {
+        if state.poll_in_progress {
+            return;
+        }
+        state.poll_in_progress = true;
+    }
+
     // We run a background thread for async work to avoid blocking the message loop.
     // tokio::spawn would require a runtime, so we use std::thread + tokio block_on.
     let hwnd_val = hwnd.0 as isize;
@@ -1415,6 +1473,7 @@ async fn do_poll() -> (Option<UsageResponse>, Option<String>) {
 
 unsafe fn on_poll_result(hwnd: HWND, usage: Option<UsageResponse>, error: Option<String>) {
     if let Some(state) = APP_STATE.as_mut() {
+        state.poll_in_progress = false;
         state.last_poll_time = Some(std::time::Instant::now());
 
         if let Some(u) = &usage {

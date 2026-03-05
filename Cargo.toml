@@ -1,6 +1,6 @@
 [package]
 name = "claudemeter"
-version = "1.8.2"
+version = "1.8.3"
 edition = "2021"
 authors = ["klivak"]
 description = "Ultra-lightweight Windows tray app for monitoring Claude AI subscription usage limits. Built in Rust for minimal memory footprint (under 10 MB RAM)."

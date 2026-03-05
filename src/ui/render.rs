@@ -410,7 +410,8 @@ impl PopupRenderer {
 
         match usage {
             None => {
-                h += 28 + 70 + 28 + 8;
+                // warn title(28) + desc(70) + btn(28) + gap(12) + status link(24)
+                h += 28 + 70 + 28 + 12 + 24;
             }
             Some(u) => {
                 h += 24;
