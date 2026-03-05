@@ -106,6 +106,7 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("ClaudeMeter", "ClaudeMeter");
     m.insert("CLAUDE", "CLAUDE");
     m.insert("CHATGPT / CODEX", "CHATGPT / CODEX");
+    m.insert("Usage History", "Használati előzmények");
     m.insert(
         "Usage History (24h)",
         "Haszn\u{00e1}lati el\u{0151}zm\u{00e9}nyek (24\u{00f3})",

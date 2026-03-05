@@ -90,6 +90,7 @@ struct AppState {
     settings_rect: RECT,
     close_rect: RECT,
     refresh_rect: RECT,
+    copy_rect: RECT,
     install_rect: RECT,
     chatgpt_link_rect: RECT,
     status_link_rect: RECT,
@@ -98,10 +99,13 @@ struct AppState {
     notification_tracker: NotificationTracker,
     exe_dir: std::path::PathBuf,
     chart_data: Vec<f64>,
+    chart_data_7d: Vec<f64>,
+    chart_7d: bool,
     chart_reset_lines: Vec<f64>,
     // Chart hit-testing
     chart_rect: RECT,
     chart_bar_count: usize,
+    chart_toggle_rect: RECT,
     // Animation state for progress bars
     anim_targets: Vec<f64>,
     anim_current: Vec<f64>,
@@ -232,6 +236,7 @@ unsafe fn run_message_loop(exe_dir: std::path::PathBuf, config_mgr: ConfigManage
         settings_rect: RECT::default(),
         close_rect: RECT::default(),
         refresh_rect: RECT::default(),
+        copy_rect: RECT::default(),
         install_rect: RECT::default(),
         chatgpt_link_rect: RECT::default(),
         status_link_rect: RECT::default(),
@@ -240,9 +245,12 @@ unsafe fn run_message_loop(exe_dir: std::path::PathBuf, config_mgr: ConfigManage
         notification_tracker: NotificationTracker::new(),
         exe_dir,
         chart_data: Vec::new(),
+        chart_data_7d: Vec::new(),
+        chart_7d: false,
         chart_reset_lines: Vec::new(),
         chart_rect: RECT::default(),
         chart_bar_count: 0,
+        chart_toggle_rect: RECT::default(),
         anim_targets: Vec::new(),
         anim_current: Vec::new(),
         anim_active: false,
@@ -358,6 +366,9 @@ unsafe fn run_message_loop(exe_dir: std::path::PathBuf, config_mgr: ConfigManage
             }
             if let Ok(slots) = db.query_24h_chart() {
                 state.chart_data = slots;
+            }
+            if let Ok(slots) = db.query_7d_chart() {
+                state.chart_data_7d = slots;
             }
         }
     }
@@ -578,19 +589,26 @@ unsafe extern "system" fn popup_wnd_proc(
                                     state.config_mgr.config.compact_mode,
                                     &colors,
                                     &state.i18n,
-                                    &state.chart_data,
+                                    if state.chart_7d {
+                                        &state.chart_data_7d
+                                    } else {
+                                        &state.chart_data
+                                    },
                                     &state.chart_reset_lines,
+                                    state.chart_7d,
                                     &state.last_error,
                                     &state.hovered_element,
                                     &state.anim_current,
                                     &mut state.settings_rect,
                                     &mut state.close_rect,
                                     &mut state.refresh_rect,
+                                    &mut state.copy_rect,
                                     &mut state.install_rect,
                                     &mut state.chatgpt_link_rect,
                                     &mut state.status_link_rect,
                                     &mut state.chart_rect,
                                     &mut state.chart_bar_count,
+                                    &mut state.chart_toggle_rect,
                                 );
                             }
 
@@ -689,12 +707,16 @@ unsafe extern "system" fn popup_wnd_proc(
                     HoveredElement::CloseButton
                 } else if crate::popup::point_in_rect(pt, state.refresh_rect) {
                     HoveredElement::RefreshButton
+                } else if crate::popup::point_in_rect(pt, state.copy_rect) {
+                    HoveredElement::CopyButton
                 } else if crate::popup::point_in_rect(pt, state.install_rect) {
                     HoveredElement::InstallButton
                 } else if crate::popup::point_in_rect(pt, state.chatgpt_link_rect) {
                     HoveredElement::ChatGptLink
                 } else if crate::popup::point_in_rect(pt, state.status_link_rect) {
                     HoveredElement::StatusLink
+                } else if crate::popup::point_in_rect(pt, state.chart_toggle_rect) {
+                    HoveredElement::ChartToggle
                 } else if crate::popup::point_in_rect(pt, state.chart_rect)
                     && state.chart_bar_count > 0
                 {
@@ -860,6 +882,15 @@ unsafe extern "system" fn popup_wnd_proc(
                     };
                     resize_popup(hwnd, h);
                     let _ = windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, true);
+                } else if crate::popup::point_in_rect(pt, state.chart_toggle_rect) {
+                    state.chart_7d = !state.chart_7d;
+                    let _ = windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, true);
+                } else if crate::popup::point_in_rect(pt, state.copy_rect) {
+                    // Copy usage metrics to clipboard
+                    if let Some(u) = &state.usage {
+                        let text = build_usage_text(u);
+                        copy_to_clipboard(&text);
+                    }
                 } else if crate::popup::point_in_rect(pt, state.refresh_rect) {
                     state.last_updated = "...".to_string();
                     let _ = windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, true);
@@ -1576,6 +1607,9 @@ unsafe fn on_poll_result(hwnd: HWND, result: PollResult) {
                 if let Ok(slots) = db.query_24h_chart() {
                     state.chart_data = slots;
                 }
+                if let Ok(slots) = db.query_7d_chart() {
+                    state.chart_data_7d = slots;
+                }
             }
 
             // Calculate 5-hour session reset lines for chart
@@ -1835,6 +1869,58 @@ fn is_user_idle(timeout_ms: u32) -> bool {
         } else {
             false
         }
+    }
+}
+
+/// Build a text summary of current usage for clipboard.
+fn build_usage_text(usage: &UsageResponse) -> String {
+    let mut lines = vec![format!("ClaudeMeter — Claude ({})", usage.detected_plan())];
+    for (key, metric) in usage.all_metrics() {
+        let name = providers::claude::format_metric_name(&key);
+        let reset_str = metric
+            .resets_at
+            .as_deref()
+            .and_then(i18n::seconds_until)
+            .map(|s| format!(" (resets in {})", format_duration(s)))
+            .unwrap_or_default();
+        lines.push(format!("{}: {:.0}%{}", name, metric.utilization, reset_str));
+    }
+    lines.join("\n")
+}
+
+/// Copy text to the Windows clipboard using raw Win32 API.
+fn copy_to_clipboard(text: &str) {
+    extern "system" {
+        fn OpenClipboard(hwnd: *mut core::ffi::c_void) -> i32;
+        fn CloseClipboard() -> i32;
+        fn EmptyClipboard() -> i32;
+        fn SetClipboardData(format: u32, hmem: *mut core::ffi::c_void) -> *mut core::ffi::c_void;
+        fn GlobalAlloc(flags: u32, bytes: usize) -> *mut core::ffi::c_void;
+        fn GlobalLock(hmem: *mut core::ffi::c_void) -> *mut core::ffi::c_void;
+        fn GlobalUnlock(hmem: *mut core::ffi::c_void) -> i32;
+    }
+    const CF_UNICODETEXT: u32 = 13;
+    const GMEM_MOVEABLE: u32 = 0x0002;
+
+    let wide: Vec<u16> = text.encode_utf16().chain(std::iter::once(0)).collect();
+    let byte_len = wide.len() * 2;
+
+    unsafe {
+        if OpenClipboard(std::ptr::null_mut()) == 0 {
+            return;
+        }
+        EmptyClipboard();
+
+        let hmem = GlobalAlloc(GMEM_MOVEABLE, byte_len);
+        if !hmem.is_null() {
+            let ptr = GlobalLock(hmem);
+            if !ptr.is_null() {
+                std::ptr::copy_nonoverlapping(wide.as_ptr() as *const u8, ptr as *mut u8, byte_len);
+                GlobalUnlock(hmem);
+                SetClipboardData(CF_UNICODETEXT, hmem);
+            }
+        }
+        CloseClipboard();
     }
 }
 

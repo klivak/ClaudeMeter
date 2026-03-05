@@ -711,11 +711,37 @@ pub fn build_tooltip_full(
 }
 
 /// Build the tray tooltip string (truncated to 127 chars for Win32 szTip limit).
+/// Uses a compact format without empty lines to fit more metrics.
 pub fn build_tooltip(
     usage: &Option<UsageResponse>,
-    show_chatgpt: bool,
+    _show_chatgpt: bool,
     last_error: &Option<String>,
 ) -> String {
-    let full = build_tooltip_full(usage, show_chatgpt, last_error);
-    full.chars().take(127).collect()
+    use crate::providers::claude::format_metric_name;
+
+    let header = match (&usage, last_error) {
+        (Some(_), Some(_)) => "ClaudeMeter \u{26a0}",
+        _ => "ClaudeMeter",
+    };
+    let mut lines = vec![header.to_string()];
+
+    match usage {
+        None => {
+            if let Some(err) = last_error {
+                lines.push(error_tooltip_label(err).to_string());
+            } else {
+                lines.push("No data".to_string());
+            }
+        }
+        Some(u) => {
+            lines.push(format!("Claude ({})", u.detected_plan()));
+            for (key, metric) in u.all_metrics() {
+                let name = format_metric_name(&key);
+                lines.push(format!("{}: {:.0}%", name, metric.utilization));
+            }
+        }
+    }
+
+    let result = lines.join("\n");
+    result.chars().take(127).collect()
 }

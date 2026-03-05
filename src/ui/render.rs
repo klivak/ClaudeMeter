@@ -51,12 +51,14 @@ pub enum HoveredElement {
     SettingsButton,
     CloseButton,
     RefreshButton,
+    CopyButton,
     InstallButton,
     ChatGptLink,
     StatusLink,
     BackButton,
     SettingRow(usize),
     ChartBar(usize),
+    ChartToggle,
 }
 
 /// Draw accessibility overlay pattern on a progress bar fill.
@@ -446,17 +448,20 @@ impl PopupRenderer {
         i18n: &I18n,
         chart_data: &[f64],
         reset_lines: &[f64],
+        chart_7d: bool,
         last_error: &Option<String>,
         hovered: &HoveredElement,
         anim_values: &[f64],
         settings_rect: &mut RECT,
         close_rect: &mut RECT,
         refresh_rect: &mut RECT,
+        copy_rect: &mut RECT,
         install_rect: &mut RECT,
         chatgpt_link_rect: &mut RECT,
         status_link_rect: &mut RECT,
         chart_rect_out: &mut RECT,
         chart_bar_count_out: &mut usize,
+        chart_toggle_rect_out: &mut RECT,
     ) {
         let Some(rt) = d2d.render_target.clone() else {
             return;
@@ -534,11 +539,13 @@ impl PopupRenderer {
                     y,
                     chart_data,
                     reset_lines,
+                    chart_7d,
                     colors,
                     i18n,
                     hovered,
                     chart_rect_out,
                     chart_bar_count_out,
+                    chart_toggle_rect_out,
                 );
                 y += self.sf(PADDING);
             }
@@ -555,6 +562,7 @@ impl PopupRenderer {
                 i18n,
                 hovered,
                 refresh_rect,
+                copy_rect,
                 status_link_rect,
             );
 
@@ -1394,16 +1402,18 @@ impl PopupRenderer {
         mut y: f32,
         data: &[f64],
         reset_lines: &[f64],
+        chart_7d: bool,
         colors: &ThemeColors,
         i18n: &I18n,
         hovered: &HoveredElement,
         chart_rect_out: &mut RECT,
         chart_bar_count_out: &mut usize,
+        chart_toggle_rect_out: &mut RECT,
     ) -> f32 {
         let pad = self.sf(PADDING);
 
-        // Header
-        let title = i18n.t("Usage History (24h)");
+        // Header with toggle: "Usage History   24h | 7d"
+        let title = i18n.t("Usage History");
         let title_text = wide(title);
         let title_format = d2d.get_text_format(11, true, 0, 1).clone();
         let title_brush = rt
@@ -1422,6 +1432,113 @@ impl PopupRenderer {
             D2D1_DRAW_TEXT_OPTIONS_NONE,
             DWRITE_MEASURING_MODE_NATURAL,
         );
+
+        // Draw "24h | 7d" toggle on the right side
+        let toggle_h = self.sf(18);
+        let toggle_w = self.sf(60);
+        let toggle_x = w - pad - toggle_w;
+        let toggle_y = y;
+
+        let is_hovered = matches!(hovered, HoveredElement::ChartToggle);
+
+        // "24h" label
+        let label_24h = "24h";
+        let label_7d = "7d";
+        let sep = " | ";
+        let toggle_str = format!("{}{}{}", label_24h, sep, label_7d);
+        let toggle_wide = wide(&toggle_str);
+
+        let active_color = colorref_to_d2d(colors.accent);
+        let inactive_color = colorref_to_d2d(colors.text_secondary);
+
+        // Draw the full toggle text, but highlight the active part
+        // First draw "24h" in active/inactive color
+        let fmt_bold = d2d.get_text_format(10, true, 0, 0).clone();
+        let fmt_normal = d2d.get_text_format(10, false, 0, 0).clone();
+
+        let label_24h_wide = wide(label_24h);
+        let brush_24h = if !chart_7d {
+            rt.CreateSolidColorBrush(&active_color as *const _, None)
+                .unwrap()
+        } else if is_hovered {
+            rt.CreateSolidColorBrush(&lighten_d2d(&inactive_color, 0.3) as *const _, None)
+                .unwrap()
+        } else {
+            rt.CreateSolidColorBrush(&inactive_color as *const _, None)
+                .unwrap()
+        };
+        let fmt_24h = if !chart_7d { &fmt_bold } else { &fmt_normal };
+        rt.DrawText(
+            &label_24h_wide[..label_24h_wide.len() - 1],
+            fmt_24h,
+            &D2D_RECT_F {
+                left: toggle_x,
+                top: toggle_y,
+                right: toggle_x + self.sf(22),
+                bottom: toggle_y + toggle_h,
+            },
+            &brush_24h,
+            D2D1_DRAW_TEXT_OPTIONS_NONE,
+            DWRITE_MEASURING_MODE_NATURAL,
+        );
+
+        // Separator " | "
+        let sep_wide = wide(sep);
+        let sep_brush = rt
+            .CreateSolidColorBrush(&inactive_color as *const _, None)
+            .unwrap();
+        rt.DrawText(
+            &sep_wide[..sep_wide.len() - 1],
+            &fmt_normal,
+            &D2D_RECT_F {
+                left: toggle_x + self.sf(22),
+                top: toggle_y,
+                right: toggle_x + self.sf(38),
+                bottom: toggle_y + toggle_h,
+            },
+            &sep_brush,
+            D2D1_DRAW_TEXT_OPTIONS_NONE,
+            DWRITE_MEASURING_MODE_NATURAL,
+        );
+
+        // "7d" label
+        let label_7d_wide = wide(label_7d);
+        let brush_7d = if chart_7d {
+            rt.CreateSolidColorBrush(&active_color as *const _, None)
+                .unwrap()
+        } else if is_hovered {
+            rt.CreateSolidColorBrush(&lighten_d2d(&inactive_color, 0.3) as *const _, None)
+                .unwrap()
+        } else {
+            rt.CreateSolidColorBrush(&inactive_color as *const _, None)
+                .unwrap()
+        };
+        let fmt_7d = if chart_7d { &fmt_bold } else { &fmt_normal };
+        rt.DrawText(
+            &label_7d_wide[..label_7d_wide.len() - 1],
+            fmt_7d,
+            &D2D_RECT_F {
+                left: toggle_x + self.sf(38),
+                top: toggle_y,
+                right: toggle_x + toggle_w,
+                bottom: toggle_y + toggle_h,
+            },
+            &brush_7d,
+            D2D1_DRAW_TEXT_OPTIONS_NONE,
+            DWRITE_MEASURING_MODE_NATURAL,
+        );
+
+        // Output toggle rect for hit-testing
+        *chart_toggle_rect_out = RECT {
+            left: toggle_x as i32,
+            top: toggle_y as i32,
+            right: (toggle_x + toggle_w) as i32,
+            bottom: (toggle_y + toggle_h) as i32,
+        };
+
+        // Suppress unused variable warning
+        let _ = toggle_wide;
+
         y += self.sf(22);
 
         let chart_h = self.sf(70);
@@ -1496,8 +1613,8 @@ impl PopupRenderer {
             }
         }
 
-        // Reset lines (dashed vertical)
-        if !reset_lines.is_empty() {
+        // Reset lines (dashed vertical) — only for 24h view
+        if !chart_7d && !reset_lines.is_empty() {
             let reset_brush = rt
                 .CreateSolidColorBrush(&colorref_to_d2d(colors.accent) as *const _, None)
                 .unwrap();
@@ -1529,12 +1646,16 @@ impl PopupRenderer {
                 let val = data[idx];
                 let bar_w = (chart_w / data.len() as f32).max(2.0);
                 let bar_cx = pad + idx as f32 * bar_w + bar_w / 2.0;
-                let hours_ago = 24.0 * (1.0 - (idx as f64 + 0.5) / data.len() as f64);
+                let total_hours = if chart_7d { 168.0 } else { 24.0 };
+                let hours_ago = total_hours * (1.0 - (idx as f64 + 0.5) / data.len() as f64);
 
                 // Show actual clock time for this bar
                 let bar_time =
                     chrono::Local::now() - chrono::Duration::seconds((hours_ago * 3600.0) as i64);
-                let time_str = if is_system_24h() {
+                let time_str = if chart_7d {
+                    // For 7d chart, show day + time
+                    bar_time.format("%a %H:%M").to_string()
+                } else if is_system_24h() {
                     bar_time.format("%H:%M").to_string()
                 } else {
                     bar_time.format("%I:%M %p").to_string()
@@ -1592,7 +1713,11 @@ impl PopupRenderer {
         y += chart_h + self.sf(4);
 
         // X-axis labels
-        let labels = ["24h ago", "18h ago", "12h ago", "6h ago", "now"];
+        let labels: &[&str] = if chart_7d {
+            &["7d", "5d", "4d", "2d", "now"]
+        } else {
+            &["24h", "18h", "12h", "6h", "now"]
+        };
         for (i, label) in labels.iter().enumerate() {
             let lx = pad + (i as f32 * chart_w / 4.0);
             let text = wide(label);
@@ -1631,6 +1756,7 @@ impl PopupRenderer {
         i18n: &I18n,
         hovered: &HoveredElement,
         refresh_rect: &mut RECT,
+        copy_rect: &mut RECT,
         _status_link_rect: &mut RECT,
     ) {
         let h = self.sf(FOOTER_H);
@@ -1663,7 +1789,7 @@ impl PopupRenderer {
             &D2D_RECT_F {
                 left: pad,
                 top: y,
-                right: w - self.sf(90),
+                right: w - self.sf(160),
                 bottom: y + h,
             },
             &text_brush,
@@ -1681,6 +1807,45 @@ impl PopupRenderer {
             bottom: y + (h - btn_h) / 2.0 + btn_h,
         };
         *refresh_rect = to_win32_rect(&btn_rect);
+
+        // Copy button (left of Refresh)
+        let copy_w = self.sf(28);
+        let copy_rect_d2d = D2D_RECT_F {
+            left: btn_rect.left - copy_w - self.sf(4),
+            top: btn_rect.top,
+            right: btn_rect.left - self.sf(4),
+            bottom: btn_rect.bottom,
+        };
+        *copy_rect = to_win32_rect(&copy_rect_d2d);
+
+        let copy_hovered = matches!(hovered, HoveredElement::CopyButton);
+        if copy_hovered {
+            let hover_brush = rt
+                .CreateSolidColorBrush(&colorref_to_d2d(colors.hover) as *const _, None)
+                .unwrap();
+            rt.FillRoundedRectangle(
+                &D2D1_ROUNDED_RECT {
+                    rect: copy_rect_d2d,
+                    radiusX: self.sf(6),
+                    radiusY: self.sf(6),
+                },
+                &hover_brush,
+            );
+        }
+        // Clipboard icon (U+1F4CB or simpler: ⧉ U+29C9)
+        self.draw_text_centered(
+            rt,
+            d2d,
+            "\u{2398}",
+            copy_rect_d2d,
+            if copy_hovered {
+                colors.accent
+            } else {
+                colors.text_secondary
+            },
+            12,
+            false,
+        );
 
         let is_hovered = matches!(hovered, HoveredElement::RefreshButton);
 

@@ -100,6 +100,35 @@ impl Database {
         Ok(slots)
     }
 
+    /// Query last 7 days of `five_hour` metric, bucketed into 4-hour intervals.
+    /// Always returns exactly 42 elements (oldest first: index 0 = 7d ago, index 41 = now).
+    /// Missing slots are filled with 0.0.
+    pub fn query_7d_chart(&self) -> SqlResult<Vec<f64>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT
+                CAST((julianday('now') - julianday(timestamp)) * 6 AS INTEGER) AS bucket,
+                AVG(utilization) AS avg_util
+             FROM usage_history
+             WHERE provider = 'claude'
+               AND metric = 'five_hour'
+               AND resets_at IS NOT NULL
+               AND timestamp > datetime('now', '-7 days')
+             GROUP BY bucket",
+        )?;
+
+        let mut slots = vec![0.0f64; 42];
+
+        let rows = stmt.query_map([], |row| Ok((row.get::<_, i64>(0)?, row.get::<_, f64>(1)?)))?;
+
+        for row in rows.flatten() {
+            let (bucket, util) = row;
+            let idx = 41 - bucket.clamp(0, 41) as usize;
+            slots[idx] = util;
+        }
+
+        Ok(slots)
+    }
+
     /// Query the most recent utilization value for each metric.
     /// Returns a list of (metric_name, utilization, resets_at) tuples.
     pub fn query_latest(&self) -> SqlResult<Vec<(String, f64, Option<String>)>> {

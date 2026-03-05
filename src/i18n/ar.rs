@@ -130,6 +130,7 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("ClaudeMeter", "ClaudeMeter");
     m.insert("CLAUDE", "CLAUDE");
     m.insert("CHATGPT / CODEX", "CHATGPT / CODEX");
+    m.insert("Usage History", "سجل الاستخدام");
     m.insert("Usage History (24h)", "\u{0633}\u{062c}\u{0644} \u{0627}\u{0644}\u{0627}\u{0633}\u{062a}\u{062e}\u{062f}\u{0627}\u{0645} (24\u{0633})");
     m.insert("Auto (English)", "\u{062a}\u{0644}\u{0642}\u{0627}\u{0626}\u{064a} (\u{0627}\u{0644}\u{0639}\u{0631}\u{0628}\u{064a}\u{0629})");
     m.insert("at", "\u{0639}\u{0646}\u{062f}");

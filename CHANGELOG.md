@@ -5,6 +5,15 @@ All notable changes to ClaudeMeter will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.0] - 2026-03-05
+
+### Added
+- **7-day chart toggle** — usage history chart now has a "24h | 7d" toggle to switch between 24-hour and 7-day views with 4-hour bucket intervals
+- **Copy button** — clipboard icon in the popup footer copies all current usage metrics to the clipboard for easy sharing
+
+### Fixed
+- **Tooltip truncation** — tray hover tooltip now uses a compact format (no empty lines or reset times) to fit all metrics within the 127-character Win32 limit
+
 ## [1.9.0] - 2026-03-05
 
 ### Added
