@@ -7,6 +7,7 @@ const ANTHROPIC_BETA: &str = "oauth-2025-04-20";
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UsageMetric {
     pub utilization: f64,
+    #[serde(default)]
     pub resets_at: Option<String>,
 }
 
@@ -219,6 +220,7 @@ pub fn format_metric_name(key: &str) -> String {
         "seven_day_sonnet" => "Sonnet (7-day)".to_string(),
         "seven_day_opus" => "Opus (7-day)".to_string(),
         "seven_day_oauth_apps" => "OAuth Apps (7-day)".to_string(),
+        "extra_usage" => "Extra Usage".to_string(),
         other => {
             // Title-case with spaces for unknown fields
             other
@@ -278,9 +280,22 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_extra_usage() {
+        let json = serde_json::json!({
+            "five_hour": {"utilization": 10.0, "resets_at": null},
+            "extra_usage": {"is_enabled": true, "monthly_limit": 5000, "used_credits": 1125.0, "utilization": 22.5}
+        });
+        let resp = parse_response(json).unwrap();
+        assert!(resp.extra.contains_key("extra_usage"));
+        assert_eq!(resp.extra["extra_usage"].utilization, 22.5);
+        assert_eq!(resp.extra["extra_usage"].resets_at, None);
+    }
+
+    #[test]
     fn test_format_metric_name() {
         assert_eq!(format_metric_name("five_hour"), "5-hour session");
         assert_eq!(format_metric_name("seven_day"), "Weekly (7-day)");
+        assert_eq!(format_metric_name("extra_usage"), "Extra Usage");
         assert_eq!(format_metric_name("iguana_necktie"), "Iguana Necktie");
     }
 

@@ -5,6 +5,11 @@ All notable changes to ClaudeMeter will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.1] - 2026-03-05
+
+### Fixed
+- **Extra Usage not displayed** — `extra_usage` field from the API (monthly credits utilization) was silently ignored because `resets_at` was missing from the response; added `#[serde(default)]` so missing optional fields parse correctly
+
 ## [1.8.0] - 2026-03-05
 
 ### Added
