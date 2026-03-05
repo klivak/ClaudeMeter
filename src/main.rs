@@ -94,6 +94,7 @@ struct AppState {
     install_rect: RECT,
     chatgpt_link_rect: RECT,
     status_link_rect: RECT,
+    plan_link_rect: RECT,
     back_rect: RECT,
     setting_rects: [RECT; 11],
     notification_tracker: NotificationTracker,
@@ -217,7 +218,7 @@ unsafe fn run_message_loop(exe_dir: std::path::PathBuf, config_mgr: ConfigManage
 
     // Apply DWM attributes (rounded corners + dark mode)
     apply_dwm_rounded_corners(popup_hwnd);
-    apply_mica_backdrop(popup_hwnd);
+    apply_acrylic_backdrop(popup_hwnd);
 
     // Initialize D2D resources
     let d2d = match D2DResources::new() {
@@ -247,6 +248,7 @@ unsafe fn run_message_loop(exe_dir: std::path::PathBuf, config_mgr: ConfigManage
         install_rect: RECT::default(),
         chatgpt_link_rect: RECT::default(),
         status_link_rect: RECT::default(),
+        plan_link_rect: RECT::default(),
         back_rect: RECT::default(),
         setting_rects: [RECT::default(); 11],
         notification_tracker: NotificationTracker::new(),
@@ -574,7 +576,8 @@ unsafe extern "system" fn popup_wnd_proc(
                         // borrow conflict with d2d being passed mutably to draw fns
                         if let Some(rt) = d2d.render_target.clone() {
                             rt.BeginDraw();
-                            let bg = colorref_to_d2d(colors.background);
+                            let mut bg = colorref_to_d2d(colors.background);
+                            bg.a = 0.88; // Semi-transparent for Acrylic backdrop
                             rt.Clear(Some(&bg as *const _));
 
                             let renderer = PopupRenderer::new(hwnd);
@@ -630,6 +633,7 @@ unsafe extern "system" fn popup_wnd_proc(
                                         &mut state.install_rect,
                                         &mut state.chatgpt_link_rect,
                                         &mut state.status_link_rect,
+                                        &mut state.plan_link_rect,
                                         &mut state.chart_rect,
                                         &mut state.chart_bar_count,
                                         &mut state.chart_toggle_rect,
@@ -701,6 +705,7 @@ unsafe extern "system" fn popup_wnd_proc(
                                         &mut state.install_rect,
                                         &mut state.chatgpt_link_rect,
                                         &mut state.status_link_rect,
+                                        &mut state.plan_link_rect,
                                         &mut state.chart_rect,
                                         &mut state.chart_bar_count,
                                         &mut state.chart_toggle_rect,
@@ -759,6 +764,7 @@ unsafe extern "system" fn popup_wnd_proc(
                                     &mut state.install_rect,
                                     &mut state.chatgpt_link_rect,
                                     &mut state.status_link_rect,
+                                    &mut state.plan_link_rect,
                                     &mut state.chart_rect,
                                     &mut state.chart_bar_count,
                                     &mut state.chart_toggle_rect,
@@ -785,10 +791,17 @@ unsafe extern "system" fn popup_wnd_proc(
                             state.anim_current.iter_mut().zip(state.anim_targets.iter())
                         {
                             let diff = tgt - *cur;
-                            if diff.abs() < 0.5 {
+                            if diff.abs() < 0.3 && *cur >= 0.0 {
                                 *cur = tgt;
                             } else {
-                                *cur += diff * 0.15;
+                                // Ease-out: fast start, smooth deceleration
+                                let ease = if *cur < 0.0 {
+                                    0.35 // quick catch-up from negative (cascade delay)
+                                } else {
+                                    let t = (*cur / tgt.max(0.01)).clamp(0.0, 1.0);
+                                    0.12 + 0.10 * (1.0 - t)
+                                };
+                                *cur += diff * ease;
                                 all_done = false;
                             }
                         }
@@ -805,7 +818,7 @@ unsafe extern "system" fn popup_wnd_proc(
                 if let Some(state) = APP_STATE.as_mut() {
                     if state.slide_anim_active {
                         let diff = state.slide_anim_target - state.slide_anim_offset;
-                        if diff.abs() < 1.0 {
+                        if diff.abs() < 0.5 {
                             state.slide_anim_offset = state.slide_anim_target;
                             state.slide_anim_active = false;
                             let _ = windows::Win32::UI::WindowsAndMessaging::KillTimer(
@@ -813,14 +826,17 @@ unsafe extern "system" fn popup_wnd_proc(
                                 TIMER_SLIDE,
                             );
                         } else {
-                            state.slide_anim_offset += diff * 0.20;
+                            // Ease-out-cubic: snappy start, smooth finish
+                            state.slide_anim_offset += diff * 0.22;
                         }
                         let _ = windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, false);
                     }
                 }
             } else if wparam.0 == TIMER_FADE {
                 if let Some(state) = APP_STATE.as_mut() {
-                    let new_alpha = (state.fade_alpha as u16 + 30).min(255) as u8;
+                    // Ease-in: accelerate fade (larger steps as alpha grows)
+                    let step = 25 + (state.fade_alpha as u16 / 10);
+                    let new_alpha = (state.fade_alpha as u16 + step).min(255) as u8;
                     state.fade_alpha = new_alpha;
                     let _ = SetLayeredWindowAttributes(
                         hwnd,
@@ -885,6 +901,8 @@ unsafe extern "system" fn popup_wnd_proc(
                     HoveredElement::ChatGptLink
                 } else if crate::popup::point_in_rect(pt, state.status_link_rect) {
                     HoveredElement::StatusLink
+                } else if crate::popup::point_in_rect(pt, state.plan_link_rect) {
+                    HoveredElement::PlanLink
                 } else if crate::popup::point_in_rect(pt, state.chart_toggle_rect) {
                     HoveredElement::ChartToggle
                 } else if crate::popup::point_in_rect(pt, state.chart_rect)
@@ -1107,6 +1125,8 @@ unsafe extern "system" fn popup_wnd_proc(
                     let _ = open::that(&url);
                 } else if crate::popup::point_in_rect(pt, state.status_link_rect) {
                     let _ = open::that("https://status.claude.com/");
+                } else if crate::popup::point_in_rect(pt, state.plan_link_rect) {
+                    let _ = open::that("https://claude.ai/settings/usage");
                 }
             }
             LRESULT(0)
@@ -1154,16 +1174,25 @@ unsafe fn apply_dwm_rounded_corners(hwnd: HWND) {
     );
 }
 
-/// Apply Mica backdrop to popup window (Win11 22H2+, silently fails on older)
-unsafe fn apply_mica_backdrop(hwnd: HWND) {
-    // DWMWA_SYSTEMBACKDROP_TYPE = 38, value 2 = Mica
-    let backdrop_type: u32 = 2;
+/// Apply Acrylic backdrop to popup window (Win11 22H2+, silently fails on older)
+unsafe fn apply_acrylic_backdrop(hwnd: HWND) {
+    // DWMWA_SYSTEMBACKDROP_TYPE = 38, value 3 = Acrylic (transient window)
+    let backdrop_type: u32 = 3;
     let _ = DwmSetWindowAttribute(
         hwnd,
         windows::Win32::Graphics::Dwm::DWMWINDOWATTRIBUTE(38),
         &backdrop_type as *const u32 as *const _,
         std::mem::size_of::<u32>() as u32,
     );
+
+    // Extend DWM frame into entire client area so backdrop shows through
+    let margins = windows::Win32::UI::Controls::MARGINS {
+        cxLeftWidth: -1,
+        cxRightWidth: -1,
+        cyTopHeight: -1,
+        cyBottomHeight: -1,
+    };
+    let _ = windows::Win32::Graphics::Dwm::DwmExtendFrameIntoClientArea(hwnd, &margins);
 }
 
 /// Apply DWM dark/light mode to popup window (Win11+, silently fails on Win10)
@@ -1250,7 +1279,7 @@ fn settings_panel_height() -> i32 {
     let header_h = 40;
     let row_h = 38;
     let num_rows = 11;
-    let legend_h = 8 + 1 + 8 + 20 + (4 * 18); // sep + gap + title + 4 icon items
+    let legend_h = 10 + 1 + 10 + 18 + (4 * 18) + 10; // gap + sep + gap + title + 4 rows + bottom padding
     let footer_h = 44;
     header_h + 8 + (num_rows * row_h) + legend_h + footer_h
 }
@@ -1363,9 +1392,16 @@ unsafe fn show_popup(_main_hwnd: HWND) {
             }
         }
 
-        // Start animation if we have targets
+        // Start animation if we have targets (cascading: each metric starts with a delay)
         if !state.anim_targets.is_empty() {
-            state.anim_current = vec![0.0; state.anim_targets.len()];
+            // Stagger: each metric starts at a negative value proportional to index.
+            // The animation loop clamps to 0, so later metrics visually wait before filling.
+            state.anim_current = state
+                .anim_targets
+                .iter()
+                .enumerate()
+                .map(|(i, _)| -(i as f64 * 8.0))
+                .collect();
             state.anim_active = true;
             windows::Win32::UI::WindowsAndMessaging::SetTimer(
                 state.popup_hwnd,

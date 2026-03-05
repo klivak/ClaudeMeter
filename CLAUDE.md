@@ -111,13 +111,19 @@ Stored as JSON: `{"claudeAiOauth": {"accessToken": "<oauth-token>"}}`
 
 ```bash
 # 1. Update version in Cargo.toml, CHANGELOG.md, VERSION
-# 2. Commit
+# 2. Update README.md if any user-facing features, settings, or languages changed
+# 3. Commit
 git add -A && git commit -m "release: v1.x.x"
 
-# 3. Tag and push — GitHub Actions builds and publishes automatically
+# 4. Tag and push — GitHub Actions builds and publishes automatically
 git tag v1.x.x
 git push origin main --tags
 ```
+
+**Pre-release checklist:**
+- [ ] README.md reflects all new features, settings, config fields, and language count
+- [ ] CHANGELOG.md has an entry for the new version
+- [ ] Version updated in Cargo.toml and VERSION
 
 ## Common Pitfalls
 

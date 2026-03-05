@@ -8,7 +8,7 @@
 /// All coordinates are in DIPs (device-independent pixels, 1 DIP = 1/96 inch).
 use crate::i18n::{format_duration, format_reset_target, is_system_24h, seconds_until, I18n};
 use crate::providers::claude::{format_metric_name, UsageResponse};
-use crate::ui::colors::{colorref_to_d2d, lighten_d2d, ThemeColors};
+use crate::ui::colors::{colorref_to_d2d, lighten_d2d, ColorRef, ThemeColors};
 use std::collections::HashMap;
 use windows::core::PCWSTR;
 use windows::Win32::Foundation::{HWND, RECT};
@@ -55,6 +55,7 @@ pub enum HoveredElement {
     InstallButton,
     ChatGptLink,
     StatusLink,
+    PlanLink,
     BackButton,
     SettingRow(usize),
     ChartBar(usize),
@@ -291,12 +292,14 @@ impl D2DResources {
             };
             // Convert pt to DIPs: 1pt = 96/72 DIPs
             let font_size = size_pt as f32 * 96.0 / 72.0;
-            let font_name = wide("Segoe UI");
+            // Segoe UI Variable (Win11) with fallback to Segoe UI (Win10)
+            let font_var = wide("Segoe UI Variable");
+            let font_fallback = wide("Segoe UI");
             let locale = wide("en-us");
             let format = unsafe {
                 self.dwrite_factory
                     .CreateTextFormat(
-                        PCWSTR(font_name.as_ptr()),
+                        PCWSTR(font_var.as_ptr()),
                         None,
                         weight,
                         DWRITE_FONT_STYLE_NORMAL,
@@ -304,6 +307,17 @@ impl D2DResources {
                         font_size,
                         PCWSTR(locale.as_ptr()),
                     )
+                    .or_else(|_| {
+                        self.dwrite_factory.CreateTextFormat(
+                            PCWSTR(font_fallback.as_ptr()),
+                            None,
+                            weight,
+                            DWRITE_FONT_STYLE_NORMAL,
+                            DWRITE_FONT_STRETCH_NORMAL,
+                            font_size,
+                            PCWSTR(locale.as_ptr()),
+                        )
+                    })
                     .expect("CreateTextFormat failed")
             };
             // Set alignment
@@ -333,12 +347,13 @@ impl D2DResources {
             DWRITE_FONT_WEIGHT_REGULAR
         };
         let font_size = size_pt as f32 * 96.0 / 72.0;
-        let font_name = wide("Segoe UI");
+        let font_var = wide("Segoe UI Variable");
+        let font_fallback = wide("Segoe UI");
         let locale = wide("en-us");
         let format = unsafe {
             self.dwrite_factory
                 .CreateTextFormat(
-                    PCWSTR(font_name.as_ptr()),
+                    PCWSTR(font_var.as_ptr()),
                     None,
                     weight,
                     DWRITE_FONT_STYLE_NORMAL,
@@ -346,6 +361,17 @@ impl D2DResources {
                     font_size,
                     PCWSTR(locale.as_ptr()),
                 )
+                .or_else(|_| {
+                    self.dwrite_factory.CreateTextFormat(
+                        PCWSTR(font_fallback.as_ptr()),
+                        None,
+                        weight,
+                        DWRITE_FONT_STYLE_NORMAL,
+                        DWRITE_FONT_STRETCH_NORMAL,
+                        font_size,
+                        PCWSTR(locale.as_ptr()),
+                    )
+                })
                 .expect("CreateTextFormat failed")
         };
         unsafe {
@@ -494,6 +520,7 @@ impl PopupRenderer {
         install_rect: &mut RECT,
         chatgpt_link_rect: &mut RECT,
         status_link_rect: &mut RECT,
+        plan_link_rect: &mut RECT,
         chart_rect_out: &mut RECT,
         chart_bar_count_out: &mut usize,
         chart_toggle_rect_out: &mut RECT,
@@ -555,6 +582,7 @@ impl PopupRenderer {
                                 anim_values,
                                 hovered,
                                 status_link_rect,
+                                plan_link_rect,
                                 hide_extra_usage,
                             );
                         }
@@ -572,6 +600,7 @@ impl PopupRenderer {
                                 chart_data,
                                 hovered,
                                 status_link_rect,
+                                plan_link_rect,
                                 hide_extra_usage,
                             );
                         }
@@ -588,6 +617,7 @@ impl PopupRenderer {
                                 rate_of_change,
                                 hovered,
                                 status_link_rect,
+                                plan_link_rect,
                                 hide_extra_usage,
                             );
                         }
@@ -640,6 +670,97 @@ impl PopupRenderer {
             // 1px border
             self.draw_border(&rt, w, (rect.bottom - rect.top) as f32, colors);
         }
+    }
+
+    /// Draw a gear/cog icon using D2D primitives within the given rect.
+    unsafe fn draw_gear_icon(
+        &self,
+        rt: &ID2D1HwndRenderTarget,
+        rect: D2D_RECT_F,
+        color: ColorRef,
+        bg_color: ColorRef,
+    ) {
+        let brush = rt
+            .CreateSolidColorBrush(&colorref_to_d2d(color) as *const _, None)
+            .unwrap();
+        let bg_brush = rt
+            .CreateSolidColorBrush(&colorref_to_d2d(bg_color) as *const _, None)
+            .unwrap();
+
+        let cx = (rect.left + rect.right) / 2.0;
+        let cy = (rect.top + rect.bottom) / 2.0;
+        let size = ((rect.right - rect.left).min(rect.bottom - rect.top)) * 0.40;
+
+        let body_r = size * 0.58;
+        let tooth_reach = size * 1.05;
+        let tooth_w = size * 0.40;
+        let hole_r = size * 0.22;
+        let num_teeth: i32 = 8;
+
+        // 1) Draw teeth as thick lines radiating from center
+        for i in 0..num_teeth {
+            let angle = (i as f32) * std::f32::consts::TAU / num_teeth as f32;
+            rt.DrawLine(
+                D2D_POINT_2F { x: cx, y: cy },
+                D2D_POINT_2F {
+                    x: cx + angle.cos() * tooth_reach,
+                    y: cy + angle.sin() * tooth_reach,
+                },
+                &brush,
+                tooth_w,
+                None,
+            );
+        }
+
+        // 2) Draw filled circle body on top (covers inner portions of teeth)
+        rt.FillEllipse(
+            &D2D1_ELLIPSE {
+                point: D2D_POINT_2F { x: cx, y: cy },
+                radiusX: body_r,
+                radiusY: body_r,
+            },
+            &brush,
+        );
+
+        // 3) Cut out center hole with background color
+        rt.FillEllipse(
+            &D2D1_ELLIPSE {
+                point: D2D_POINT_2F { x: cx, y: cy },
+                radiusX: hole_r,
+                radiusY: hole_r,
+            },
+            &bg_brush,
+        );
+    }
+
+    /// Draw an X close icon using D2D lines
+    unsafe fn draw_close_icon(
+        &self,
+        rt: &ID2D1HwndRenderTarget,
+        rect: D2D_RECT_F,
+        color: ColorRef,
+    ) {
+        let brush = rt
+            .CreateSolidColorBrush(&colorref_to_d2d(color) as *const _, None)
+            .unwrap();
+        let cx = (rect.left + rect.right) / 2.0;
+        let cy = (rect.top + rect.bottom) / 2.0;
+        let half = ((rect.right - rect.left).min(rect.bottom - rect.top)) * 0.18;
+        let stroke = 1.8;
+        rt.DrawLine(
+            D2D_POINT_2F { x: cx - half, y: cy - half },
+            D2D_POINT_2F { x: cx + half, y: cy + half },
+            &brush,
+            stroke,
+            None,
+        );
+        rt.DrawLine(
+            D2D_POINT_2F { x: cx + half, y: cy - half },
+            D2D_POINT_2F { x: cx - half, y: cy + half },
+            &brush,
+            stroke,
+            None,
+        );
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -718,15 +839,18 @@ impl PopupRenderer {
             );
         }
 
-        self.draw_text_centered(
-            rt,
-            d2d,
-            "\u{2699}",
-            settings_r,
-            colors.text_secondary,
-            14,
-            false,
-        );
+        let settings_hovered = matches!(hovered, HoveredElement::SettingsButton);
+        let gear_bg = if settings_hovered {
+            colors.hover
+        } else {
+            colors.background
+        };
+        let gear_color = if settings_hovered {
+            colors.accent
+        } else {
+            colors.text_secondary
+        };
+        self.draw_gear_icon(rt, settings_r, gear_color, gear_bg);
 
         // × button
         let close_r = D2D_RECT_F {
@@ -752,15 +876,12 @@ impl PopupRenderer {
             );
         }
 
-        self.draw_text_centered(
-            rt,
-            d2d,
-            "\u{00D7}",
-            close_r,
-            colors.text_secondary,
-            14,
-            false,
-        );
+        let close_color = if matches!(hovered, HoveredElement::CloseButton) {
+            colors.accent
+        } else {
+            colors.text_secondary
+        };
+        self.draw_close_icon(rt, close_r, close_color);
 
         y + h
     }
@@ -772,14 +893,17 @@ impl PopupRenderer {
         y: f32,
         colors: &ThemeColors,
     ) -> f32 {
+        let pad = self.sf(PADDING);
+        let mut sep_color = colorref_to_d2d(colors.separator);
+        sep_color.a = 0.4; // Subtle semi-transparent separator
         let brush = rt
-            .CreateSolidColorBrush(&colorref_to_d2d(colors.separator) as *const _, None)
+            .CreateSolidColorBrush(&sep_color as *const _, None)
             .unwrap();
         rt.DrawLine(
-            D2D_POINT_2F { x: 0.0, y },
-            D2D_POINT_2F { x: w, y },
+            D2D_POINT_2F { x: pad, y },
+            D2D_POINT_2F { x: w - pad, y },
             &brush,
-            1.0,
+            0.5,
             None,
         );
         y + self.sf(SEPARATOR_H)
@@ -799,6 +923,7 @@ impl PopupRenderer {
         rate_of_change: &HashMap<String, f64>,
         hovered: &HoveredElement,
         status_link_rect: &mut RECT,
+        plan_link_rect: &mut RECT,
         hide_extra_usage: bool,
     ) -> f32 {
         // Section header
@@ -812,6 +937,7 @@ impl PopupRenderer {
             i18n,
             hovered,
             status_link_rect,
+            plan_link_rect,
         );
 
         for (i, (key, metric)) in usage.all_metrics().iter().enumerate() {
@@ -819,7 +945,7 @@ impl PopupRenderer {
                 continue;
             }
             let util = if i < anim_values.len() {
-                anim_values[i]
+                anim_values[i].max(0.0)
             } else {
                 metric.utilization
             };
@@ -1116,6 +1242,7 @@ impl PopupRenderer {
         anim_values: &[f64],
         hovered: &HoveredElement,
         status_link_rect: &mut RECT,
+        plan_link_rect: &mut RECT,
         hide_extra_usage: bool,
     ) -> f32 {
         let pad = self.sf(PADDING);
@@ -1132,6 +1259,7 @@ impl PopupRenderer {
             i18n,
             hovered,
             status_link_rect,
+            plan_link_rect,
         );
 
         // Find highest utilization metric
@@ -1160,7 +1288,7 @@ impl PopupRenderer {
             .unwrap_or((0, &fallback_pair));
 
         let util = if best_idx < anim_values.len() {
-            anim_values[best_idx]
+            anim_values[best_idx].max(0.0)
         } else {
             best_metric.utilization
         };
@@ -1330,6 +1458,7 @@ impl PopupRenderer {
         chart_data: &[f64],
         hovered: &HoveredElement,
         status_link_rect: &mut RECT,
+        plan_link_rect: &mut RECT,
         hide_extra_usage: bool,
     ) -> f32 {
         // Section header
@@ -1343,6 +1472,7 @@ impl PopupRenderer {
             i18n,
             hovered,
             status_link_rect,
+            plan_link_rect,
         );
 
         let pad = self.sf(PADDING);
@@ -1352,7 +1482,7 @@ impl PopupRenderer {
                 continue;
             }
             let util = if i < anim_values.len() {
-                anim_values[i]
+                anim_values[i].max(0.0)
             } else {
                 metric.utilization
             };
@@ -1437,35 +1567,77 @@ impl PopupRenderer {
         i18n: &I18n,
         hovered: &HoveredElement,
         status_link_rect: &mut RECT,
+        plan_link_rect: &mut RECT,
     ) -> f32 {
         let pad = self.sf(PADDING);
         let detected = usage.detected_plan();
         let plan = i18n.t(&detected);
-        let header_str = format!(
-            "\u{2601} {} \u{00B7} {} {}",
+        let prefix = format!(
+            "\u{2601} {} \u{00B7} {} ",
             i18n.t("CLAUDE"),
             i18n.t("Plan"),
-            plan
         );
 
-        let header_text = wide(&header_str);
+        // Draw prefix (non-clickable)
+        let prefix_text = wide(&prefix);
         let format = d2d.get_text_format(12, true, 0, 1).clone();
         let brush = rt
             .CreateSolidColorBrush(&colorref_to_d2d(colors.text_secondary) as *const _, None)
             .unwrap();
+        let header_rect = D2D_RECT_F {
+            left: pad,
+            top: y,
+            right: w - pad - self.sf(60),
+            bottom: y + self.sf(20),
+        };
         rt.DrawText(
-            &header_text[..header_text.len() - 1],
+            &prefix_text[..prefix_text.len() - 1],
             &format,
-            &D2D_RECT_F {
-                left: pad,
-                top: y,
-                right: w - pad - self.sf(60),
-                bottom: y + self.sf(20),
-            },
+            &header_rect,
             &brush,
             D2D1_DRAW_TEXT_OPTIONS_NONE,
             DWRITE_MEASURING_MODE_NATURAL,
         );
+
+        // Measure prefix width to position the plan name link
+        let dw_factory = &d2d.dwrite_factory;
+        let layout = dw_factory
+            .CreateTextLayout(&prefix_text[..prefix_text.len() - 1], &format, 999.0, 20.0)
+            .ok();
+        let prefix_w = layout
+            .and_then(|l| {
+                let mut metrics = windows::Win32::Graphics::DirectWrite::DWRITE_TEXT_METRICS::default();
+                l.GetMetrics(&mut metrics).ok()?;
+                Some(metrics.width)
+            })
+            .unwrap_or(self.sf(100));
+
+        // Draw plan name as clickable link
+        let is_plan_hovered = matches!(hovered, HoveredElement::PlanLink);
+        let plan_color = if is_plan_hovered {
+            lighten_d2d(&colorref_to_d2d(colors.accent), 0.3)
+        } else {
+            colorref_to_d2d(colors.accent)
+        };
+        let plan_brush = rt
+            .CreateSolidColorBrush(&plan_color as *const _, None)
+            .unwrap();
+        let plan_text = wide(plan);
+        let plan_rect = D2D_RECT_F {
+            left: pad + prefix_w,
+            top: y,
+            right: pad + prefix_w + self.sf(50),
+            bottom: y + self.sf(20),
+        };
+        rt.DrawText(
+            &plan_text[..plan_text.len() - 1],
+            &format,
+            &plan_rect,
+            &plan_brush,
+            D2D1_DRAW_TEXT_OPTIONS_NONE,
+            DWRITE_MEASURING_MODE_NATURAL,
+        );
+        *plan_link_rect = to_win32_rect(&plan_rect);
 
         // "Status ↗" link
         let status_str = format!("{} \u{2197}", i18n.t("Status"));
@@ -2585,26 +2757,17 @@ pub unsafe fn draw_settings_panel(
         );
     }
 
-    let close_text = wide("\u{00D7}");
-    let close_format = d2d.get_text_format(13, false, 2, 1).clone();
-    let close_brush = rt
-        .CreateSolidColorBrush(&colorref_to_d2d(colors.text_secondary) as *const _, None)
-        .unwrap();
-    rt.DrawText(
-        &close_text[..close_text.len() - 1],
-        &close_format,
-        &close_r,
-        &close_brush,
-        D2D1_DRAW_TEXT_OPTIONS_NONE,
-        DWRITE_MEASURING_MODE_NATURAL,
-    );
+    let close_col = if matches!(hovered, HoveredElement::CloseButton) {
+        colors.accent
+    } else {
+        colors.text_secondary
+    };
+    draw_close_icon_freestanding(&rt, close_r, close_col);
 
     let mut y = header_h + 8.0;
 
     // Settings rows
-    let check_on = "\u{2611}"; // ☑
-    let check_off = "\u{2610}"; // ☐
-                                // Build language display: "Auto (English)" or "English", "Українська", etc.
+    // Build language display: "Auto (English)" or "English", "Українська", etc.
     let lang_display = if config.language == "auto" {
         let detected = crate::i18n::Locale::detect_from_windows();
         format!("{} ({})", i18n.t("Auto"), detected.display_name())
@@ -2614,86 +2777,22 @@ pub unsafe fn draw_settings_panel(
             .unwrap_or_else(|| config.language.to_uppercase())
     };
 
-    let rows: Vec<(String, String)> = vec![
-        (
-            i18n.t("Theme").to_string(),
-            i18n.t(&capitalize(&config.theme)).to_string(),
-        ),
-        (i18n.t("Language").to_string(), lang_display),
-        (
-            i18n.t("Compact mode").to_string(),
-            (if config.compact_mode {
-                check_on
-            } else {
-                check_off
-            })
-            .to_string(),
-        ),
-        (
-            i18n.t("Show ChatGPT section").to_string(),
-            (if config.show_chatgpt_section {
-                check_on
-            } else {
-                check_off
-            })
-            .to_string(),
-        ),
-        (
-            i18n.t("Start with Windows").to_string(),
-            (if config.autostart {
-                check_on
-            } else {
-                check_off
-            })
-            .to_string(),
-        ),
-        (
-            i18n.t("Show widget").to_string(),
-            (if config.show_widget {
-                check_on
-            } else {
-                check_off
-            })
-            .to_string(),
-        ),
-        (
-            i18n.t("Check for updates").to_string(),
-            (if config.check_updates {
-                check_on
-            } else {
-                check_off
-            })
-            .to_string(),
-        ),
-        (
-            i18n.t("Accessibility patterns").to_string(),
-            (if config.accessibility_patterns {
-                check_on
-            } else {
-                check_off
-            })
-            .to_string(),
-        ),
-        (
-            i18n.t("Icon style").to_string(),
-            i18n.t(&capitalize(&config.tray_icon_style)).to_string(),
-        ),
-        (
-            i18n.t("Dashboard layout").to_string(),
-            i18n.t(&capitalize(&config.dashboard_layout)).to_string(),
-        ),
-        (
-            i18n.t("Hide Extra Usage").to_string(),
-            (if config.hide_extra_usage {
-                check_on
-            } else {
-                check_off
-            })
-            .to_string(),
-        ),
+    // (label, Option<text_value>, Option<bool_checked>)
+    let rows: Vec<(String, Option<String>, Option<bool>)> = vec![
+        (i18n.t("Theme").to_string(), Some(i18n.t(&capitalize(&config.theme)).to_string()), None),
+        (i18n.t("Language").to_string(), Some(lang_display), None),
+        (i18n.t("Compact mode").to_string(), None, Some(config.compact_mode)),
+        (i18n.t("Show ChatGPT section").to_string(), None, Some(config.show_chatgpt_section)),
+        (i18n.t("Start with Windows").to_string(), None, Some(config.autostart)),
+        (i18n.t("Show widget").to_string(), None, Some(config.show_widget)),
+        (i18n.t("Check for updates").to_string(), None, Some(config.check_updates)),
+        (i18n.t("Accessibility patterns").to_string(), None, Some(config.accessibility_patterns)),
+        (i18n.t("Icon style").to_string(), Some(i18n.t(&capitalize(&config.tray_icon_style)).to_string()), None),
+        (i18n.t("Dashboard layout").to_string(), Some(i18n.t(&capitalize(&config.dashboard_layout)).to_string()), None),
+        (i18n.t("Hide Extra Usage").to_string(), None, Some(config.hide_extra_usage)),
     ];
 
-    for (i, (label, value)) in rows.iter().enumerate() {
+    for (i, (label, text_val, bool_val)) in rows.iter().enumerate() {
         let is_hovered = matches!(hovered, HoveredElement::SettingRow(idx) if *idx == i);
 
         // Row background
@@ -2744,54 +2843,71 @@ pub unsafe fn draw_settings_panel(
             DWRITE_MEASURING_MODE_NATURAL,
         );
 
-        // Value (right)
-        let val_text = wide(value);
-        let val_format = d2d.get_text_format(12, false, 1, 1).clone();
-        let val_brush = rt
-            .CreateSolidColorBrush(&colorref_to_d2d(colors.accent) as *const _, None)
-            .unwrap();
-        rt.DrawText(
-            &val_text[..val_text.len() - 1],
-            &val_format,
-            &D2D_RECT_F {
-                left: w / 2.0 + 40.0,
-                top: y,
-                right: w - pad,
-                bottom: y + row_h,
-            },
-            &val_brush,
-            D2D1_DRAW_TEXT_OPTIONS_NONE,
-            DWRITE_MEASURING_MODE_NATURAL,
-        );
+        // Value (right) — either text or D2D checkbox
+        if let Some(checked) = bool_val {
+            // D2D checkbox aligned right
+            let cb_x = w - pad - 14.0;
+            let cb_y = y + (row_h - 14.0) / 2.0;
+            draw_checkbox_freestanding(&rt, cb_x, cb_y, *checked, colors);
+        } else if let Some(value) = text_val {
+            let val_text = wide(value);
+            let val_format = d2d.get_text_format(12, false, 1, 1).clone();
+            let val_brush = rt
+                .CreateSolidColorBrush(&colorref_to_d2d(colors.accent) as *const _, None)
+                .unwrap();
+            rt.DrawText(
+                &val_text[..val_text.len() - 1],
+                &val_format,
+                &D2D_RECT_F {
+                    left: w / 2.0 + 40.0,
+                    top: y,
+                    right: w - pad,
+                    bottom: y + row_h,
+                },
+                &val_brush,
+                D2D1_DRAW_TEXT_OPTIONS_NONE,
+                DWRITE_MEASURING_MODE_NATURAL,
+            );
+        }
 
         y += row_h;
 
         // Separator between rows
         if i < rows.len() - 1 {
+            let mut row_sep_color = colorref_to_d2d(colors.separator);
+            row_sep_color.a = 0.3;
+            let row_sep_brush = rt
+                .CreateSolidColorBrush(&row_sep_color as *const _, None)
+                .unwrap();
             rt.DrawLine(
                 D2D_POINT_2F { x: pad, y },
                 D2D_POINT_2F { x: w - pad, y },
-                &sep_brush,
-                1.0,
+                &row_sep_brush,
+                0.5,
                 None,
             );
         }
     }
 
-    // Icon legend section
-    y += 8.0;
+    // Icon legend section — compact 2-row layout
+    y += 10.0;
+    let mut sep_line_color = colorref_to_d2d(colors.separator);
+    sep_line_color.a = 0.3;
+    let sep_line_brush = rt
+        .CreateSolidColorBrush(&sep_line_color as *const _, None)
+        .unwrap();
     rt.DrawLine(
         D2D_POINT_2F { x: pad, y },
         D2D_POINT_2F { x: w - pad, y },
-        &sep_brush,
-        1.0,
+        &sep_line_brush,
+        0.5,
         None,
     );
-    y += 8.0;
+    y += 10.0;
 
     // Legend title
     let legend_title = wide(i18n.t("Tray icon colors:"));
-    let legend_format = d2d.get_text_format(11, false, 0, 0).clone();
+    let legend_format = d2d.get_text_format(10, false, 0, 0).clone();
     let legend_brush = rt
         .CreateSolidColorBrush(&colorref_to_d2d(colors.text_secondary) as *const _, None)
         .unwrap();
@@ -2802,15 +2918,15 @@ pub unsafe fn draw_settings_panel(
             left: pad,
             top: y,
             right: w - pad,
-            bottom: y + 18.0,
+            bottom: y + 16.0,
         },
         &legend_brush,
         D2D1_DRAW_TEXT_OPTIONS_NONE,
         DWRITE_MEASURING_MODE_NATURAL,
     );
-    y += 20.0;
+    y += 18.0;
 
-    // Icon items: colored circle + text
+    // 4 items in single column
     let icon_items: [(windows::Win32::Foundation::COLORREF, &str); 4] = [
         (colors.green, i18n.t("< 50% usage")),
         (colors.yellow, i18n.t("50-79% usage")),
@@ -2819,25 +2935,23 @@ pub unsafe fn draw_settings_panel(
     ];
 
     for (color, label) in &icon_items {
-        let circle_size = 10.0f32;
-        let circle_y = y + (16.0 - circle_size) / 2.0;
-        let cx = pad + 2.0 + circle_size / 2.0;
-        let cy = circle_y + circle_size / 2.0;
-
-        let circle_brush = rt
+        let dot_r = 5.0f32;
+        let dot_cx = pad + dot_r + 2.0;
+        let dot_cy = y + 8.0;
+        let dot_brush = rt
             .CreateSolidColorBrush(&colorref_to_d2d(*color) as *const _, None)
             .unwrap();
         rt.FillEllipse(
             &D2D1_ELLIPSE {
-                point: D2D_POINT_2F { x: cx, y: cy },
-                radiusX: circle_size / 2.0,
-                radiusY: circle_size / 2.0,
+                point: D2D_POINT_2F { x: dot_cx, y: dot_cy },
+                radiusX: dot_r,
+                radiusY: dot_r,
             },
-            &circle_brush,
+            &dot_brush,
         );
 
         let lbl_text = wide(label);
-        let lbl_format = d2d.get_text_format(11, false, 0, 0).clone();
+        let lbl_format = d2d.get_text_format(10, false, 0, 0).clone();
         let lbl_brush = rt
             .CreateSolidColorBrush(&colorref_to_d2d(colors.text_primary) as *const _, None)
             .unwrap();
@@ -2845,7 +2959,7 @@ pub unsafe fn draw_settings_panel(
             &lbl_text[..lbl_text.len() - 1],
             &lbl_format,
             &D2D_RECT_F {
-                left: pad + 18.0,
+                left: pad + dot_r * 2.0 + 8.0,
                 top: y,
                 right: w - pad,
                 bottom: y + 16.0,
@@ -2927,6 +3041,97 @@ pub unsafe fn draw_settings_panel(
         1.0,
         None,
     );
+}
+
+/// Freestanding close icon (X) using D2D lines — for use in free functions
+unsafe fn draw_close_icon_freestanding(
+    rt: &ID2D1HwndRenderTarget,
+    rect: D2D_RECT_F,
+    color: ColorRef,
+) {
+    let brush = rt
+        .CreateSolidColorBrush(&colorref_to_d2d(color) as *const _, None)
+        .unwrap();
+    let cx = (rect.left + rect.right) / 2.0;
+    let cy = (rect.top + rect.bottom) / 2.0;
+    let half = ((rect.right - rect.left).min(rect.bottom - rect.top)) * 0.18;
+    let stroke = 1.8;
+    rt.DrawLine(
+        D2D_POINT_2F { x: cx - half, y: cy - half },
+        D2D_POINT_2F { x: cx + half, y: cy + half },
+        &brush,
+        stroke,
+        None,
+    );
+    rt.DrawLine(
+        D2D_POINT_2F { x: cx + half, y: cy - half },
+        D2D_POINT_2F { x: cx - half, y: cy + half },
+        &brush,
+        stroke,
+        None,
+    );
+}
+
+/// Freestanding D2D checkbox — for use in free functions
+unsafe fn draw_checkbox_freestanding(
+    rt: &ID2D1HwndRenderTarget,
+    x: f32,
+    y: f32,
+    checked: bool,
+    colors: &ThemeColors,
+) {
+    let size = 14.0f32;
+    let radius = 3.0f32;
+    let r = D2D_RECT_F {
+        left: x,
+        top: y,
+        right: x + size,
+        bottom: y + size,
+    };
+
+    if checked {
+        let fill_brush = rt
+            .CreateSolidColorBrush(&colorref_to_d2d(colors.accent) as *const _, None)
+            .unwrap();
+        rt.FillRoundedRectangle(
+            &D2D1_ROUNDED_RECT { rect: r, radiusX: radius, radiusY: radius },
+            &fill_brush,
+        );
+        // White checkmark
+        let check_brush = rt
+            .CreateSolidColorBrush(
+                &D2D1_COLOR_F { r: 1.0, g: 1.0, b: 1.0, a: 1.0 } as *const _,
+                None,
+            )
+            .unwrap();
+        let stroke = 1.8;
+        rt.DrawLine(
+            D2D_POINT_2F { x: x + size * 0.25, y: y + size * 0.52 },
+            D2D_POINT_2F { x: x + size * 0.42, y: y + size * 0.70 },
+            &check_brush,
+            stroke,
+            None,
+        );
+        rt.DrawLine(
+            D2D_POINT_2F { x: x + size * 0.42, y: y + size * 0.70 },
+            D2D_POINT_2F { x: x + size * 0.75, y: y + size * 0.30 },
+            &check_brush,
+            stroke,
+            None,
+        );
+    } else {
+        let mut border_color = colorref_to_d2d(colors.text_secondary);
+        border_color.a = 0.5;
+        let border_brush = rt
+            .CreateSolidColorBrush(&border_color as *const _, None)
+            .unwrap();
+        rt.DrawRoundedRectangle(
+            &D2D1_ROUNDED_RECT { rect: r, radiusX: radius, radiusY: radius },
+            &border_brush,
+            1.5,
+            None,
+        );
+    }
 }
 
 fn capitalize(s: &str) -> String {
