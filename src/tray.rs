@@ -642,16 +642,50 @@ impl Drop for TrayIcon {
     }
 }
 
+/// Classify an error string into a short tooltip-friendly label.
+fn error_tooltip_label(err: &str) -> &'static str {
+    let tag = err
+        .strip_prefix('[')
+        .and_then(|s| s.split_once(']'))
+        .map(|(t, _)| t);
+    match tag {
+        Some("token_expired") => "\u{26a0} Token expired",
+        Some("network_error") => "\u{26a0} Connection error",
+        Some("rate_limited") => "\u{26a0} Rate limited",
+        Some("server_error") => "\u{26a0} Server error",
+        Some("api_error") => "\u{26a0} API error",
+        _ => {
+            if err.contains("credentials not found") || err.contains("accessToken") {
+                "\u{26a0} Not logged in"
+            } else {
+                "\u{26a0} Error"
+            }
+        }
+    }
+}
+
 /// Build full tooltip text without truncation (used by widget tooltip).
-pub fn build_tooltip_full(usage: &Option<UsageResponse>, show_chatgpt: bool) -> String {
+pub fn build_tooltip_full(
+    usage: &Option<UsageResponse>,
+    show_chatgpt: bool,
+    last_error: &Option<String>,
+) -> String {
     use crate::i18n::format_duration;
     use crate::providers::claude::format_metric_name;
 
-    let mut lines = vec!["ClaudeMeter".to_string()];
+    let header = match (&usage, last_error) {
+        (Some(_), Some(_)) => "ClaudeMeter \u{26a0}".to_string(),
+        _ => "ClaudeMeter".to_string(),
+    };
+    let mut lines = vec![header];
 
     match usage {
         None => {
-            lines.push("No data".to_string());
+            if let Some(err) = last_error {
+                lines.push(error_tooltip_label(err).to_string());
+            } else {
+                lines.push("No data".to_string());
+            }
         }
         Some(u) => {
             lines.push(format!("Claude ({})", u.detected_plan()));
@@ -677,7 +711,11 @@ pub fn build_tooltip_full(usage: &Option<UsageResponse>, show_chatgpt: bool) -> 
 }
 
 /// Build the tray tooltip string (truncated to 127 chars for Win32 szTip limit).
-pub fn build_tooltip(usage: &Option<UsageResponse>, show_chatgpt: bool) -> String {
-    let full = build_tooltip_full(usage, show_chatgpt);
+pub fn build_tooltip(
+    usage: &Option<UsageResponse>,
+    show_chatgpt: bool,
+    last_error: &Option<String>,
+) -> String {
+    let full = build_tooltip_full(usage, show_chatgpt, last_error);
     full.chars().take(127).collect()
 }

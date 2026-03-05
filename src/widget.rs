@@ -290,6 +290,7 @@ unsafe extern "system" fn widget_wnd_proc(
                     crate::tray::build_tooltip_full(
                         &state.usage,
                         state.config_mgr.config.show_chatgpt_section,
+                        &state.last_error,
                     )
                 } else {
                     "ClaudeMeter".to_string()

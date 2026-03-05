@@ -5,6 +5,13 @@ All notable changes to ClaudeMeter will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0] - 2026-03-05
+
+### Added
+- **Tooltip with error info** — hovering the tray icon now shows the error type (token expired, connection error, rate limited, etc.) when data is unavailable, and a warning indicator when stale data is shown
+- **Token expiry warning** — proactive balloon notification when the OAuth token is about to expire within 1 hour, with guidance to run `claude login` to refresh
+- **Wake-from-sleep polling** — app immediately polls the API when the system resumes from sleep/hibernate, instead of waiting for the next timer tick (up to 10 min with backoff)
+
 ## [1.8.3] - 2026-03-05
 
 ### Added

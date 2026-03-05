@@ -121,6 +121,8 @@ struct AppState {
     d2d: Option<D2DResources>,
     hovered_element: HoveredElement,
     mouse_tracking: bool,
+    // Token expiry warning (avoid repeated notifications)
+    token_expiry_warned: bool,
     // Mini-widget window
     widget_hwnd: Option<HWND>,
 }
@@ -253,6 +255,7 @@ unsafe fn run_message_loop(exe_dir: std::path::PathBuf, config_mgr: ConfigManage
         d2d,
         hovered_element: HoveredElement::None,
         mouse_tracking: false,
+        token_expiry_warned: false,
         widget_hwnd: None,
     });
 
@@ -457,6 +460,7 @@ unsafe extern "system" fn main_wnd_proc(
                             let tooltip = build_tooltip(
                                 &state.usage,
                                 state.config_mgr.config.show_chatgpt_section,
+                                &state.last_error,
                             );
                             tray.update(&state.usage, &tooltip, style);
                         } else {
@@ -469,18 +473,11 @@ unsafe extern "system" fn main_wnd_proc(
         }
         WM_POLL_RESULT => {
             // Poll result received (usage data posted back to main thread)
-            // wparam = pointer to Box<Option<UsageResponse>>
-            // lparam = pointer to Box<Option<String>> (error)
-            let usage_ptr = wparam.0 as *mut Option<UsageResponse>;
-            let err_ptr = lparam.0 as *mut Option<String>;
-            if !usage_ptr.is_null() {
-                let usage = *Box::from_raw(usage_ptr);
-                let err = if !err_ptr.is_null() {
-                    *Box::from_raw(err_ptr)
-                } else {
-                    None
-                };
-                on_poll_result(hwnd, usage, err);
+            // wparam = pointer to Box<PollResult>
+            let result_ptr = wparam.0 as *mut PollResult;
+            if !result_ptr.is_null() {
+                let result = *Box::from_raw(result_ptr);
+                on_poll_result(hwnd, result);
             }
             LRESULT(0)
         }
@@ -503,6 +500,18 @@ unsafe extern "system" fn main_wnd_proc(
                 log::info!("Update available: {} — {}", tag, url);
             }
             LRESULT(0)
+        }
+        // WM_POWERBROADCAST: resume from sleep/hibernate
+        0x0218 => {
+            // PBT_APMRESUMEAUTOMATIC = 0x12
+            if wparam.0 == 0x12 {
+                log::info!("System resumed from sleep, triggering immediate poll");
+                if let Some(state) = APP_STATE.as_mut() {
+                    state.consecutive_failures = 0;
+                }
+                trigger_poll(hwnd);
+            }
+            LRESULT(1)
         }
         WM_DESTROY => {
             PostQuitMessage(0);
@@ -828,8 +837,11 @@ unsafe extern "system" fn popup_wnd_proc(
                     state.config_mgr.config.tray_icon_style = next.to_string();
                     state.config_mgr.save();
                     // Immediately update tray icon with new style
-                    let tooltip =
-                        build_tooltip(&state.usage, state.config_mgr.config.show_chatgpt_section);
+                    let tooltip = build_tooltip(
+                        &state.usage,
+                        state.config_mgr.config.show_chatgpt_section,
+                        &state.last_error,
+                    );
                     if let Some(tray) = &mut state.tray {
                         tray.update(&state.usage, &tooltip, next);
                     }
@@ -1088,7 +1100,11 @@ unsafe fn show_popup(_main_hwnd: HWND) {
             let _ =
                 windows::Win32::UI::WindowsAndMessaging::KillTimer(state.main_hwnd, TIMER_BLINK);
             // Restore normal icon
-            let tooltip = build_tooltip(&state.usage, state.config_mgr.config.show_chatgpt_section);
+            let tooltip = build_tooltip(
+                &state.usage,
+                state.config_mgr.config.show_chatgpt_section,
+                &state.last_error,
+            );
             if let Some(tray) = &mut state.tray {
                 let style = &state.config_mgr.config.tray_icon_style.clone();
                 tray.update(&state.usage, &tooltip, style);
@@ -1422,39 +1438,66 @@ unsafe fn trigger_poll(hwnd: HWND) {
             .unwrap();
 
         rt.block_on(async move {
-            let (usage, error) = do_poll().await;
+            let result = do_poll().await;
 
             // Post result back to main thread
             let hwnd = HWND(hwnd_val as *mut _);
-            let usage_box = Box::new(usage);
-            let err_box = Box::new(error);
-            let usage_ptr = Box::into_raw(usage_box) as isize;
-            let err_ptr = Box::into_raw(err_box) as isize;
+            let result_ptr = Box::into_raw(Box::new(result)) as isize;
 
-            let _ = PostMessageW(
-                hwnd,
-                WM_POLL_RESULT,
-                WPARAM(usage_ptr as usize),
-                LPARAM(err_ptr),
-            );
+            let _ = PostMessageW(hwnd, WM_POLL_RESULT, WPARAM(result_ptr as usize), LPARAM(0));
         });
     });
 }
 
-async fn do_poll() -> (Option<UsageResponse>, Option<String>) {
+/// Result of a poll, including optional token expiry info.
+struct PollResult {
+    usage: Option<UsageResponse>,
+    error: Option<String>,
+    /// Milliseconds until token expires (None if unknown)
+    token_expires_in_ms: Option<u64>,
+}
+
+async fn do_poll() -> PollResult {
     let cred_info = match credentials::read_claude_token() {
         Ok(info) => info,
         Err(e) => {
             log::warn!("Could not read Claude token: {e}");
-            return (None, Some(e.to_string()));
+            return PollResult {
+                usage: None,
+                error: Some(e.to_string()),
+                token_expires_in_ms: None,
+            };
         }
     };
+
+    // Check token expiry
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64;
+
+    let token_expires_in_ms = cred_info.expires_at.map(|exp| exp.saturating_sub(now_ms));
+
+    // If token is already expired, return error immediately
+    if let Some(0) = token_expires_in_ms {
+        return PollResult {
+            usage: None,
+            error: Some(
+                "[token_expired] OAuth token has expired. Run `claude login` to refresh.".into(),
+            ),
+            token_expires_in_ms: Some(0),
+        };
+    }
 
     let client = match ClaudeClient::new() {
         Ok(c) => c,
         Err(e) => {
             log::error!("Failed to create HTTP client: {e}");
-            return (None, Some(e));
+            return PollResult {
+                usage: None,
+                error: Some(e),
+                token_expires_in_ms,
+            };
         }
     };
 
@@ -1462,19 +1505,54 @@ async fn do_poll() -> (Option<UsageResponse>, Option<String>) {
         Ok(mut usage) => {
             usage.subscription_type = cred_info.subscription_type;
             usage.rate_limit_tier = cred_info.rate_limit_tier;
-            (Some(usage), None)
+            PollResult {
+                usage: Some(usage),
+                error: None,
+                token_expires_in_ms,
+            }
         }
         Err(e) => {
             log::warn!("Failed to fetch usage: {e}");
-            (None, Some(e))
+            PollResult {
+                usage: None,
+                error: Some(e),
+                token_expires_in_ms,
+            }
         }
     }
 }
 
-unsafe fn on_poll_result(hwnd: HWND, usage: Option<UsageResponse>, error: Option<String>) {
+unsafe fn on_poll_result(hwnd: HWND, result: PollResult) {
     if let Some(state) = APP_STATE.as_mut() {
         state.poll_in_progress = false;
         state.last_poll_time = Some(std::time::Instant::now());
+
+        let PollResult {
+            usage,
+            error,
+            token_expires_in_ms,
+        } = result;
+
+        // Token expiry warning: notify once when token expires within 1 hour
+        if let Some(ms) = token_expires_in_ms {
+            if ms > 0 && ms < 3_600_000 && !state.token_expiry_warned {
+                state.token_expiry_warned = true;
+                let minutes = ms / 60_000;
+                if let Some(tray) = &state.tray {
+                    tray.show_balloon(
+                        "ClaudeMeter",
+                        &format!(
+                            "OAuth token expires in ~{} min. Run `claude login` to refresh.",
+                            minutes
+                        ),
+                    );
+                }
+            }
+            // Reset warning flag if token was refreshed (>1h remaining)
+            if ms >= 3_600_000 {
+                state.token_expiry_warned = false;
+            }
+        }
 
         if let Some(u) = &usage {
             state.consecutive_failures = 0;
@@ -1647,7 +1725,11 @@ unsafe fn on_poll_result(hwnd: HWND, usage: Option<UsageResponse>, error: Option
         }
 
         // Update tray
-        let tooltip = build_tooltip(&state.usage, state.config_mgr.config.show_chatgpt_section);
+        let tooltip = build_tooltip(
+            &state.usage,
+            state.config_mgr.config.show_chatgpt_section,
+            &state.last_error,
+        );
         if let Some(tray) = &mut state.tray {
             let style = &state.config_mgr.config.tray_icon_style.clone();
             tray.update(&state.usage, &tooltip, style);

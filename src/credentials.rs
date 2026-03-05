@@ -8,6 +8,8 @@ pub struct CredentialInfo {
     pub subscription_type: Option<String>,
     /// e.g. "default_claude_max_5x" — rate limit tier from credentials
     pub rate_limit_tier: Option<String>,
+    /// Token expiry time in milliseconds since epoch
+    pub expires_at: Option<u64>,
 }
 
 #[derive(Debug)]
@@ -147,10 +149,14 @@ fn extract_credential_info(json: &str) -> Result<CredentialInfo, CredentialError
             .and_then(|o| o.get("rateLimitTier"))
             .and_then(|s| s.as_str())
             .map(|s| s.to_string());
+        let expires_at = oauth
+            .and_then(|o| o.get("expiresAt"))
+            .and_then(|v| v.as_u64());
         return Ok(CredentialInfo {
             access_token: token.to_string(),
             subscription_type,
             rate_limit_tier,
+            expires_at,
         });
     }
 
@@ -164,10 +170,12 @@ fn extract_credential_info(json: &str) -> Result<CredentialInfo, CredentialError
             .get("rateLimitTier")
             .and_then(|s| s.as_str())
             .map(|s| s.to_string());
+        let expires_at = v.get("expiresAt").and_then(|v| v.as_u64());
         return Ok(CredentialInfo {
             access_token: token.to_string(),
             subscription_type,
             rate_limit_tier,
+            expires_at,
         });
     }
 
