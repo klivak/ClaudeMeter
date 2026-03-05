@@ -5,6 +5,12 @@ All notable changes to ClaudeMeter will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.2] - 2026-03-05
+
+### Fixed
+- **Tooltip plan name** — compact plan display: "Max 5X" → "5x", "Max 20X" → "20x" for cleaner tooltip
+- **Tooltip extra metrics** — single extra metric now shown inline with name and reset time instead of "+1 extra"
+
 ## [1.10.1] - 2026-03-05
 
 ### Fixed

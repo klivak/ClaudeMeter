@@ -731,19 +731,27 @@ pub fn build_tooltip(
             }
         }
         Some(u) => {
-            let header = if last_error.is_some() {
-                format!("Claude ({}) \u{26a0}", u.detected_plan())
+            // Compact plan name: "Max 5X" → "5x", "Max 20X" → "20x", "Max" → "Max", "Pro" → "Pro"
+            let plan = u.detected_plan();
+            let compact_plan = if let Some(rest) = plan.strip_prefix("Max ") {
+                rest.to_lowercase()
             } else {
-                format!("Claude ({})", u.detected_plan())
+                plan
+            };
+            let header = if last_error.is_some() {
+                format!("Claude ({}) \u{26a0}", compact_plan)
+            } else {
+                format!("Claude ({})", compact_plan)
             };
             lines.push(header);
 
             let all = u.all_metrics();
-            let known_count = all.iter().filter(|(k, _)| !u.extra.contains_key(k)).count();
-            let extra_count = all.len() - known_count;
+            let extra_metrics: Vec<_> = all
+                .iter()
+                .filter(|(k, _)| u.extra.contains_key(k))
+                .collect();
 
             for (key, metric) in &all {
-                // For extra metrics beyond known ones, just show summary
                 if u.extra.contains_key(key) {
                     continue;
                 }
@@ -758,9 +766,21 @@ pub fn build_tooltip(
                 lines.push(format!("{}: {:.0}%{}", name, metric.utilization, reset_str));
             }
 
-            if extra_count > 0 {
+            // Extra metrics: show inline if 1, summary if more
+            if extra_metrics.len() == 1 {
+                let (key, metric) = extra_metrics[0];
+                let name = format_metric_name(key);
+                let reset_str = metric
+                    .resets_at
+                    .as_deref()
+                    .and_then(crate::i18n::seconds_until)
+                    .map(|s| format!(" | {}", format_duration(s)))
+                    .unwrap_or_default();
                 lines.push(String::new());
-                lines.push(format!("+{} extra", extra_count));
+                lines.push(format!("{}: {:.0}%{}", name, metric.utilization, reset_str));
+            } else if extra_metrics.len() > 1 {
+                lines.push(String::new());
+                lines.push(format!("+{} extra", extra_metrics.len()));
             }
         }
     }
