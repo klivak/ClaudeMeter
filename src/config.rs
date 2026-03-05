@@ -111,14 +111,18 @@ impl Default for Config {
 }
 
 impl Config {
-    pub fn polling_interval_clamped(&self) -> u64 {
-        self.polling_interval_seconds.clamp(30, 600)
+    /// Generate a random polling interval between 90-180 seconds.
+    /// Uses system time nanoseconds for simple randomness without external crate.
+    pub fn random_polling_interval() -> u64 {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.subsec_nanos())
+            .unwrap_or(0);
+        90 + (nanos as u64 % 91) // 90 to 180 inclusive
     }
 
     /// Validate and fix config values to safe ranges.
     pub fn validate(&mut self) {
-        self.polling_interval_seconds = self.polling_interval_seconds.clamp(30, 600);
-
         // Thresholds: keep only 1..=100, remove duplicates, sort
         self.notifications
             .thresholds

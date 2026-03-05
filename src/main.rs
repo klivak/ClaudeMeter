@@ -66,7 +66,6 @@ const TIMER_POLL: usize = 1;
 const TIMER_ANIM: usize = 2;
 const TIMER_BLINK: usize = 3;
 const TIMER_FADE: usize = 4;
-const TIMER_POLL_INTERVAL_MS: u32 = 120_000; // 2 minutes
 const ANIM_INTERVAL_MS: u32 = 16; // ~60fps
 const BLINK_INTERVAL_MS: u32 = 500;
 const FADE_INTERVAL_MS: u32 = 16;
@@ -376,11 +375,8 @@ unsafe fn run_message_loop(exe_dir: std::path::PathBuf, config_mgr: ConfigManage
     // Initial poll (async via tokio)
     trigger_poll(main_hwnd);
 
-    // Set up polling timer
-    let interval = APP_STATE
-        .as_ref()
-        .map(|s| s.config_mgr.config.polling_interval_clamped() as u32 * 1000)
-        .unwrap_or(TIMER_POLL_INTERVAL_MS);
+    // Set up polling timer with random interval (90-180 seconds)
+    let interval = crate::config::Config::random_polling_interval() as u32 * 1000;
     windows::Win32::UI::WindowsAndMessaging::SetTimer(main_hwnd, TIMER_POLL, interval, None);
 
     // Message loop
@@ -1728,8 +1724,8 @@ unsafe fn on_poll_result(hwnd: HWND, result: PollResult) {
         }
         state.last_error = error;
 
-        // Adjust polling interval with exponential backoff on failures
-        let base = state.config_mgr.config.polling_interval_clamped() as u32 * 1000;
+        // Adjust polling interval: random 90-180s on success, exponential backoff on failures
+        let base = crate::config::Config::random_polling_interval() as u32 * 1000;
         let interval = if state.consecutive_failures > 0 {
             let multiplier = 2u32.pow(state.consecutive_failures.min(3));
             (base * multiplier).min(600_000) // cap at 10 minutes
