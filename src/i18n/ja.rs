@@ -165,5 +165,10 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Number", "\u{6570}\u{5b57}");
     m.insert("Ring", "\u{30ea}\u{30f3}\u{30b0}");
     m.insert("Bar", "\u{30d0}\u{30fc}");
+    m.insert("Pie", "円グラフ");
+    m.insert("Dashboard layout", "ダッシュボードレイアウト");
+    m.insert("Minimal", "最小");
+    m.insert("Standard", "標準");
+    m.insert("Detailed", "詳細");
     m
 }

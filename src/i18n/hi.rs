@@ -183,5 +183,10 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Number", "\u{0938}\u{0902}\u{0916}\u{094d}\u{092f}\u{093e}");
     m.insert("Ring", "\u{0930}\u{093f}\u{0902}\u{0917}");
     m.insert("Bar", "\u{092c}\u{093e}\u{0930}");
+    m.insert("Pie", "पाई");
+    m.insert("Dashboard layout", "डैशबोर्ड लेआउट");
+    m.insert("Minimal", "न्यूनतम");
+    m.insert("Standard", "मानक");
+    m.insert("Detailed", "विस्तृत");
     m
 }

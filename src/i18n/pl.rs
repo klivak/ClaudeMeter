@@ -111,5 +111,10 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Number", "Liczba");
     m.insert("Ring", "Pier\u{015b}cie\u{0144}");
     m.insert("Bar", "Pasek");
+    m.insert("Pie", "Kołowy");
+    m.insert("Dashboard layout", "Układ panelu");
+    m.insert("Minimal", "Minimalny");
+    m.insert("Standard", "Standardowy");
+    m.insert("Detailed", "Szczegółowy");
     m
 }

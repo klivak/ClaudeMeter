@@ -153,5 +153,10 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Number", "S\u{1ed1}");
     m.insert("Ring", "V\u{00f2}ng");
     m.insert("Bar", "Thanh");
+    m.insert("Pie", "Biểu đồ tròn");
+    m.insert("Dashboard layout", "Bố cục bảng");
+    m.insert("Minimal", "Tối thiểu");
+    m.insert("Standard", "Tiêu chuẩn");
+    m.insert("Detailed", "Chi tiết");
     m
 }

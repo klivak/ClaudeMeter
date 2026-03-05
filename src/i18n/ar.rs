@@ -174,5 +174,10 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Number", "\u{0631}\u{0642}\u{0645}");
     m.insert("Ring", "\u{062d}\u{0644}\u{0642}\u{0629}");
     m.insert("Bar", "\u{0634}\u{0631}\u{064a}\u{0637}");
+    m.insert("Pie", "دائري");
+    m.insert("Dashboard layout", "تخطيط اللوحة");
+    m.insert("Minimal", "الحد الأدنى");
+    m.insert("Standard", "قياسي");
+    m.insert("Detailed", "مفصل");
     m
 }

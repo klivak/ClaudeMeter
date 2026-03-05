@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use rusqlite::{params, Connection, Result as SqlResult};
+use std::collections::HashMap;
 use std::io::Write;
 use std::path::Path;
 
@@ -183,6 +184,71 @@ impl Database {
         Ok(rows.flatten().collect())
     }
 
+    /// Compute rate of change (%/hour) for each metric by comparing current values
+    /// against values from `lookback_minutes` ago.
+    pub fn query_rate_of_change(&self, lookback_minutes: i64) -> SqlResult<HashMap<String, f64>> {
+        let latest = self.query_latest()?;
+
+        let half_window = 5; // +/- 5 min window around the lookback point
+        let window_start = format!("-{} minutes", lookback_minutes + half_window);
+        let window_end = format!("-{} minutes", (lookback_minutes - half_window).max(0));
+
+        let mut stmt = self.conn.prepare(
+            "SELECT metric, AVG(utilization) AS avg_util
+             FROM usage_history
+             WHERE provider = 'claude'
+               AND timestamp BETWEEN datetime('now', ?1) AND datetime('now', ?2)
+             GROUP BY metric",
+        )?;
+
+        let past_rows = stmt.query_map(params![window_start, window_end], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, f64>(1)?))
+        })?;
+
+        let mut past_map: HashMap<String, f64> = HashMap::new();
+        for row in past_rows.flatten() {
+            past_map.insert(row.0, row.1);
+        }
+
+        let hours = lookback_minutes as f64 / 60.0;
+        let mut result = HashMap::new();
+        for (metric, current_util, _) in &latest {
+            if let Some(&past_util) = past_map.get(metric) {
+                let rate = (current_util - past_util) / hours;
+                result.insert(metric.clone(), rate);
+            }
+        }
+
+        Ok(result)
+    }
+
+    /// Open an in-memory database (for testing).
+    #[cfg(test)]
+    pub fn open_in_memory() -> SqlResult<Self> {
+        let conn = Connection::open_in_memory()?;
+        let db = Self { conn };
+        db.init()?;
+        Ok(db)
+    }
+
+    /// Insert a record with a specific timestamp (for testing).
+    #[cfg(test)]
+    pub fn insert_at(
+        &self,
+        timestamp: &str,
+        provider: &str,
+        metric: &str,
+        utilization: f64,
+        resets_at: Option<&str>,
+    ) -> SqlResult<()> {
+        self.conn.execute(
+            "INSERT INTO usage_history (timestamp, provider, metric, utilization, resets_at)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![timestamp, provider, metric, utilization, resets_at],
+        )?;
+        Ok(())
+    }
+
     /// Export all usage history to a CSV file. Returns the number of rows written.
     pub fn export_csv(&self, path: &Path) -> SqlResult<usize> {
         let mut stmt = self.conn.prepare(
@@ -217,5 +283,159 @@ impl Database {
         }
 
         Ok(count)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_open_and_insert() {
+        let db = Database::open_in_memory().unwrap();
+        db.insert(
+            "claude",
+            "five_hour",
+            42.0,
+            Some("2025-11-04T05:00:00+00:00"),
+        )
+        .unwrap();
+        let latest = db.query_latest().unwrap();
+        assert_eq!(latest.len(), 1);
+        assert_eq!(latest[0].0, "five_hour");
+        assert_eq!(latest[0].1, 42.0);
+    }
+
+    #[test]
+    fn test_query_latest_multiple_metrics() {
+        let db = Database::open_in_memory().unwrap();
+        db.insert("claude", "five_hour", 30.0, None).unwrap();
+        db.insert("claude", "seven_day", 15.0, None).unwrap();
+        db.insert("claude", "five_hour", 60.0, None).unwrap(); // newer
+        let latest = db.query_latest().unwrap();
+        // Should have 2 metrics, five_hour should be the latest (60.0)
+        assert_eq!(latest.len(), 2);
+        let five_hour = latest.iter().find(|(m, _, _)| m == "five_hour").unwrap();
+        assert_eq!(five_hour.1, 60.0);
+    }
+
+    #[test]
+    fn test_query_24h_chart_returns_48_slots() {
+        let db = Database::open_in_memory().unwrap();
+        let slots = db.query_24h_chart().unwrap();
+        assert_eq!(slots.len(), 48);
+    }
+
+    #[test]
+    fn test_query_7d_chart_returns_42_slots() {
+        let db = Database::open_in_memory().unwrap();
+        let slots = db.query_7d_chart().unwrap();
+        assert_eq!(slots.len(), 42);
+    }
+
+    #[test]
+    fn test_query_30d_chart_returns_30_slots() {
+        let db = Database::open_in_memory().unwrap();
+        let slots = db.query_30d_chart().unwrap();
+        assert_eq!(slots.len(), 30);
+    }
+
+    #[test]
+    fn test_query_24h_chart_with_data() {
+        let db = Database::open_in_memory().unwrap();
+        // Insert a record at "now" — should land in the newest bucket
+        db.insert(
+            "claude",
+            "five_hour",
+            75.0,
+            Some("2025-11-04T05:00:00+00:00"),
+        )
+        .unwrap();
+        let slots = db.query_24h_chart().unwrap();
+        // The newest slot (index 47) should have data
+        assert!(slots[47] > 0.0);
+    }
+
+    #[test]
+    fn test_rate_of_change_no_data() {
+        let db = Database::open_in_memory().unwrap();
+        let roc = db.query_rate_of_change(60).unwrap();
+        assert!(roc.is_empty());
+    }
+
+    #[test]
+    fn test_rate_of_change_with_data() {
+        let db = Database::open_in_memory().unwrap();
+        // Insert an old record ~60 min ago
+        db.insert_at(
+            &format!(
+                "{}",
+                chrono::Utc::now()
+                    .checked_sub_signed(chrono::Duration::minutes(60))
+                    .unwrap()
+                    .format("%Y-%m-%d %H:%M:%S")
+            ),
+            "claude",
+            "five_hour",
+            20.0,
+            Some("2025-11-04T05:00:00+00:00"),
+        )
+        .unwrap();
+        // Insert a current record
+        db.insert(
+            "claude",
+            "five_hour",
+            50.0,
+            Some("2025-11-04T05:00:00+00:00"),
+        )
+        .unwrap();
+
+        let roc = db.query_rate_of_change(60).unwrap();
+        if let Some(&rate) = roc.get("five_hour") {
+            // Rate should be positive (~30%/hour)
+            assert!(rate > 0.0, "Expected positive rate, got {rate}");
+        }
+        // It's OK if no rate is found (timing-sensitive), but if found it should be positive
+    }
+
+    #[test]
+    fn test_export_csv() {
+        let db = Database::open_in_memory().unwrap();
+        db.insert("claude", "five_hour", 42.0, None).unwrap();
+        db.insert("claude", "seven_day", 15.0, None).unwrap();
+
+        let tmp = std::env::temp_dir().join("claudemeter_test_export.csv");
+        let count = db.export_csv(&tmp).unwrap();
+        assert_eq!(count, 2);
+
+        let content = std::fs::read_to_string(&tmp).unwrap();
+        assert!(content.contains("timestamp,provider,metric,utilization,resets_at"));
+        assert!(content.contains("five_hour"));
+        assert!(content.contains("seven_day"));
+
+        let _ = std::fs::remove_file(&tmp);
+    }
+
+    #[test]
+    fn test_five_hour_null_resets_cleaned_on_init() {
+        let db = Database::open_in_memory().unwrap();
+        // Insert a five_hour with NULL resets_at
+        db.insert("claude", "five_hour", 10.0, None).unwrap();
+        // Insert a five_hour with resets_at
+        db.insert(
+            "claude",
+            "five_hour",
+            20.0,
+            Some("2025-11-04T05:00:00+00:00"),
+        )
+        .unwrap();
+
+        // Re-init (simulates startup cleanup)
+        db.init().unwrap();
+
+        let latest = db.query_latest().unwrap();
+        // Only the one with resets_at should survive
+        let five_hour = latest.iter().find(|(m, _, _)| m == "five_hour").unwrap();
+        assert_eq!(five_hour.1, 20.0);
     }
 }

@@ -73,10 +73,16 @@ pub struct Config {
     pub accessibility_patterns: bool,
     #[serde(default = "default_icon_style")]
     pub tray_icon_style: String,
+    #[serde(default = "default_dashboard_layout")]
+    pub dashboard_layout: String,
     #[serde(default)]
     pub custom_colors: CustomColors,
     #[serde(default)]
     pub quiet_hours: QuietHoursConfig,
+}
+
+fn default_dashboard_layout() -> String {
+    "standard".to_string()
 }
 
 fn default_icon_style() -> String {
@@ -104,6 +110,7 @@ impl Default for Config {
             check_updates: true,
             accessibility_patterns: false,
             tray_icon_style: "number".to_string(),
+            dashboard_layout: "standard".to_string(),
             custom_colors: CustomColors::default(),
             quiet_hours: QuietHoursConfig::default(),
         }
@@ -139,8 +146,13 @@ impl Config {
         }
 
         // Validate tray icon style
-        if !["number", "ring", "bar"].contains(&self.tray_icon_style.as_str()) {
+        if !["number", "ring", "bar", "pie"].contains(&self.tray_icon_style.as_str()) {
             self.tray_icon_style = "number".to_string();
+        }
+
+        // Validate dashboard layout
+        if !["minimal", "standard", "detailed"].contains(&self.dashboard_layout.as_str()) {
+            self.dashboard_layout = "standard".to_string();
         }
 
         // Validate language
@@ -217,5 +229,121 @@ impl ConfigManager {
             }
             Err(e) => log::error!("Failed to serialize config: {e}"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_default_config_values() {
+        let cfg = Config::default();
+        assert_eq!(cfg.dashboard_layout, "standard");
+        assert_eq!(cfg.tray_icon_style, "number");
+        assert_eq!(cfg.theme, "auto");
+        assert!(!cfg.compact_mode);
+    }
+
+    #[test]
+    fn test_validate_dashboard_layout() {
+        let mut cfg = Config::default();
+
+        // Valid values should be preserved
+        for valid in ["minimal", "standard", "detailed"] {
+            cfg.dashboard_layout = valid.to_string();
+            cfg.validate();
+            assert_eq!(cfg.dashboard_layout, valid);
+        }
+
+        // Invalid value resets to default
+        cfg.dashboard_layout = "invalid".to_string();
+        cfg.validate();
+        assert_eq!(cfg.dashboard_layout, "standard");
+    }
+
+    #[test]
+    fn test_validate_tray_icon_style_includes_pie() {
+        let mut cfg = Config::default();
+
+        for valid in ["number", "ring", "bar", "pie"] {
+            cfg.tray_icon_style = valid.to_string();
+            cfg.validate();
+            assert_eq!(cfg.tray_icon_style, valid);
+        }
+
+        cfg.tray_icon_style = "invalid".to_string();
+        cfg.validate();
+        assert_eq!(cfg.tray_icon_style, "number");
+    }
+
+    #[test]
+    fn test_validate_theme() {
+        let mut cfg = Config::default();
+        for valid in ["auto", "dark", "light"] {
+            cfg.theme = valid.to_string();
+            cfg.validate();
+            assert_eq!(cfg.theme, valid);
+        }
+        cfg.theme = "neon".to_string();
+        cfg.validate();
+        assert_eq!(cfg.theme, "auto");
+    }
+
+    #[test]
+    fn test_validate_thresholds() {
+        let mut cfg = Config::default();
+        // Out-of-range and duplicate thresholds cleaned up
+        cfg.notifications.thresholds = vec![0, 50, 50, 101, 75];
+        cfg.validate();
+        assert_eq!(cfg.notifications.thresholds, vec![50, 75]);
+    }
+
+    #[test]
+    fn test_validate_empty_thresholds_reset() {
+        let mut cfg = Config::default();
+        cfg.notifications.thresholds = vec![0, 200]; // all invalid
+        cfg.validate();
+        assert_eq!(cfg.notifications.thresholds, vec![50, 75, 90]);
+    }
+
+    #[test]
+    fn test_random_polling_interval_range() {
+        for _ in 0..100 {
+            let interval = Config::random_polling_interval();
+            assert!((90..=180).contains(&interval));
+        }
+    }
+
+    #[test]
+    fn test_config_serialization_roundtrip() {
+        let cfg = Config::default();
+        let json = serde_json::to_string(&cfg).unwrap();
+        let parsed: Config = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.dashboard_layout, cfg.dashboard_layout);
+        assert_eq!(parsed.tray_icon_style, cfg.tray_icon_style);
+        assert_eq!(parsed.theme, cfg.theme);
+    }
+
+    #[test]
+    fn test_config_deserialize_missing_new_fields() {
+        // Simulates loading old config without new v2.0 fields
+        let json = r#"{
+            "version": "1.10.0",
+            "polling_interval_seconds": 120,
+            "notifications": {"enabled": true, "thresholds": [50, 75, 90], "sound": true},
+            "autostart": false,
+            "compact_mode": false,
+            "theme": "auto",
+            "language": "en",
+            "show_chatgpt_section": false,
+            "chatgpt_usage_url": "https://chatgpt.com/codex/settings/usage",
+            "claude_install_url": "https://claude.ai/download"
+        }"#;
+        let cfg: Config = serde_json::from_str(json).unwrap();
+        // New fields should get defaults
+        assert_eq!(cfg.dashboard_layout, "standard");
+        assert_eq!(cfg.tray_icon_style, "number");
+        assert!(!cfg.show_widget);
     }
 }

@@ -108,5 +108,10 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Number", "Число");
     m.insert("Ring", "Кольцо");
     m.insert("Bar", "Полоса");
+    m.insert("Pie", "Круговая");
+    m.insert("Dashboard layout", "Макет панели");
+    m.insert("Minimal", "Минимальный");
+    m.insert("Standard", "Стандартный");
+    m.insert("Detailed", "Детальный");
     m
 }

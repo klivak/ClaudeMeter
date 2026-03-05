@@ -64,7 +64,12 @@ impl PopupWindow {
 
     fn calculate_height(&self, config: &Config, usage: &Option<UsageResponse>) -> i32 {
         let renderer = PopupRenderer { dpi_scale: 1.0 };
-        renderer.calculate_height(usage, config.show_chatgpt_section, config.compact_mode)
+        renderer.calculate_height(
+            usage,
+            config.show_chatgpt_section,
+            config.compact_mode,
+            &config.dashboard_layout,
+        )
     }
 }
 

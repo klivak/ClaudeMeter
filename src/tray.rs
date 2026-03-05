@@ -482,6 +482,137 @@ fn create_bar_icon(pct: f64, color: ColorRef, bg_color: u32) -> Option<HICON> {
     }
 }
 
+/// Create a 16x16 icon with a pie chart showing metrics as proportional sectors.
+fn create_pie_icon(metrics: &[(f64, u32)], bg_color: u32) -> Option<HICON> {
+    const SIZE: i32 = 16;
+
+    unsafe {
+        let dc = CreateCompatibleDC(None);
+        if dc.is_invalid() {
+            return None;
+        }
+
+        let bmi = BITMAPINFO {
+            bmiHeader: BITMAPINFOHEADER {
+                biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
+                biWidth: SIZE,
+                biHeight: -SIZE,
+                biPlanes: 1,
+                biBitCount: 32,
+                biCompression: BI_RGB.0,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let mut bits: *mut std::ffi::c_void = std::ptr::null_mut();
+        let hbm_color = CreateDIBSection(dc, &bmi, DIB_RGB_COLORS, &mut bits, None, 0);
+        if hbm_color.is_err() {
+            let _ = DeleteDC(dc);
+            return None;
+        }
+        let hbm_color = hbm_color.unwrap();
+
+        let pixels = std::slice::from_raw_parts_mut(bits as *mut u32, (SIZE * SIZE) as usize);
+
+        let bg_r = (bg_color >> 16) & 0xFF;
+        let bg_g = (bg_color >> 8) & 0xFF;
+        let bg_b = bg_color & 0xFF;
+        let bg_pixel = 0xFF000000 | (bg_r << 16) | (bg_g << 8) | bg_b;
+
+        // Track color for unused portion
+        let track_pixel = 0xFF000000 | (0x50 << 16) | (0x50 << 8) | 0x50;
+
+        let cx = 7.5_f64;
+        let cy = 7.5_f64;
+        let radius = 6.5_f64;
+
+        let total: f64 = metrics.iter().map(|(u, _)| u).sum::<f64>().max(0.001);
+
+        for row in 0..SIZE {
+            for col in 0..SIZE {
+                let dx = col as f64 - cx;
+                let dy = row as f64 - cy;
+                let dist = (dx * dx + dy * dy).sqrt();
+                let idx = (row * SIZE + col) as usize;
+
+                if dist <= radius {
+                    let mut angle = dx.atan2(-dy).to_degrees();
+                    if angle < 0.0 {
+                        angle += 360.0;
+                    }
+
+                    let mut sector_start = 0.0_f64;
+                    let mut chosen_pixel = track_pixel;
+                    for (util, color_rgb) in metrics {
+                        let sector_angle = (util / total) * 360.0;
+                        if angle >= sector_start && angle < sector_start + sector_angle {
+                            // color_rgb is 0x00RRGGBB
+                            let r = (color_rgb >> 16) & 0xFF;
+                            let g = (color_rgb >> 8) & 0xFF;
+                            let b = color_rgb & 0xFF;
+                            chosen_pixel = 0xFF000000 | (r << 16) | (g << 8) | b;
+                            break;
+                        }
+                        sector_start += sector_angle;
+                    }
+
+                    pixels[idx] = chosen_pixel;
+                } else {
+                    pixels[idx] = bg_pixel;
+                }
+            }
+        }
+
+        // Create mask bitmap
+        let mask_bmi = BITMAPINFO {
+            bmiHeader: BITMAPINFOHEADER {
+                biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
+                biWidth: SIZE,
+                biHeight: -SIZE,
+                biPlanes: 1,
+                biBitCount: 32,
+                biCompression: BI_RGB.0,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let mut mask_bits: *mut std::ffi::c_void = std::ptr::null_mut();
+        let hbm_mask = CreateDIBSection(dc, &mask_bmi, DIB_RGB_COLORS, &mut mask_bits, None, 0);
+        if hbm_mask.is_err() {
+            let _ = DeleteObject(hbm_color);
+            let _ = DeleteDC(dc);
+            return None;
+        }
+        let hbm_mask = hbm_mask.unwrap();
+
+        let icon_info = ICONINFO {
+            fIcon: true.into(),
+            xHotspot: 0,
+            yHotspot: 0,
+            hbmMask: hbm_mask,
+            hbmColor: hbm_color,
+        };
+
+        let icon = CreateIconIndirect(&icon_info).ok();
+
+        let _ = DeleteObject(hbm_color);
+        let _ = DeleteObject(hbm_mask);
+        let _ = DeleteDC(dc);
+
+        icon
+    }
+}
+
+/// Pie chart color palette (Catppuccin-inspired)
+const PIE_PALETTE: [u32; 5] = [
+    0x40a02b, // green
+    0x89b4fa, // blue
+    0xdf8e1d, // amber
+    0xcba6f7, // lavender
+    0xea76cb, // pink
+];
+
 impl TrayIcon {
     pub fn new(hwnd: HWND) -> Result<Self, String> {
         let fallback = unsafe { LoadIconW(None, IDI_APPLICATION).map_err(|e| e.to_string())? };
@@ -545,6 +676,24 @@ impl TrayIcon {
             let dyn_icon = match icon_style {
                 "ring" => create_ring_icon(pct, color_ref, bg_color),
                 "bar" => create_bar_icon(pct, color_ref, bg_color),
+                "pie" => {
+                    if let Some(u) = usage.as_ref() {
+                        let pie_metrics: Vec<(f64, u32)> = u
+                            .all_metrics()
+                            .iter()
+                            .enumerate()
+                            .filter(|(_, (_, m))| m.utilization > 0.0)
+                            .map(|(i, (_, m))| (m.utilization, PIE_PALETTE[i % PIE_PALETTE.len()]))
+                            .collect();
+                        if pie_metrics.is_empty() {
+                            create_ring_icon(0.0, color_ref, bg_color)
+                        } else {
+                            create_pie_icon(&pie_metrics, bg_color)
+                        }
+                    } else {
+                        None
+                    }
+                }
                 _ => {
                     // "number" style (default)
                     if let Some(session_pct) = session_util {

@@ -102,5 +102,10 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Number", "ตัวเลข");
     m.insert("Ring", "วงแหวน");
     m.insert("Bar", "แถบ");
+    m.insert("Pie", "วงกลม");
+    m.insert("Dashboard layout", "รูปแบบแดชบอร์ด");
+    m.insert("Minimal", "น้อยที่สุด");
+    m.insert("Standard", "มาตรฐาน");
+    m.insert("Detailed", "ละเอียด");
     m
 }

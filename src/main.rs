@@ -66,6 +66,7 @@ const TIMER_POLL: usize = 1;
 const TIMER_ANIM: usize = 2;
 const TIMER_BLINK: usize = 3;
 const TIMER_FADE: usize = 4;
+const TIMER_SLIDE: usize = 5;
 const ANIM_INTERVAL_MS: u32 = 16; // ~60fps
 const BLINK_INTERVAL_MS: u32 = 500;
 const FADE_INTERVAL_MS: u32 = 16;
@@ -94,7 +95,7 @@ struct AppState {
     chatgpt_link_rect: RECT,
     status_link_rect: RECT,
     back_rect: RECT,
-    setting_rects: [RECT; 9],
+    setting_rects: [RECT; 10],
     notification_tracker: NotificationTracker,
     exe_dir: std::path::PathBuf,
     chart_data: Vec<f64>,
@@ -129,6 +130,12 @@ struct AppState {
     token_expiry_warned: bool,
     // Mini-widget window
     widget_hwnd: Option<HWND>,
+    // Rate of change per metric (%/hour)
+    rate_of_change: std::collections::HashMap<String, f64>,
+    // Slide animation state for settings ↔ dashboard transition
+    slide_anim_offset: f32,
+    slide_anim_target: f32,
+    slide_anim_active: bool,
 }
 
 // Safety: AppState is accessed only from the main thread via raw pointer.
@@ -241,7 +248,7 @@ unsafe fn run_message_loop(exe_dir: std::path::PathBuf, config_mgr: ConfigManage
         chatgpt_link_rect: RECT::default(),
         status_link_rect: RECT::default(),
         back_rect: RECT::default(),
-        setting_rects: [RECT::default(); 9],
+        setting_rects: [RECT::default(); 10],
         notification_tracker: NotificationTracker::new(),
         exe_dir,
         chart_data: Vec::new(),
@@ -266,6 +273,10 @@ unsafe fn run_message_loop(exe_dir: std::path::PathBuf, config_mgr: ConfigManage
         mouse_tracking: false,
         token_expiry_warned: false,
         widget_hwnd: None,
+        rate_of_change: std::collections::HashMap::new(),
+        slide_anim_offset: 0.0,
+        slide_anim_target: 0.0,
+        slide_anim_active: false,
     });
 
     // Create tray icon
@@ -568,7 +579,143 @@ unsafe extern "system" fn popup_wnd_proc(
 
                             let renderer = PopupRenderer::new(hwnd);
 
-                            if state.popup_in_settings {
+                            if state.slide_anim_active {
+                                // During slide animation, draw both panels with X offset
+                                let offset = state.slide_anim_offset;
+                                let popup_w = crate::ui::render::POPUP_WIDTH as f32;
+
+                                // Draw outgoing panel (opposite of current state)
+                                let outgoing_dx = if state.popup_in_settings {
+                                    offset - popup_w
+                                } else {
+                                    offset + popup_w
+                                };
+                                let outgoing_transform = windows::Foundation::Numerics::Matrix3x2 {
+                                    M11: 1.0,
+                                    M12: 0.0,
+                                    M21: 0.0,
+                                    M22: 1.0,
+                                    M31: outgoing_dx,
+                                    M32: 0.0,
+                                };
+                                rt.SetTransform(&outgoing_transform);
+                                if state.popup_in_settings {
+                                    // Outgoing is dashboard
+                                    renderer.draw(
+                                        d2d,
+                                        &rect,
+                                        &state.usage,
+                                        &state.last_updated,
+                                        state.config_mgr.config.show_chatgpt_section,
+                                        state.config_mgr.config.compact_mode,
+                                        &colors,
+                                        &state.i18n,
+                                        match state.chart_mode {
+                                            1 => &state.chart_data_7d,
+                                            2 => &state.chart_data_30d,
+                                            _ => &state.chart_data,
+                                        },
+                                        &state.chart_reset_lines,
+                                        state.chart_mode,
+                                        &state.last_error,
+                                        &state.hovered_element,
+                                        &state.anim_current,
+                                        &state.config_mgr.config.dashboard_layout,
+                                        &state.rate_of_change,
+                                        &mut state.settings_rect,
+                                        &mut state.close_rect,
+                                        &mut state.refresh_rect,
+                                        &mut state.copy_rect,
+                                        &mut state.install_rect,
+                                        &mut state.chatgpt_link_rect,
+                                        &mut state.status_link_rect,
+                                        &mut state.chart_rect,
+                                        &mut state.chart_bar_count,
+                                        &mut state.chart_toggle_rect,
+                                    );
+                                } else {
+                                    // Outgoing is settings
+                                    draw_settings_panel(
+                                        d2d,
+                                        &rect,
+                                        &colors,
+                                        &state.i18n,
+                                        &state.config_mgr.config,
+                                        &mut state.back_rect,
+                                        &mut state.close_rect,
+                                        &mut state.setting_rects,
+                                        &state.hovered_element,
+                                    );
+                                }
+
+                                // Draw incoming panel (current state)
+                                let incoming_transform = windows::Foundation::Numerics::Matrix3x2 {
+                                    M11: 1.0,
+                                    M12: 0.0,
+                                    M21: 0.0,
+                                    M22: 1.0,
+                                    M31: offset,
+                                    M32: 0.0,
+                                };
+                                rt.SetTransform(&incoming_transform);
+                                if state.popup_in_settings {
+                                    draw_settings_panel(
+                                        d2d,
+                                        &rect,
+                                        &colors,
+                                        &state.i18n,
+                                        &state.config_mgr.config,
+                                        &mut state.back_rect,
+                                        &mut state.close_rect,
+                                        &mut state.setting_rects,
+                                        &state.hovered_element,
+                                    );
+                                } else {
+                                    renderer.draw(
+                                        d2d,
+                                        &rect,
+                                        &state.usage,
+                                        &state.last_updated,
+                                        state.config_mgr.config.show_chatgpt_section,
+                                        state.config_mgr.config.compact_mode,
+                                        &colors,
+                                        &state.i18n,
+                                        match state.chart_mode {
+                                            1 => &state.chart_data_7d,
+                                            2 => &state.chart_data_30d,
+                                            _ => &state.chart_data,
+                                        },
+                                        &state.chart_reset_lines,
+                                        state.chart_mode,
+                                        &state.last_error,
+                                        &state.hovered_element,
+                                        &state.anim_current,
+                                        &state.config_mgr.config.dashboard_layout,
+                                        &state.rate_of_change,
+                                        &mut state.settings_rect,
+                                        &mut state.close_rect,
+                                        &mut state.refresh_rect,
+                                        &mut state.copy_rect,
+                                        &mut state.install_rect,
+                                        &mut state.chatgpt_link_rect,
+                                        &mut state.status_link_rect,
+                                        &mut state.chart_rect,
+                                        &mut state.chart_bar_count,
+                                        &mut state.chart_toggle_rect,
+                                    );
+                                }
+
+                                // Reset transform
+                                let identity = windows::Foundation::Numerics::Matrix3x2 {
+                                    M11: 1.0,
+                                    M12: 0.0,
+                                    M21: 0.0,
+                                    M22: 1.0,
+                                    M31: 0.0,
+                                    M32: 0.0,
+                                };
+                                rt.SetTransform(&identity);
+                            } else if state.popup_in_settings {
                                 draw_settings_panel(
                                     d2d,
                                     &rect,
@@ -600,6 +747,8 @@ unsafe extern "system" fn popup_wnd_proc(
                                     &state.last_error,
                                     &state.hovered_element,
                                     &state.anim_current,
+                                    &state.config_mgr.config.dashboard_layout,
+                                    &state.rate_of_change,
                                     &mut state.settings_rect,
                                     &mut state.close_rect,
                                     &mut state.refresh_rect,
@@ -647,6 +796,23 @@ unsafe extern "system" fn popup_wnd_proc(
                                 hwnd, TIMER_ANIM,
                             );
                         }
+                    }
+                }
+            } else if wparam.0 == TIMER_SLIDE {
+                if let Some(state) = APP_STATE.as_mut() {
+                    if state.slide_anim_active {
+                        let diff = state.slide_anim_target - state.slide_anim_offset;
+                        if diff.abs() < 1.0 {
+                            state.slide_anim_offset = state.slide_anim_target;
+                            state.slide_anim_active = false;
+                            let _ = windows::Win32::UI::WindowsAndMessaging::KillTimer(
+                                hwnd,
+                                TIMER_SLIDE,
+                            );
+                        } else {
+                            state.slide_anim_offset += diff * 0.20;
+                        }
+                        let _ = windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, false);
                     }
                 }
             } else if wparam.0 == TIMER_FADE {
@@ -771,14 +937,25 @@ unsafe extern "system" fn popup_wnd_proc(
                 } else if state.popup_in_settings
                     && crate::popup::point_in_rect(pt, state.back_rect)
                 {
+                    // Slide back to dashboard
                     state.popup_in_settings = false;
                     let renderer = PopupRenderer::new(hwnd);
                     let h = renderer.calculate_height(
                         &state.usage,
                         state.config_mgr.config.show_chatgpt_section,
                         state.config_mgr.config.compact_mode,
+                        &state.config_mgr.config.dashboard_layout,
                     );
                     resize_popup(hwnd, h);
+                    state.slide_anim_offset = -(crate::ui::render::POPUP_WIDTH as f32);
+                    state.slide_anim_target = 0.0;
+                    state.slide_anim_active = true;
+                    let _ = windows::Win32::UI::WindowsAndMessaging::SetTimer(
+                        hwnd,
+                        TIMER_SLIDE,
+                        ANIM_INTERVAL_MS,
+                        None,
+                    );
                     let _ = windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, true);
                 } else if state.popup_in_settings
                     && crate::popup::point_in_rect(pt, state.setting_rects[0])
@@ -851,10 +1028,11 @@ unsafe extern "system" fn popup_wnd_proc(
                 } else if state.popup_in_settings
                     && crate::popup::point_in_rect(pt, state.setting_rects[8])
                 {
-                    // Icon style: cycle number → ring → bar → number
+                    // Icon style: cycle number → ring → bar → pie → number
                     let next = match state.config_mgr.config.tray_icon_style.as_str() {
                         "number" => "ring",
                         "ring" => "bar",
+                        "bar" => "pie",
                         _ => "number",
                     };
                     state.config_mgr.config.tray_icon_style = next.to_string();
@@ -869,19 +1047,32 @@ unsafe extern "system" fn popup_wnd_proc(
                         tray.update(&state.usage, &tooltip, next);
                     }
                     let _ = windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, true);
-                } else if crate::popup::point_in_rect(pt, state.settings_rect) {
-                    state.popup_in_settings = !state.popup_in_settings;
-                    let h = if state.popup_in_settings {
-                        settings_panel_height()
-                    } else {
-                        let renderer = PopupRenderer::new(hwnd);
-                        renderer.calculate_height(
-                            &state.usage,
-                            state.config_mgr.config.show_chatgpt_section,
-                            state.config_mgr.config.compact_mode,
-                        )
+                } else if state.popup_in_settings
+                    && crate::popup::point_in_rect(pt, state.setting_rects[9])
+                {
+                    // Dashboard layout: cycle minimal → standard → detailed
+                    let next = match state.config_mgr.config.dashboard_layout.as_str() {
+                        "minimal" => "standard",
+                        "standard" => "detailed",
+                        _ => "minimal",
                     };
+                    state.config_mgr.config.dashboard_layout = next.to_string();
+                    state.config_mgr.save();
+                    let _ = windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, true);
+                } else if crate::popup::point_in_rect(pt, state.settings_rect) {
+                    // Slide to settings
+                    state.popup_in_settings = true;
+                    let h = settings_panel_height();
                     resize_popup(hwnd, h);
+                    state.slide_anim_offset = crate::ui::render::POPUP_WIDTH as f32;
+                    state.slide_anim_target = 0.0;
+                    state.slide_anim_active = true;
+                    let _ = windows::Win32::UI::WindowsAndMessaging::SetTimer(
+                        hwnd,
+                        TIMER_SLIDE,
+                        ANIM_INTERVAL_MS,
+                        None,
+                    );
                     let _ = windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, true);
                 } else if crate::popup::point_in_rect(pt, state.chart_toggle_rect) {
                     state.chart_mode = (state.chart_mode + 1) % 3;
@@ -1028,10 +1219,25 @@ unsafe fn toggle_popup(main_hwnd: HWND) {
 }
 
 /// Calculate the settings panel height (header + rows + footer).
+/// Check if Windows Focus Assist / DND is active.
+/// Uses SHQueryUserNotificationState from shell32.
+fn is_focus_assist_active() -> bool {
+    use windows::Win32::UI::Shell::SHQueryUserNotificationState;
+    unsafe {
+        match SHQueryUserNotificationState() {
+            Ok(state) => {
+                // QUNS_ACCEPTS_NOTIFICATIONS = 5; anything else means DND is active
+                state.0 != 5
+            }
+            Err(_) => false,
+        }
+    }
+}
+
 fn settings_panel_height() -> i32 {
     let header_h = 40;
     let row_h = 38;
-    let num_rows = 9;
+    let num_rows = 10;
     let legend_h = 8 + 1 + 8 + 20 + (4 * 18); // sep + gap + title + 4 icon items
     let footer_h = 44;
     header_h + 8 + (num_rows * row_h) + legend_h + footer_h
@@ -1082,6 +1288,7 @@ unsafe fn show_popup(_main_hwnd: HWND) {
                 &state.usage,
                 state.config_mgr.config.show_chatgpt_section,
                 state.config_mgr.config.compact_mode,
+                &state.config_mgr.config.dashboard_layout,
             )
         };
 
@@ -1567,7 +1774,7 @@ unsafe fn on_poll_result(hwnd: HWND, result: PollResult) {
 
         // Token expiry warning: notify once when token expires within 1 hour
         if let Some(ms) = token_expires_in_ms {
-            if ms > 0 && ms < 3_600_000 && !state.token_expiry_warned {
+            if ms > 0 && ms < 3_600_000 && !state.token_expiry_warned && !is_focus_assist_active() {
                 state.token_expiry_warned = true;
                 let minutes = ms / 60_000;
                 if let Some(tray) = &state.tray {
@@ -1613,6 +1820,10 @@ unsafe fn on_poll_result(hwnd: HWND, result: PollResult) {
                 if let Ok(slots) = db.query_30d_chart() {
                     state.chart_data_30d = slots;
                 }
+                // Compute rate of change
+                if let Ok(rates) = db.query_rate_of_change(60) {
+                    state.rate_of_change = rates;
+                }
             }
 
             // Calculate 5-hour session reset lines for chart
@@ -1633,7 +1844,8 @@ unsafe fn on_poll_result(hwnd: HWND, result: PollResult) {
             // Check notifications (skip during quiet hours)
             let thresholds = state.config_mgr.config.notifications.thresholds.clone();
             let in_quiet = is_in_quiet_hours(&state.config_mgr.config.quiet_hours);
-            if state.config_mgr.config.notifications.enabled && !in_quiet {
+            let focus_assist = is_focus_assist_active();
+            if state.config_mgr.config.notifications.enabled && !in_quiet && !focus_assist {
                 for (key, metric) in u.all_metrics() {
                     let fired =
                         state
@@ -1779,6 +1991,7 @@ unsafe fn on_poll_result(hwnd: HWND, result: PollResult) {
                 &state.usage,
                 state.config_mgr.config.show_chatgpt_section,
                 state.config_mgr.config.compact_mode,
+                &state.config_mgr.config.dashboard_layout,
             );
             resize_popup(state.popup_hwnd, h);
             let _ = windows::Win32::Graphics::Gdi::InvalidateRect(state.popup_hwnd, None, true);

@@ -387,6 +387,7 @@ impl PopupRenderer {
         usage: &Option<UsageResponse>,
         show_chatgpt: bool,
         compact: bool,
+        dashboard_layout: &str,
     ) -> i32 {
         if compact {
             let metric_count = usage
@@ -416,10 +417,32 @@ impl PopupRenderer {
                 h += 28 + 70 + 28 + 12 + 24;
             }
             Some(u) => {
-                h += 24;
-                let metric_count = u.all_metrics().len() as i32;
-                h += metric_count
-                    * (METRIC_LABEL_H + 4 + PROGRESS_H + 4 + RESET_LABEL_H + SECTION_GAP);
+                match dashboard_layout {
+                    "minimal" => {
+                        // header(24) + name(24) + gap(8) + percentage(48) + gap(8) + bar(20) + gap(8) + reset(18) + gap
+                        h += 24 + 24 + 8 + 48 + 8 + 20 + 8 + 18 + SECTION_GAP;
+                    }
+                    "detailed" => {
+                        h += 24;
+                        let metric_count = u.all_metrics().len() as i32;
+                        // Extra 28px per metric for sparkline
+                        h += metric_count
+                            * (METRIC_LABEL_H
+                                + 4
+                                + PROGRESS_H
+                                + 4
+                                + RESET_LABEL_H
+                                + 28
+                                + SECTION_GAP);
+                    }
+                    _ => {
+                        // "standard"
+                        h += 24;
+                        let metric_count = u.all_metrics().len() as i32;
+                        h += metric_count
+                            * (METRIC_LABEL_H + 4 + PROGRESS_H + 4 + RESET_LABEL_H + SECTION_GAP);
+                    }
+                }
             }
         }
 
@@ -452,6 +475,8 @@ impl PopupRenderer {
         last_error: &Option<String>,
         hovered: &HoveredElement,
         anim_values: &[f64],
+        dashboard_layout: &str,
+        rate_of_change: &HashMap<String, f64>,
         settings_rect: &mut RECT,
         close_rect: &mut RECT,
         refresh_rect: &mut RECT,
@@ -507,20 +532,53 @@ impl PopupRenderer {
                             status_link_rect,
                         );
                     }
-                    Some(u) => {
-                        y = self.draw_claude_section(
-                            &rt,
-                            d2d,
-                            w,
-                            y,
-                            u,
-                            colors,
-                            i18n,
-                            anim_values,
-                            hovered,
-                            status_link_rect,
-                        );
-                    }
+                    Some(u) => match dashboard_layout {
+                        "minimal" => {
+                            y = self.draw_claude_minimal(
+                                &rt,
+                                d2d,
+                                w,
+                                y,
+                                u,
+                                colors,
+                                i18n,
+                                anim_values,
+                                hovered,
+                                status_link_rect,
+                            );
+                        }
+                        "detailed" => {
+                            y = self.draw_claude_detailed(
+                                &rt,
+                                d2d,
+                                w,
+                                y,
+                                u,
+                                colors,
+                                i18n,
+                                anim_values,
+                                rate_of_change,
+                                chart_data,
+                                hovered,
+                                status_link_rect,
+                            );
+                        }
+                        _ => {
+                            y = self.draw_claude_section(
+                                &rt,
+                                d2d,
+                                w,
+                                y,
+                                u,
+                                colors,
+                                i18n,
+                                anim_values,
+                                rate_of_change,
+                                hovered,
+                                status_link_rect,
+                            );
+                        }
+                    },
                 }
 
                 if show_chatgpt {
@@ -725,70 +783,22 @@ impl PopupRenderer {
         colors: &ThemeColors,
         i18n: &I18n,
         anim_values: &[f64],
+        rate_of_change: &HashMap<String, f64>,
         hovered: &HoveredElement,
         status_link_rect: &mut RECT,
     ) -> f32 {
-        let pad = self.sf(PADDING);
-
-        // Section header: "☁ CLAUDE · Pro plan"
-        let detected = usage.detected_plan();
-        let plan = i18n.t(&detected);
-        let header_str = format!(
-            "\u{2601} {} \u{00B7} {} {}",
-            i18n.t("CLAUDE"),
-            i18n.t("Plan"),
-            plan
+        // Section header
+        y = self.draw_section_header(
+            rt,
+            d2d,
+            w,
+            y,
+            usage,
+            colors,
+            i18n,
+            hovered,
+            status_link_rect,
         );
-
-        let header_text = wide(&header_str);
-        let format = d2d.get_text_format(12, true, 0, 1).clone();
-        let brush = rt
-            .CreateSolidColorBrush(&colorref_to_d2d(colors.text_secondary) as *const _, None)
-            .unwrap();
-        rt.DrawText(
-            &header_text[..header_text.len() - 1],
-            &format,
-            &D2D_RECT_F {
-                left: pad,
-                top: y,
-                right: w - pad - self.sf(60),
-                bottom: y + self.sf(20),
-            },
-            &brush,
-            D2D1_DRAW_TEXT_OPTIONS_NONE,
-            DWRITE_MEASURING_MODE_NATURAL,
-        );
-
-        // "Status ↗" link (right-aligned on header line)
-        let status_str = format!("{} \u{2197}", i18n.t("Status"));
-        let status_text = wide(&status_str);
-        let status_format = d2d.get_text_format(10, false, 1, 1).clone();
-        let is_status_hovered = matches!(hovered, HoveredElement::StatusLink);
-        let status_color = if is_status_hovered {
-            lighten_d2d(&colorref_to_d2d(colors.accent), 0.3)
-        } else {
-            colorref_to_d2d(colors.accent)
-        };
-        let status_brush = rt
-            .CreateSolidColorBrush(&status_color as *const _, None)
-            .unwrap();
-        let sr = D2D_RECT_F {
-            left: w - pad - self.sf(56),
-            top: y,
-            right: w - pad,
-            bottom: y + self.sf(20),
-        };
-        *status_link_rect = to_win32_rect(&sr);
-        rt.DrawText(
-            &status_text[..status_text.len() - 1],
-            &status_format,
-            &sr,
-            &status_brush,
-            D2D1_DRAW_TEXT_OPTIONS_NONE,
-            DWRITE_MEASURING_MODE_NATURAL,
-        );
-
-        y += self.sf(24);
 
         for (i, (key, metric)) in usage.all_metrics().iter().enumerate() {
             let util = if i < anim_values.len() {
@@ -796,6 +806,7 @@ impl PopupRenderer {
             } else {
                 metric.utilization
             };
+            let rate = rate_of_change.get(key).copied();
             y = self.draw_metric(
                 rt,
                 d2d,
@@ -806,6 +817,7 @@ impl PopupRenderer {
                 metric.resets_at.as_deref(),
                 colors,
                 i18n,
+                rate,
             );
             y += self.sf(SECTION_GAP);
         }
@@ -825,16 +837,28 @@ impl PopupRenderer {
         resets_at: Option<&str>,
         colors: &ThemeColors,
         i18n: &I18n,
+        rate: Option<f64>,
     ) -> f32 {
         let pad = self.sf(PADDING);
         let content_w = w - pad * 2.0;
         let bar_h = self.sf(PROGRESS_H);
         let radius = bar_h / 2.0;
 
-        // Label + percentage on same line
+        // Label + percentage + rate arrow on same line
         let metric_name_str = format_metric_name(key);
         let display_name = i18n.t(&metric_name_str);
         let pct_str = format!("{:.0}%", utilization);
+        let pct_area_w = self.sf(62);
+
+        // Rate of change arrow
+        let (arrow_str, arrow_color) = match rate {
+            Some(r) if r > 10.0 => ("\u{2191}", colorref_to_d2d(colors.red)), // ↑
+            Some(r) if r > 2.0 => ("\u{2197}", colorref_to_d2d(colors.red)),  // ↗
+            Some(r) if r >= -2.0 => ("\u{2192}", colorref_to_d2d(colors.text_secondary)), // →
+            Some(r) if r >= -10.0 => ("\u{2198}", colorref_to_d2d(colors.green)), // ↘
+            Some(_) => ("\u{2193}", colorref_to_d2d(colors.green)),           // ↓
+            None => ("", colorref_to_d2d(colors.text_secondary)),
+        };
 
         // Label (left)
         let label_text = wide(display_name);
@@ -848,7 +872,7 @@ impl PopupRenderer {
             &D2D_RECT_F {
                 left: pad,
                 top: y,
-                right: w - pad - self.sf(50),
+                right: w - pad - pct_area_w,
                 bottom: y + self.sf(METRIC_LABEL_H),
             },
             &label_brush,
@@ -863,19 +887,46 @@ impl PopupRenderer {
         let pct_brush = rt
             .CreateSolidColorBrush(&pct_color as *const _, None)
             .unwrap();
+        let pct_right = if arrow_str.is_empty() {
+            w - pad
+        } else {
+            w - pad - self.sf(16)
+        };
         rt.DrawText(
             &pct_text[..pct_text.len() - 1],
             &pct_format,
             &D2D_RECT_F {
-                left: w - pad - self.sf(50),
+                left: w - pad - pct_area_w,
                 top: y,
-                right: w - pad,
+                right: pct_right,
                 bottom: y + self.sf(METRIC_LABEL_H),
             },
             &pct_brush,
             D2D1_DRAW_TEXT_OPTIONS_NONE,
             DWRITE_MEASURING_MODE_NATURAL,
         );
+
+        // Rate arrow (far right)
+        if !arrow_str.is_empty() {
+            let arrow_text = wide(arrow_str);
+            let arrow_format = d2d.get_text_format(11, false, 1, 1).clone();
+            let arrow_brush = rt
+                .CreateSolidColorBrush(&arrow_color as *const _, None)
+                .unwrap();
+            rt.DrawText(
+                &arrow_text[..arrow_text.len() - 1],
+                &arrow_format,
+                &D2D_RECT_F {
+                    left: w - pad - self.sf(16),
+                    top: y,
+                    right: w - pad,
+                    bottom: y + self.sf(METRIC_LABEL_H),
+                },
+                &arrow_brush,
+                D2D1_DRAW_TEXT_OPTIONS_NONE,
+                DWRITE_MEASURING_MODE_NATURAL,
+            );
+        }
 
         y += self.sf(METRIC_LABEL_H + 4);
 
@@ -902,18 +953,8 @@ impl PopupRenderer {
             .max(0.0)
             .min(content_w);
         if fill_w > 0.5 {
-            let fill_color = colorref_to_d2d(colors.progress_color(utilization));
-            let light_color = lighten_d2d(&fill_color, 0.35);
-            let stops = [
-                D2D1_GRADIENT_STOP {
-                    position: 0.0,
-                    color: fill_color,
-                },
-                D2D1_GRADIENT_STOP {
-                    position: 1.0,
-                    color: light_color,
-                },
-            ];
+            use crate::ui::colors::{GRADIENT_HIGH, GRADIENT_LOW, GRADIENT_MID};
+
             let fill_rect = D2D1_ROUNDED_RECT {
                 rect: D2D_RECT_F {
                     left: pad,
@@ -924,21 +965,72 @@ impl PopupRenderer {
                 radiusX: radius.min(fill_w / 2.0),
                 radiusY: radius,
             };
-            if let Ok(stop_coll) =
-                rt.CreateGradientStopCollection(&stops, D2D1_GAMMA_2_2, D2D1_EXTEND_MODE_CLAMP)
-            {
-                let grad_props = D2D1_LINEAR_GRADIENT_BRUSH_PROPERTIES {
-                    startPoint: D2D_POINT_2F { x: pad, y: 0.0 },
-                    endPoint: D2D_POINT_2F {
-                        x: pad + fill_w,
-                        y: 0.0,
+
+            if colors.has_overrides {
+                // Fallback: original 2-stop gradient for custom color themes
+                let fill_color = colorref_to_d2d(colors.progress_color(utilization));
+                let light_color = lighten_d2d(&fill_color, 0.35);
+                let stops = [
+                    D2D1_GRADIENT_STOP {
+                        position: 0.0,
+                        color: fill_color,
                     },
-                };
-                if let Ok(grad_brush) = rt.CreateLinearGradientBrush(&grad_props, None, &stop_coll)
+                    D2D1_GRADIENT_STOP {
+                        position: 1.0,
+                        color: light_color,
+                    },
+                ];
+                if let Ok(stop_coll) =
+                    rt.CreateGradientStopCollection(&stops, D2D1_GAMMA_2_2, D2D1_EXTEND_MODE_CLAMP)
                 {
-                    rt.FillRoundedRectangle(&fill_rect, &grad_brush);
+                    let grad_props = D2D1_LINEAR_GRADIENT_BRUSH_PROPERTIES {
+                        startPoint: D2D_POINT_2F { x: pad, y: 0.0 },
+                        endPoint: D2D_POINT_2F {
+                            x: pad + fill_w,
+                            y: 0.0,
+                        },
+                    };
+                    if let Ok(grad_brush) =
+                        rt.CreateLinearGradientBrush(&grad_props, None, &stop_coll)
+                    {
+                        rt.FillRoundedRectangle(&fill_rect, &grad_brush);
+                    }
+                }
+            } else {
+                // Full-spectrum gradient: green → amber → coral across 0-100%
+                let stops = [
+                    D2D1_GRADIENT_STOP {
+                        position: 0.0,
+                        color: GRADIENT_LOW,
+                    },
+                    D2D1_GRADIENT_STOP {
+                        position: 0.5,
+                        color: GRADIENT_MID,
+                    },
+                    D2D1_GRADIENT_STOP {
+                        position: 1.0,
+                        color: GRADIENT_HIGH,
+                    },
+                ];
+                if let Ok(stop_coll) =
+                    rt.CreateGradientStopCollection(&stops, D2D1_GAMMA_2_2, D2D1_EXTEND_MODE_CLAMP)
+                {
+                    // Map gradient across full bar width so color reflects position
+                    let grad_props = D2D1_LINEAR_GRADIENT_BRUSH_PROPERTIES {
+                        startPoint: D2D_POINT_2F { x: pad, y: 0.0 },
+                        endPoint: D2D_POINT_2F {
+                            x: pad + content_w,
+                            y: 0.0,
+                        },
+                    };
+                    if let Ok(grad_brush) =
+                        rt.CreateLinearGradientBrush(&grad_props, None, &stop_coll)
+                    {
+                        rt.FillRoundedRectangle(&fill_rect, &grad_brush);
+                    }
                 }
             }
+
             // Accessibility overlay pattern
             if crate::APP_STATE
                 .as_ref()
@@ -991,6 +1083,391 @@ impl PopupRenderer {
         }
 
         y
+    }
+
+    /// Minimal layout: shows only the highest-utilization metric, large and centered.
+    #[allow(clippy::too_many_arguments)]
+    unsafe fn draw_claude_minimal(
+        &self,
+        rt: &ID2D1HwndRenderTarget,
+        d2d: &mut D2DResources,
+        w: f32,
+        mut y: f32,
+        usage: &UsageResponse,
+        colors: &ThemeColors,
+        i18n: &I18n,
+        anim_values: &[f64],
+        hovered: &HoveredElement,
+        status_link_rect: &mut RECT,
+    ) -> f32 {
+        let pad = self.sf(PADDING);
+        let content_w = w - pad * 2.0;
+
+        // Section header (same as standard)
+        y = self.draw_section_header(
+            rt,
+            d2d,
+            w,
+            y,
+            usage,
+            colors,
+            i18n,
+            hovered,
+            status_link_rect,
+        );
+
+        // Find highest utilization metric
+        let metrics = usage.all_metrics();
+        let fallback_key = String::new();
+        let fallback_metric = crate::providers::claude::UsageMetric {
+            utilization: 0.0,
+            resets_at: None,
+        };
+        let fallback_pair = (fallback_key, &fallback_metric);
+        let (best_idx, (best_key, best_metric)) = metrics
+            .iter()
+            .enumerate()
+            .max_by(|(_, (_, a)), (_, (_, b))| {
+                a.utilization
+                    .partial_cmp(&b.utilization)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
+            .unwrap_or((0, &fallback_pair));
+
+        let util = if best_idx < anim_values.len() {
+            anim_values[best_idx]
+        } else {
+            best_metric.utilization
+        };
+
+        // Metric name (centered, 14pt)
+        let metric_name_formatted = format_metric_name(best_key);
+        let name = i18n.t(&metric_name_formatted);
+        let name_text = wide(name);
+        let name_format = d2d.get_text_format(14, true, 2, 1).clone();
+        let name_brush = rt
+            .CreateSolidColorBrush(&colorref_to_d2d(colors.text_secondary) as *const _, None)
+            .unwrap();
+        rt.DrawText(
+            &name_text[..name_text.len() - 1],
+            &name_format,
+            &D2D_RECT_F {
+                left: pad,
+                top: y,
+                right: w - pad,
+                bottom: y + self.sf(24),
+            },
+            &name_brush,
+            D2D1_DRAW_TEXT_OPTIONS_NONE,
+            DWRITE_MEASURING_MODE_NATURAL,
+        );
+        y += self.sf(24 + 8);
+
+        // Large percentage (centered, 36pt bold)
+        let pct_str = format!("{:.0}%", util);
+        let pct_text = wide(&pct_str);
+        let pct_format = d2d.get_text_format(36, true, 2, 1).clone();
+        let pct_color = colorref_to_d2d(colors.progress_color(util));
+        let pct_brush = rt
+            .CreateSolidColorBrush(&pct_color as *const _, None)
+            .unwrap();
+        rt.DrawText(
+            &pct_text[..pct_text.len() - 1],
+            &pct_format,
+            &D2D_RECT_F {
+                left: pad,
+                top: y,
+                right: w - pad,
+                bottom: y + self.sf(48),
+            },
+            &pct_brush,
+            D2D1_DRAW_TEXT_OPTIONS_NONE,
+            DWRITE_MEASURING_MODE_NATURAL,
+        );
+        y += self.sf(48 + 8);
+
+        // Wide progress bar (20px tall)
+        let bar_h = self.sf(20);
+        let radius = bar_h / 2.0;
+
+        let bg_brush = rt
+            .CreateSolidColorBrush(&colorref_to_d2d(colors.progress_bg) as *const _, None)
+            .unwrap();
+        rt.FillRoundedRectangle(
+            &D2D1_ROUNDED_RECT {
+                rect: D2D_RECT_F {
+                    left: pad,
+                    top: y,
+                    right: pad + content_w,
+                    bottom: y + bar_h,
+                },
+                radiusX: radius,
+                radiusY: radius,
+            },
+            &bg_brush,
+        );
+
+        let fill_w = (content_w * util as f32 / 100.0).max(0.0).min(content_w);
+        if fill_w > 0.5 {
+            use crate::ui::colors::{GRADIENT_HIGH, GRADIENT_LOW, GRADIENT_MID};
+            let fill_rect = D2D1_ROUNDED_RECT {
+                rect: D2D_RECT_F {
+                    left: pad,
+                    top: y,
+                    right: pad + fill_w,
+                    bottom: y + bar_h,
+                },
+                radiusX: radius.min(fill_w / 2.0),
+                radiusY: radius,
+            };
+            let stops = [
+                D2D1_GRADIENT_STOP {
+                    position: 0.0,
+                    color: GRADIENT_LOW,
+                },
+                D2D1_GRADIENT_STOP {
+                    position: 0.5,
+                    color: GRADIENT_MID,
+                },
+                D2D1_GRADIENT_STOP {
+                    position: 1.0,
+                    color: GRADIENT_HIGH,
+                },
+            ];
+            if let Ok(stop_coll) =
+                rt.CreateGradientStopCollection(&stops, D2D1_GAMMA_2_2, D2D1_EXTEND_MODE_CLAMP)
+            {
+                let grad_props = D2D1_LINEAR_GRADIENT_BRUSH_PROPERTIES {
+                    startPoint: D2D_POINT_2F { x: pad, y: 0.0 },
+                    endPoint: D2D_POINT_2F {
+                        x: pad + content_w,
+                        y: 0.0,
+                    },
+                };
+                if let Ok(grad_brush) = rt.CreateLinearGradientBrush(&grad_props, None, &stop_coll)
+                {
+                    rt.FillRoundedRectangle(&fill_rect, &grad_brush);
+                }
+            }
+        }
+        y += bar_h + self.sf(8);
+
+        // Reset time
+        if let Some(reset_str) = best_metric.resets_at.as_deref() {
+            if let Some(secs) = seconds_until(reset_str) {
+                if secs > 0 {
+                    let duration = format_duration(secs);
+                    let target = format_reset_target(reset_str).unwrap_or_default();
+                    let reset_text = format!("{} {} {}", i18n.t("resets in"), duration, target);
+                    let text = wide(&reset_text);
+                    let format = d2d.get_text_format(11, false, 2, 1).clone();
+                    let brush = rt
+                        .CreateSolidColorBrush(
+                            &colorref_to_d2d(colors.text_secondary) as *const _,
+                            None,
+                        )
+                        .unwrap();
+                    rt.DrawText(
+                        &text[..text.len() - 1],
+                        &format,
+                        &D2D_RECT_F {
+                            left: pad,
+                            top: y,
+                            right: w - pad,
+                            bottom: y + self.sf(18),
+                        },
+                        &brush,
+                        D2D1_DRAW_TEXT_OPTIONS_NONE,
+                        DWRITE_MEASURING_MODE_NATURAL,
+                    );
+                    y += self.sf(18);
+                }
+            }
+        }
+
+        y += self.sf(SECTION_GAP);
+        y
+    }
+
+    /// Detailed layout: standard metrics + mini sparkline under each metric.
+    #[allow(clippy::too_many_arguments)]
+    unsafe fn draw_claude_detailed(
+        &self,
+        rt: &ID2D1HwndRenderTarget,
+        d2d: &mut D2DResources,
+        w: f32,
+        mut y: f32,
+        usage: &UsageResponse,
+        colors: &ThemeColors,
+        i18n: &I18n,
+        anim_values: &[f64],
+        rate_of_change: &HashMap<String, f64>,
+        chart_data: &[f64],
+        hovered: &HoveredElement,
+        status_link_rect: &mut RECT,
+    ) -> f32 {
+        // Section header
+        y = self.draw_section_header(
+            rt,
+            d2d,
+            w,
+            y,
+            usage,
+            colors,
+            i18n,
+            hovered,
+            status_link_rect,
+        );
+
+        let pad = self.sf(PADDING);
+
+        for (i, (key, metric)) in usage.all_metrics().iter().enumerate() {
+            let util = if i < anim_values.len() {
+                anim_values[i]
+            } else {
+                metric.utilization
+            };
+            let rate = rate_of_change.get(key).copied();
+            y = self.draw_metric(
+                rt,
+                d2d,
+                w,
+                y,
+                key,
+                util,
+                metric.resets_at.as_deref(),
+                colors,
+                i18n,
+                rate,
+            );
+
+            // Mini sparkline for five_hour metric (we have chart_data for it)
+            if key == "five_hour" && !chart_data.is_empty() {
+                let spark_w = w - pad * 2.0;
+                let spark_h = self.sf(20);
+                let max_val = chart_data.iter().cloned().fold(1.0_f64, f64::max);
+
+                // Background
+                let spark_bg = rt
+                    .CreateSolidColorBrush(&colorref_to_d2d(colors.surface) as *const _, None)
+                    .unwrap();
+                rt.FillRoundedRectangle(
+                    &D2D1_ROUNDED_RECT {
+                        rect: D2D_RECT_F {
+                            left: pad,
+                            top: y,
+                            right: pad + spark_w,
+                            bottom: y + spark_h,
+                        },
+                        radiusX: 3.0,
+                        radiusY: 3.0,
+                    },
+                    &spark_bg,
+                );
+
+                // Draw sparkline bars
+                let bar_w = spark_w / chart_data.len() as f32;
+                let gap = 1.0_f32.max(bar_w / 6.0);
+                let spark_brush = rt
+                    .CreateSolidColorBrush(&colorref_to_d2d(colors.accent) as *const _, None)
+                    .unwrap();
+                for (j, &val) in chart_data.iter().enumerate() {
+                    if val > 0.0 {
+                        let bh = (val / max_val) as f32 * (spark_h - 4.0);
+                        let bx = pad + j as f32 * bar_w + gap / 2.0;
+                        rt.FillRectangle(
+                            &D2D_RECT_F {
+                                left: bx,
+                                top: y + spark_h - 2.0 - bh,
+                                right: bx + bar_w - gap,
+                                bottom: y + spark_h - 2.0,
+                            },
+                            &spark_brush,
+                        );
+                    }
+                }
+                y += spark_h + self.sf(4);
+            }
+
+            y += self.sf(SECTION_GAP);
+        }
+
+        y
+    }
+
+    /// Draw the section header ("☁ CLAUDE · Plan") shared between layouts.
+    #[allow(clippy::too_many_arguments)]
+    unsafe fn draw_section_header(
+        &self,
+        rt: &ID2D1HwndRenderTarget,
+        d2d: &mut D2DResources,
+        w: f32,
+        y: f32,
+        usage: &UsageResponse,
+        colors: &ThemeColors,
+        i18n: &I18n,
+        hovered: &HoveredElement,
+        status_link_rect: &mut RECT,
+    ) -> f32 {
+        let pad = self.sf(PADDING);
+        let detected = usage.detected_plan();
+        let plan = i18n.t(&detected);
+        let header_str = format!(
+            "\u{2601} {} \u{00B7} {} {}",
+            i18n.t("CLAUDE"),
+            i18n.t("Plan"),
+            plan
+        );
+
+        let header_text = wide(&header_str);
+        let format = d2d.get_text_format(12, true, 0, 1).clone();
+        let brush = rt
+            .CreateSolidColorBrush(&colorref_to_d2d(colors.text_secondary) as *const _, None)
+            .unwrap();
+        rt.DrawText(
+            &header_text[..header_text.len() - 1],
+            &format,
+            &D2D_RECT_F {
+                left: pad,
+                top: y,
+                right: w - pad - self.sf(60),
+                bottom: y + self.sf(20),
+            },
+            &brush,
+            D2D1_DRAW_TEXT_OPTIONS_NONE,
+            DWRITE_MEASURING_MODE_NATURAL,
+        );
+
+        // "Status ↗" link
+        let status_str = format!("{} \u{2197}", i18n.t("Status"));
+        let status_text = wide(&status_str);
+        let status_format = d2d.get_text_format(10, false, 1, 1).clone();
+        let is_status_hovered = matches!(hovered, HoveredElement::StatusLink);
+        let status_color = if is_status_hovered {
+            lighten_d2d(&colorref_to_d2d(colors.accent), 0.3)
+        } else {
+            colorref_to_d2d(colors.accent)
+        };
+        let status_brush = rt
+            .CreateSolidColorBrush(&status_color as *const _, None)
+            .unwrap();
+        let sr = D2D_RECT_F {
+            left: w - pad - self.sf(56),
+            top: y,
+            right: w - pad,
+            bottom: y + self.sf(20),
+        };
+        *status_link_rect = to_win32_rect(&sr);
+        rt.DrawText(
+            &status_text[..status_text.len() - 1],
+            &status_format,
+            &sr,
+            &status_brush,
+            D2D1_DRAW_TEXT_OPTIONS_NONE,
+            DWRITE_MEASURING_MODE_NATURAL,
+        );
+
+        y + self.sf(24)
     }
 
     unsafe fn draw_compact_metrics(
@@ -1447,7 +1924,13 @@ impl PopupRenderer {
         let fmt_bold = d2d.get_text_format(10, true, 0, 0).clone();
         let fmt_normal = d2d.get_text_format(10, false, 0, 0).clone();
 
-        let segments: &[(&str, u8)] = &[("24h", 0), (" | ", 255), ("7d", 1), (" | ", 255), ("30d", 2)];
+        let segments: &[(&str, u8)] = &[
+            ("24h", 0),
+            (" | ", 255),
+            ("7d", 1),
+            (" | ", 255),
+            ("30d", 2),
+        ];
         let mut sx = toggle_x;
         let seg_widths: &[i32] = &[22, 16, 14, 16, 24];
 
@@ -1940,7 +2423,7 @@ pub unsafe fn draw_settings_panel(
     config: &crate::config::Config,
     back_rect: &mut RECT,
     close_rect: &mut RECT,
-    setting_rects: &mut [RECT; 9],
+    setting_rects: &mut [RECT; 10],
     hovered: &HoveredElement,
 ) {
     let Some(rt) = d2d.render_target.clone() else {
@@ -2163,6 +2646,10 @@ pub unsafe fn draw_settings_panel(
         (
             i18n.t("Icon style").to_string(),
             i18n.t(&capitalize(&config.tray_icon_style)).to_string(),
+        ),
+        (
+            i18n.t("Dashboard layout").to_string(),
+            i18n.t(&capitalize(&config.dashboard_layout)).to_string(),
         ),
     ];
 

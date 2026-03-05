@@ -5,6 +5,16 @@ All notable changes to ClaudeMeter will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-03-05
+
+### Added
+- **Slide animation** — smooth horizontal slide transition between Dashboard and Settings views
+- **Dashboard layouts** — three layout modes selectable in Settings: Minimal (single largest metric, large percentage), Standard (existing view), Detailed (metrics with inline sparkline charts)
+- **Gradient progress bars** — full-spectrum green→amber→coral gradient across progress bars reflecting utilization position; falls back to solid colors when custom color overrides are active
+- **Pie chart tray icon** — new "Pie" icon style showing all metrics as proportional colored sectors in a mini pie chart
+- **Rate of change indicators** — arrow symbols (↑↗→↘↓) next to each metric percentage showing utilization trend based on hourly rate of change from historical data
+- **Focus Assist integration** — automatically suppresses all notifications when Windows Focus Assist / Do Not Disturb is active (uses SHQueryUserNotificationState API)
+
 ## [1.10.4] - 2026-03-05
 
 ### Added
