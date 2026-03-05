@@ -11,8 +11,14 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Plan", "Pl\u{00e1}n");
     m.insert("Pro", "Pro");
     m.insert("Max", "Max");
-    m.insert("Claude Code not detected", "Claude Code nebol zisten\u{00fd}");
-    m.insert("credentials_not_found", "Prihl\u{00e1}sovacie \u{00fa}daje neboli n\u{00e1}jden\u{00e9}");
+    m.insert(
+        "Claude Code not detected",
+        "Claude Code nebol zisten\u{00fd}",
+    );
+    m.insert(
+        "credentials_not_found",
+        "Prihl\u{00e1}sovacie \u{00fa}daje neboli n\u{00e1}jden\u{00e9}",
+    );
     m.insert("connection_error", "Chyba pripojenia");
     m.insert("token_expired", "Token vypr\u{0161}al");
     m.insert(
@@ -41,14 +47,20 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
         "openai_no_api",
         "OpenAI neposkytuje API na sledovanie pou\u{017e}\u{00ed}vania predplatn\u{00e9}ho ChatGPT.",
     );
-    m.insert("Check your usage manually:", "Skontrolujte pou\u{017e}\u{00ed}vanie manu\u{00e1}lne:");
+    m.insert(
+        "Check your usage manually:",
+        "Skontrolujte pou\u{017e}\u{00ed}vanie manu\u{00e1}lne:",
+    );
     m.insert(
         "Open ChatGPT Usage \u{2192}",
         "Otvori\u{0165} ChatGPT Usage \u{2192}",
     );
     m.insert("Refresh Now", "Obnovi\u{0165} teraz");
     m.insert("Open Dashboard", "Otvori\u{0165} dashboard");
-    m.insert("Export History (CSV)", "Exportova\u{0165} hist\u{00f3}riu (CSV)");
+    m.insert(
+        "Export History (CSV)",
+        "Exportova\u{0165} hist\u{00f3}riu (CSV)",
+    );
     m.insert("Settings", "Nastavenia");
     m.insert("Start with Windows", "Spusti\u{0165} s Windows");
     m.insert("About", "O aplik\u{00e1}cii");
@@ -78,12 +90,18 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Startup", "Spustenie");
     m.insert("General", "V\u{0161}eobecn\u{00e9}");
     m.insert("Back", "\u{2190} Sp\u{00e4}\u{0165}");
-    m.insert("Open Claude.ai \u{2192}", "Otvori\u{0165} Claude.ai \u{2192}");
+    m.insert(
+        "Open Claude.ai \u{2192}",
+        "Otvori\u{0165} Claude.ai \u{2192}",
+    );
     m.insert("ClaudeMeter", "ClaudeMeter");
     m.insert("CLAUDE", "CLAUDE");
     m.insert("CHATGPT / CODEX", "CHATGPT / CODEX");
     m.insert("Usage History", "Hist\u{00f3}ria pou\u{017e}\u{00ed}vania");
-    m.insert("Usage History (24h)", "Hist\u{00f3}ria pou\u{017e}\u{00ed}vania (24h)");
+    m.insert(
+        "Usage History (24h)",
+        "Hist\u{00f3}ria pou\u{017e}\u{00ed}vania (24h)",
+    );
     m.insert("Auto (English)", "Auto (English)");
     m.insert("at", "o");
     m.insert("Resets in", "Reset za");
@@ -94,7 +112,10 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("No data", "\u{017d}iadne d\u{00e1}ta");
     m.insert("exceeded", "prekro\u{010d}en\u{00e9}");
     m.insert("Show widget", "Zobrazi\u{0165} widget");
-    m.insert("Check for updates", "Skontrolova\u{0165} aktualiz\u{00e1}cie");
+    m.insert(
+        "Check for updates",
+        "Skontrolova\u{0165} aktualiz\u{00e1}cie",
+    );
     m.insert("Accessibility patterns", "Vzory pr\u{00ed}stupnosti");
     m.insert("Update available", "Dostupn\u{00e1} aktualiz\u{00e1}cia");
     m.insert(

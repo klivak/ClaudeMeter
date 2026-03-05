@@ -748,15 +748,27 @@ impl PopupRenderer {
         let half = ((rect.right - rect.left).min(rect.bottom - rect.top)) * 0.18;
         let stroke = 1.8;
         rt.DrawLine(
-            D2D_POINT_2F { x: cx - half, y: cy - half },
-            D2D_POINT_2F { x: cx + half, y: cy + half },
+            D2D_POINT_2F {
+                x: cx - half,
+                y: cy - half,
+            },
+            D2D_POINT_2F {
+                x: cx + half,
+                y: cy + half,
+            },
             &brush,
             stroke,
             None,
         );
         rt.DrawLine(
-            D2D_POINT_2F { x: cx + half, y: cy - half },
-            D2D_POINT_2F { x: cx - half, y: cy + half },
+            D2D_POINT_2F {
+                x: cx + half,
+                y: cy - half,
+            },
+            D2D_POINT_2F {
+                x: cx - half,
+                y: cy + half,
+            },
             &brush,
             stroke,
             None,
@@ -1572,11 +1584,7 @@ impl PopupRenderer {
         let pad = self.sf(PADDING);
         let detected = usage.detected_plan();
         let plan = i18n.t(&detected);
-        let prefix = format!(
-            "\u{2601} {} \u{00B7} {} ",
-            i18n.t("CLAUDE"),
-            i18n.t("Plan"),
-        );
+        let prefix = format!("\u{2601} {} \u{00B7} {} ", i18n.t("CLAUDE"), i18n.t("Plan"),);
 
         // Draw prefix (non-clickable)
         let prefix_text = wide(&prefix);
@@ -1606,9 +1614,11 @@ impl PopupRenderer {
             .ok();
         let prefix_w = layout
             .and_then(|l| {
-                let mut metrics = windows::Win32::Graphics::DirectWrite::DWRITE_TEXT_METRICS::default();
+                let mut metrics =
+                    windows::Win32::Graphics::DirectWrite::DWRITE_TEXT_METRICS::default();
                 l.GetMetrics(&mut metrics).ok()?;
-                Some(metrics.width)
+                // Keep the explicit space after "Plan" when positioning the clickable plan link.
+                Some(metrics.widthIncludingTrailingWhitespace)
             })
             .unwrap_or(self.sf(100));
 
@@ -2779,17 +2789,57 @@ pub unsafe fn draw_settings_panel(
 
     // (label, Option<text_value>, Option<bool_checked>)
     let rows: Vec<(String, Option<String>, Option<bool>)> = vec![
-        (i18n.t("Theme").to_string(), Some(i18n.t(&capitalize(&config.theme)).to_string()), None),
+        (
+            i18n.t("Theme").to_string(),
+            Some(i18n.t(&capitalize(&config.theme)).to_string()),
+            None,
+        ),
         (i18n.t("Language").to_string(), Some(lang_display), None),
-        (i18n.t("Compact mode").to_string(), None, Some(config.compact_mode)),
-        (i18n.t("Show ChatGPT section").to_string(), None, Some(config.show_chatgpt_section)),
-        (i18n.t("Start with Windows").to_string(), None, Some(config.autostart)),
-        (i18n.t("Show widget").to_string(), None, Some(config.show_widget)),
-        (i18n.t("Check for updates").to_string(), None, Some(config.check_updates)),
-        (i18n.t("Accessibility patterns").to_string(), None, Some(config.accessibility_patterns)),
-        (i18n.t("Icon style").to_string(), Some(i18n.t(&capitalize(&config.tray_icon_style)).to_string()), None),
-        (i18n.t("Dashboard layout").to_string(), Some(i18n.t(&capitalize(&config.dashboard_layout)).to_string()), None),
-        (i18n.t("Hide Extra Usage").to_string(), None, Some(config.hide_extra_usage)),
+        (
+            i18n.t("Compact mode").to_string(),
+            None,
+            Some(config.compact_mode),
+        ),
+        (
+            i18n.t("Show ChatGPT section").to_string(),
+            None,
+            Some(config.show_chatgpt_section),
+        ),
+        (
+            i18n.t("Start with Windows").to_string(),
+            None,
+            Some(config.autostart),
+        ),
+        (
+            i18n.t("Show widget").to_string(),
+            None,
+            Some(config.show_widget),
+        ),
+        (
+            i18n.t("Check for updates").to_string(),
+            None,
+            Some(config.check_updates),
+        ),
+        (
+            i18n.t("Accessibility patterns").to_string(),
+            None,
+            Some(config.accessibility_patterns),
+        ),
+        (
+            i18n.t("Icon style").to_string(),
+            Some(i18n.t(&capitalize(&config.tray_icon_style)).to_string()),
+            None,
+        ),
+        (
+            i18n.t("Dashboard layout").to_string(),
+            Some(i18n.t(&capitalize(&config.dashboard_layout)).to_string()),
+            None,
+        ),
+        (
+            i18n.t("Hide Extra Usage").to_string(),
+            None,
+            Some(config.hide_extra_usage),
+        ),
     ];
 
     for (i, (label, text_val, bool_val)) in rows.iter().enumerate() {
@@ -2943,7 +2993,10 @@ pub unsafe fn draw_settings_panel(
             .unwrap();
         rt.FillEllipse(
             &D2D1_ELLIPSE {
-                point: D2D_POINT_2F { x: dot_cx, y: dot_cy },
+                point: D2D_POINT_2F {
+                    x: dot_cx,
+                    y: dot_cy,
+                },
                 radiusX: dot_r,
                 radiusY: dot_r,
             },
@@ -3057,15 +3110,27 @@ unsafe fn draw_close_icon_freestanding(
     let half = ((rect.right - rect.left).min(rect.bottom - rect.top)) * 0.18;
     let stroke = 1.8;
     rt.DrawLine(
-        D2D_POINT_2F { x: cx - half, y: cy - half },
-        D2D_POINT_2F { x: cx + half, y: cy + half },
+        D2D_POINT_2F {
+            x: cx - half,
+            y: cy - half,
+        },
+        D2D_POINT_2F {
+            x: cx + half,
+            y: cy + half,
+        },
         &brush,
         stroke,
         None,
     );
     rt.DrawLine(
-        D2D_POINT_2F { x: cx + half, y: cy - half },
-        D2D_POINT_2F { x: cx - half, y: cy + half },
+        D2D_POINT_2F {
+            x: cx + half,
+            y: cy - half,
+        },
+        D2D_POINT_2F {
+            x: cx - half,
+            y: cy + half,
+        },
         &brush,
         stroke,
         None,
@@ -3094,27 +3159,48 @@ unsafe fn draw_checkbox_freestanding(
             .CreateSolidColorBrush(&colorref_to_d2d(colors.accent) as *const _, None)
             .unwrap();
         rt.FillRoundedRectangle(
-            &D2D1_ROUNDED_RECT { rect: r, radiusX: radius, radiusY: radius },
+            &D2D1_ROUNDED_RECT {
+                rect: r,
+                radiusX: radius,
+                radiusY: radius,
+            },
             &fill_brush,
         );
         // White checkmark
         let check_brush = rt
             .CreateSolidColorBrush(
-                &D2D1_COLOR_F { r: 1.0, g: 1.0, b: 1.0, a: 1.0 } as *const _,
+                &D2D1_COLOR_F {
+                    r: 1.0,
+                    g: 1.0,
+                    b: 1.0,
+                    a: 1.0,
+                } as *const _,
                 None,
             )
             .unwrap();
         let stroke = 1.8;
         rt.DrawLine(
-            D2D_POINT_2F { x: x + size * 0.25, y: y + size * 0.52 },
-            D2D_POINT_2F { x: x + size * 0.42, y: y + size * 0.70 },
+            D2D_POINT_2F {
+                x: x + size * 0.25,
+                y: y + size * 0.52,
+            },
+            D2D_POINT_2F {
+                x: x + size * 0.42,
+                y: y + size * 0.70,
+            },
             &check_brush,
             stroke,
             None,
         );
         rt.DrawLine(
-            D2D_POINT_2F { x: x + size * 0.42, y: y + size * 0.70 },
-            D2D_POINT_2F { x: x + size * 0.75, y: y + size * 0.30 },
+            D2D_POINT_2F {
+                x: x + size * 0.42,
+                y: y + size * 0.70,
+            },
+            D2D_POINT_2F {
+                x: x + size * 0.75,
+                y: y + size * 0.30,
+            },
             &check_brush,
             stroke,
             None,
@@ -3126,7 +3212,11 @@ unsafe fn draw_checkbox_freestanding(
             .CreateSolidColorBrush(&border_color as *const _, None)
             .unwrap();
         rt.DrawRoundedRectangle(
-            &D2D1_ROUNDED_RECT { rect: r, radiusX: radius, radiusY: radius },
+            &D2D1_ROUNDED_RECT {
+                rect: r,
+                radiusX: radius,
+                radiusY: radius,
+            },
             &border_brush,
             1.5,
             None,

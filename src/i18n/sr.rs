@@ -5,9 +5,18 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("5-hour session", "5-\u{0447}\u{0430}\u{0441}\u{043e}\u{0432}\u{043d}\u{0430} \u{0441}\u{0435}\u{0441}\u{0438}\u{0458}\u{0430}");
     m.insert("Weekly (7-day)", "\u{041d}\u{0435}\u{0434}\u{0435}\u{0459}\u{043d}\u{043e} (7 \u{0434}\u{0430}\u{043d}\u{0430})");
     m.insert("Opus (7-day)", "Opus (7 \u{0434}\u{0430}\u{043d}\u{0430})");
-    m.insert("Sonnet (7-day)", "Sonnet (7 \u{0434}\u{0430}\u{043d}\u{0430})");
-    m.insert("OAuth Apps (7-day)", "OAuth Apps (7 \u{0434}\u{0430}\u{043d}\u{0430})");
-    m.insert("resets in", "\u{0440}\u{0435}\u{0441}\u{0435}\u{0442}\u{0443}\u{0458}\u{0435} \u{0437}\u{0430}");
+    m.insert(
+        "Sonnet (7-day)",
+        "Sonnet (7 \u{0434}\u{0430}\u{043d}\u{0430})",
+    );
+    m.insert(
+        "OAuth Apps (7-day)",
+        "OAuth Apps (7 \u{0434}\u{0430}\u{043d}\u{0430})",
+    );
+    m.insert(
+        "resets in",
+        "\u{0440}\u{0435}\u{0441}\u{0435}\u{0442}\u{0443}\u{0458}\u{0435} \u{0437}\u{0430}",
+    );
     m.insert("Plan", "\u{041f}\u{043b}\u{0430}\u{043d}");
     m.insert("Pro", "Pro");
     m.insert("Max", "Max");
@@ -46,15 +55,30 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
         "Open ChatGPT Usage \u{2192}",
         "\u{041e}\u{0442}\u{0432}\u{043e}\u{0440}\u{0438} ChatGPT Usage \u{2192}",
     );
-    m.insert("Refresh Now", "\u{041e}\u{0441}\u{0432}\u{0435}\u{0436}\u{0438} \u{0441}\u{0430}\u{0434}\u{0430}");
+    m.insert(
+        "Refresh Now",
+        "\u{041e}\u{0441}\u{0432}\u{0435}\u{0436}\u{0438} \u{0441}\u{0430}\u{0434}\u{0430}",
+    );
     m.insert("Open Dashboard", "\u{041e}\u{0442}\u{0432}\u{043e}\u{0440}\u{0438} \u{043a}\u{043e}\u{043d}\u{0442}\u{0440}\u{043e}\u{043b}\u{043d}\u{0443} \u{0442}\u{0430}\u{0431}\u{043b}\u{0443}");
     m.insert("Export History (CSV)", "\u{0418}\u{0437}\u{0432}\u{0435}\u{0437}\u{0438} \u{0438}\u{0441}\u{0442}\u{043e}\u{0440}\u{0438}\u{0458}\u{0443} (CSV)");
-    m.insert("Settings", "\u{041f}\u{043e}\u{0434}\u{0435}\u{0448}\u{0430}\u{0432}\u{0430}\u{045a}\u{0430}");
-    m.insert("Start with Windows", "\u{041f}\u{043e}\u{043a}\u{0440}\u{0435}\u{043d}\u{0438} \u{0441}\u{0430} Windows");
-    m.insert("About", "\u{041e} \u{0430}\u{043f}\u{043b}\u{0438}\u{043a}\u{0430}\u{0446}\u{0438}\u{0458}\u{0438}");
+    m.insert(
+        "Settings",
+        "\u{041f}\u{043e}\u{0434}\u{0435}\u{0448}\u{0430}\u{0432}\u{0430}\u{045a}\u{0430}",
+    );
+    m.insert(
+        "Start with Windows",
+        "\u{041f}\u{043e}\u{043a}\u{0440}\u{0435}\u{043d}\u{0438} \u{0441}\u{0430} Windows",
+    );
+    m.insert(
+        "About",
+        "\u{041e} \u{0430}\u{043f}\u{043b}\u{0438}\u{043a}\u{0430}\u{0446}\u{0438}\u{0458}\u{0438}",
+    );
     m.insert("Exit", "\u{0418}\u{0437}\u{043b}\u{0430}\u{0437}");
     m.insert("Last updated:", "\u{041f}\u{043e}\u{0441}\u{043b}\u{0435}\u{0434}\u{045a}\u{0435} \u{0430}\u{0436}\u{0443}\u{0440}\u{0438}\u{0440}\u{0430}\u{045a}\u{0435}:");
-    m.insert("Refresh", "\u{041e}\u{0441}\u{0432}\u{0435}\u{0436}\u{0438}");
+    m.insert(
+        "Refresh",
+        "\u{041e}\u{0441}\u{0432}\u{0435}\u{0436}\u{0438}",
+    );
     m.insert("Status", "\u{0421}\u{0442}\u{0430}\u{0442}\u{0443}\u{0441}");
     m.insert("Usage Alert", "\u{0423}\u{043f}\u{043e}\u{0437}\u{043e}\u{0440}\u{0435}\u{045a}\u{0435} \u{043e} \u{043a}\u{043e}\u{0440}\u{0438}\u{0448}\u{045b}\u{0435}\u{045a}\u{0443}");
     m.insert("Usage Critical", "\u{041a}\u{0440}\u{0438}\u{0442}\u{0438}\u{0447}\u{043d}\u{043e} \u{043a}\u{043e}\u{0440}\u{0438}\u{0448}\u{045b}\u{0435}\u{045a}\u{0435}");
@@ -65,20 +89,38 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Compact mode", "\u{041a}\u{043e}\u{043c}\u{043f}\u{0430}\u{043a}\u{0442}\u{043d}\u{0438} \u{0440}\u{0435}\u{0436}\u{0438}\u{043c}");
     m.insert("Theme", "\u{0422}\u{0435}\u{043c}\u{0430}");
     m.insert("Language", "\u{0408}\u{0435}\u{0437}\u{0438}\u{043a}");
-    m.insert("Notifications", "\u{041e}\u{0431}\u{0430}\u{0432}\u{0435}\u{0448}\u{0442}\u{0435}\u{045a}\u{0430}");
+    m.insert(
+        "Notifications",
+        "\u{041e}\u{0431}\u{0430}\u{0432}\u{0435}\u{0448}\u{0442}\u{0435}\u{045a}\u{0430}",
+    );
     m.insert("Dark", "\u{0422}\u{0430}\u{043c}\u{043d}\u{0430}");
     m.insert("Light", "\u{0421}\u{0432}\u{0435}\u{0442}\u{043b}\u{0430}");
     m.insert("Auto", "\u{0410}\u{0443}\u{0442}\u{043e}");
     m.insert("Show ChatGPT section", "\u{041f}\u{0440}\u{0438}\u{043a}\u{0430}\u{0436}\u{0438} ChatGPT \u{0441}\u{0435}\u{043a}\u{0446}\u{0438}\u{0458}\u{0443}");
-    m.insert("Enabled", "\u{041e}\u{043c}\u{043e}\u{0433}\u{0443}\u{045b}\u{0435}\u{043d}\u{043e}");
+    m.insert(
+        "Enabled",
+        "\u{041e}\u{043c}\u{043e}\u{0433}\u{0443}\u{045b}\u{0435}\u{043d}\u{043e}",
+    );
     m.insert("Sound", "\u{0417}\u{0432}\u{0443}\u{043a}");
-    m.insert("Thresholds", "\u{041f}\u{0440}\u{0430}\u{0433}\u{043e}\u{0432}\u{0438}");
+    m.insert(
+        "Thresholds",
+        "\u{041f}\u{0440}\u{0430}\u{0433}\u{043e}\u{0432}\u{0438}",
+    );
     m.insert("Polling interval", "\u{0418}\u{043d}\u{0442}\u{0435}\u{0440}\u{0432}\u{0430}\u{043b} \u{043f}\u{0440}\u{043e}\u{0432}\u{0435}\u{0440}\u{0435}");
-    m.insert("seconds", "\u{0441}\u{0435}\u{043a}\u{0443}\u{043d}\u{0434}\u{0438}");
-    m.insert("Startup", "\u{041f}\u{043e}\u{043a}\u{0440}\u{0435}\u{0442}\u{0430}\u{045a}\u{0435}");
+    m.insert(
+        "seconds",
+        "\u{0441}\u{0435}\u{043a}\u{0443}\u{043d}\u{0434}\u{0438}",
+    );
+    m.insert(
+        "Startup",
+        "\u{041f}\u{043e}\u{043a}\u{0440}\u{0435}\u{0442}\u{0430}\u{045a}\u{0435}",
+    );
     m.insert("General", "\u{041e}\u{043f}\u{0448}\u{0442}\u{0435}");
     m.insert("Back", "\u{2190} \u{041d}\u{0430}\u{0437}\u{0430}\u{0434}");
-    m.insert("Open Claude.ai \u{2192}", "\u{041e}\u{0442}\u{0432}\u{043e}\u{0440}\u{0438} Claude.ai \u{2192}");
+    m.insert(
+        "Open Claude.ai \u{2192}",
+        "\u{041e}\u{0442}\u{0432}\u{043e}\u{0440}\u{0438} Claude.ai \u{2192}",
+    );
     m.insert("ClaudeMeter", "ClaudeMeter");
     m.insert("CLAUDE", "CLAUDE");
     m.insert("CHATGPT / CODEX", "CHATGPT / CODEX");
@@ -86,13 +128,22 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Usage History (24h)", "\u{0418}\u{0441}\u{0442}\u{043e}\u{0440}\u{0438}\u{0458}\u{0430} \u{043a}\u{043e}\u{0440}\u{0438}\u{0448}\u{045b}\u{0435}\u{045a}\u{0430} (24h)");
     m.insert("Auto (English)", "Auto (English)");
     m.insert("at", "\u{0443}");
-    m.insert("Resets in", "\u{0420}\u{0435}\u{0441}\u{0435}\u{0442}\u{0443}\u{0458}\u{0435} \u{0437}\u{0430}");
-    m.insert("Tray icon colors:", "\u{0411}\u{043e}\u{0458}\u{0435} \u{0438}\u{043a}\u{043e}\u{043d}\u{0435}:");
+    m.insert(
+        "Resets in",
+        "\u{0420}\u{0435}\u{0441}\u{0435}\u{0442}\u{0443}\u{0458}\u{0435} \u{0437}\u{0430}",
+    );
+    m.insert(
+        "Tray icon colors:",
+        "\u{0411}\u{043e}\u{0458}\u{0435} \u{0438}\u{043a}\u{043e}\u{043d}\u{0435}:",
+    );
     m.insert("< 50% usage", "< 50%");
     m.insert("50-79% usage", "50\u{2013}79%");
     m.insert(">= 80% usage", "\u{2265} 80%");
     m.insert("No data", "\u{041d}\u{0435}\u{043c}\u{0430} \u{043f}\u{043e}\u{0434}\u{0430}\u{0442}\u{0430}\u{043a}\u{0430}");
-    m.insert("exceeded", "\u{043f}\u{0440}\u{0435}\u{043a}\u{043e}\u{0440}\u{0430}\u{0447}\u{0435}\u{043d}\u{043e}");
+    m.insert(
+        "exceeded",
+        "\u{043f}\u{0440}\u{0435}\u{043a}\u{043e}\u{0440}\u{0430}\u{0447}\u{0435}\u{043d}\u{043e}",
+    );
     m.insert("Show widget", "\u{041f}\u{0440}\u{0438}\u{043a}\u{0430}\u{0436}\u{0438} \u{0432}\u{0438}\u{045f}\u{0435}\u{0442}");
     m.insert("Check for updates", "\u{041f}\u{0440}\u{043e}\u{0432}\u{0435}\u{0440}\u{0438} \u{0430}\u{0436}\u{0443}\u{0440}\u{0438}\u{0440}\u{0430}\u{045a}\u{0430}");
     m.insert("Accessibility patterns", "\u{041e}\u{0431}\u{0440}\u{0430}\u{0441}\u{0446}\u{0438} \u{043f}\u{0440}\u{0438}\u{0441}\u{0442}\u{0443}\u{043f}\u{0430}\u{0447}\u{043d}\u{043e}\u{0441}\u{0442}\u{0438}");
@@ -101,15 +152,30 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
         "is available. Click to download.",
         "\u{0458}\u{0435} \u{0434}\u{043e}\u{0441}\u{0442}\u{0443}\u{043f}\u{043d}\u{043e}. \u{041a}\u{043b}\u{0438}\u{043a}\u{043d}\u{0438}\u{0442}\u{0435} \u{0437}\u{0430} \u{043f}\u{0440}\u{0435}\u{0443}\u{0437}\u{0438}\u{043c}\u{0430}\u{045a}\u{0435}.",
     );
-    m.insert("Icon style", "\u{0421}\u{0442}\u{0438}\u{043b} \u{0438}\u{043a}\u{043e}\u{043d}\u{0435}");
+    m.insert(
+        "Icon style",
+        "\u{0421}\u{0442}\u{0438}\u{043b} \u{0438}\u{043a}\u{043e}\u{043d}\u{0435}",
+    );
     m.insert("Number", "\u{0411}\u{0440}\u{043e}\u{0458}");
     m.insert("Ring", "\u{041f}\u{0440}\u{0441}\u{0442}\u{0435}\u{043d}");
     m.insert("Bar", "\u{0422}\u{0440}\u{0430}\u{043a}\u{0430}");
     m.insert("Pie", "\u{041a}\u{043e}\u{043b}\u{0430}\u{0447}");
     m.insert("Dashboard layout", "\u{0420}\u{0430}\u{0441}\u{043f}\u{043e}\u{0440}\u{0435}\u{0434} \u{043a}\u{043e}\u{043d}\u{0442}\u{0440}\u{043e}\u{043b}\u{043d}\u{0435} \u{0442}\u{0430}\u{0431}\u{043b}\u{0435}");
-    m.insert("Minimal", "\u{041c}\u{0438}\u{043d}\u{0438}\u{043c}\u{0430}\u{043b}\u{043d}\u{043e}");
-    m.insert("Standard", "\u{0421}\u{0442}\u{0430}\u{043d}\u{0434}\u{0430}\u{0440}\u{0434}\u{043d}\u{043e}");
-    m.insert("Detailed", "\u{0414}\u{0435}\u{0442}\u{0430}\u{0459}\u{043d}\u{043e}");
-    m.insert("Hide Extra Usage", "\u{0421}\u{0430}\u{043a}\u{0440}\u{0438}\u{0458} Extra Usage");
+    m.insert(
+        "Minimal",
+        "\u{041c}\u{0438}\u{043d}\u{0438}\u{043c}\u{0430}\u{043b}\u{043d}\u{043e}",
+    );
+    m.insert(
+        "Standard",
+        "\u{0421}\u{0442}\u{0430}\u{043d}\u{0434}\u{0430}\u{0440}\u{0434}\u{043d}\u{043e}",
+    );
+    m.insert(
+        "Detailed",
+        "\u{0414}\u{0435}\u{0442}\u{0430}\u{0459}\u{043d}\u{043e}",
+    );
+    m.insert(
+        "Hide Extra Usage",
+        "\u{0421}\u{0430}\u{043a}\u{0440}\u{0438}\u{0458} Extra Usage",
+    );
     m
 }
