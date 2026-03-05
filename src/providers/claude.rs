@@ -163,13 +163,14 @@ impl ClaudeClient {
 
         let status = response.status();
         if status.as_u16() == 429 {
-            let retry_after = response
+            let retry_secs: u64 = response
                 .headers()
                 .get("retry-after")
                 .and_then(|v| v.to_str().ok())
-                .unwrap_or("60")
-                .to_string();
-            return Err(format!("[rate_limited] Retry after {retry_after}s"));
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(60)
+                .max(1);
+            return Err(format!("[rate_limited] Retry after {retry_secs}s"));
         }
         if status.as_u16() == 401 || status.as_u16() == 403 {
             return Err("[token_expired] OAuth token expired or revoked".to_string());
