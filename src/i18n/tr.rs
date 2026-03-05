@@ -16,6 +16,18 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
         "credentials_not_found",
         "Kimlik bilgileri bulunamad\u{0131}",
     );
+    m.insert("connection_error", "Bağlantı hatası");
+    m.insert("token_expired", "Token süresi doldu");
+    m.insert(
+        "token_expired_desc",
+        "OAuth tokeninizin süresi doldu. Yenilemek için terminalinizde `claude login` komutunu çalıştırın.",
+    );
+    m.insert("rate_limited", "İstek sınırı");
+    m.insert("server_error", "Sunucu hatası");
+    m.insert(
+        "server_error_desc",
+        "Anthropic API geçici olarak kullanılamıyor. Otomatik olarak tekrar denenecek.",
+    );
     m.insert(
         "run_claude_login_desc",
         "Claude Code y\u{00fc}kl\u{00fc} ancak giri\u{015f} yap\u{0131}lmam\u{0131}\u{015f}. Terminalinizde `claude login` komutunu \u{00e7}al\u{0131}\u{015f}t\u{0131}r\u{0131}n.",

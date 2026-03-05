@@ -19,6 +19,18 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
         "credentials_not_found",
         "Kh\u{00f4}ng t\u{00ec}m th\u{1ea5}y th\u{00f4}ng tin \u{0111}\u{0103}ng nh\u{1ead}p",
     );
+    m.insert("connection_error", "L\u{1ed7}i k\u{1ebf}t n\u{1ed1}i");
+    m.insert("token_expired", "Token hết hạn");
+    m.insert(
+        "token_expired_desc",
+        "Token OAuth của bạn đã hết hạn. Chạy `claude login` trong terminal để làm mới.",
+    );
+    m.insert("rate_limited", "Giới hạn yêu cầu");
+    m.insert("server_error", "Lỗi máy chủ");
+    m.insert(
+        "server_error_desc",
+        "API Anthropic tạm thời không khả dụng. Sẽ tự động thử lại.",
+    );
     m.insert(
         "run_claude_login_desc",
         "Claude Code \u{0111}\u{00e3} c\u{00e0}i \u{0111}\u{1eb7}t nh\u{01b0}ng ch\u{01b0}a \u{0111}\u{0103}ng nh\u{1ead}p. Ch\u{1ea1}y `claude login` trong terminal.",

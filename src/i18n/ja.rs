@@ -23,6 +23,21 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     );
     m.insert("credentials_not_found", "\u{8a8d}\u{8a3c}\u{60c5}\u{5831}\u{304c}\u{898b}\u{3064}\u{304b}\u{308a}\u{307e}\u{305b}\u{3093}");
     m.insert(
+        "connection_error",
+        "\u{63a5}\u{7d9a}\u{30a8}\u{30e9}\u{30fc}",
+    );
+    m.insert("token_expired", "トークン期限切れ");
+    m.insert(
+        "token_expired_desc",
+        "OAuthトークンが期限切れです。ターミナルで `claude login` を実行して更新してください。",
+    );
+    m.insert("rate_limited", "レート制限");
+    m.insert("server_error", "サーバーエラー");
+    m.insert(
+        "server_error_desc",
+        "Anthropic APIが一時的に利用できません。自動的に再試行します。",
+    );
+    m.insert(
         "run_claude_login_desc",
         "Claude Code\u{306f}\u{30a4}\u{30f3}\u{30b9}\u{30c8}\u{30fc}\u{30eb}\u{6e08}\u{307f}\u{3067}\u{3059}\u{304c}\u{30ed}\u{30b0}\u{30a4}\u{30f3}\u{3055}\u{308c}\u{3066}\u{3044}\u{307e}\u{305b}\u{3093}\u{3002}\u{30bf}\u{30fc}\u{30df}\u{30ca}\u{30eb}\u{3067} `claude login` \u{3092}\u{5b9f}\u{884c}\u{3057}\u{3066}\u{304f}\u{3060}\u{3055}\u{3044}\u{3002}",
     );

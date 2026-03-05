@@ -16,6 +16,18 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
         "credentials_not_found",
         "Inloggningsuppgifter hittades inte",
     );
+    m.insert("connection_error", "Anslutningsfel");
+    m.insert("token_expired", "Token har utgått");
+    m.insert(
+        "token_expired_desc",
+        "Din OAuth-token har utgått. Kör `claude login` i terminalen för att förnya den.",
+    );
+    m.insert("rate_limited", "Hastighetsbegränsning");
+    m.insert("server_error", "Serverfel");
+    m.insert(
+        "server_error_desc",
+        "Anthropic API är tillfälligt otillgängligt. Försöker igen automatiskt.",
+    );
     m.insert(
         "run_claude_login_desc",
         "Claude Code är installerat men inte inloggat. Kör `claude login` i terminalen för att ansluta ditt konto.",

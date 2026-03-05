@@ -1537,9 +1537,24 @@ unsafe fn on_poll_result(hwnd: HWND, usage: Option<UsageResponse>, error: Option
         } else {
             // Poll failed — track for backoff
             state.consecutive_failures += 1;
+
+            // Start error blink if there's no cached data to show
+            if state.usage.is_none() && !state.blink_active {
+                state.blink_active = true;
+                state.blink_visible = true;
+                windows::Win32::UI::WindowsAndMessaging::SetTimer(
+                    state.main_hwnd,
+                    TIMER_BLINK,
+                    BLINK_INTERVAL_MS,
+                    None,
+                );
+            }
         }
 
-        state.usage = usage;
+        // Only overwrite usage when poll succeeded; keep previous data on failure
+        if usage.is_some() {
+            state.usage = usage;
+        }
         state.last_error = error;
 
         // Adjust polling interval with exponential backoff on failures

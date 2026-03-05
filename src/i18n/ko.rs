@@ -16,6 +16,18 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
         "Claude Code\u{b97c} \u{cc3e}\u{c744} \u{c218} \u{c5c6}\u{c2b5}\u{b2c8}\u{b2e4}",
     );
     m.insert("credentials_not_found", "\u{c778}\u{c99d} \u{c815}\u{bcf4}\u{b97c} \u{cc3e}\u{c744} \u{c218} \u{c5c6}\u{c2b5}\u{b2c8}\u{b2e4}");
+    m.insert("connection_error", "\u{c5f0}\u{acb0} \u{c624}\u{b958}");
+    m.insert("token_expired", "토큰 만료");
+    m.insert(
+        "token_expired_desc",
+        "OAuth 토큰이 만료되었습니다. 터미널에서 `claude login`을 실행하여 갱신하세요.",
+    );
+    m.insert("rate_limited", "요청 제한");
+    m.insert("server_error", "서버 오류");
+    m.insert(
+        "server_error_desc",
+        "Anthropic API가 일시적으로 사용할 수 없습니다. 자동으로 재시도합니다.",
+    );
     m.insert(
         "run_claude_login_desc",
         "Claude Code\u{ac00} \u{c124}\u{ce58}\u{b418}\u{c5c8}\u{c9c0}\u{b9cc} \u{b85c}\u{adf8}\u{c778}\u{b418}\u{c9c0} \u{c54a}\u{c558}\u{c2b5}\u{b2c8}\u{b2e4}. \u{d130}\u{bbf8}\u{b110}\u{c5d0}\u{c11c} `claude login`\u{c744} \u{c2e4}\u{d589}\u{d558}\u{c138}\u{c694}.",

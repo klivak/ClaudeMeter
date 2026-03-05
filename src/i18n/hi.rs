@@ -25,6 +25,18 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
         "Claude Code \u{0928}\u{0939}\u{0940}\u{0902} \u{092e}\u{093f}\u{0932}\u{093e}",
     );
     m.insert("credentials_not_found", "\u{0915}\u{094d}\u{0930}\u{0947}\u{0921}\u{0947}\u{0902}\u{0936}\u{093f}\u{092f}\u{0932} \u{0928}\u{0939}\u{0940}\u{0902} \u{092e}\u{093f}\u{0932}\u{0947}");
+    m.insert("connection_error", "\u{0915}\u{0928}\u{0947}\u{0915}\u{094d}\u{0936}\u{0928} \u{0924}\u{094d}\u{0930}\u{0941}\u{091f}\u{093f}");
+    m.insert("token_expired", "टोकन समाप्त");
+    m.insert(
+        "token_expired_desc",
+        "आपका OAuth टोकन समाप्त हो गया है। इसे नवीनीकृत करने के लिए टर्मिनल में `claude login` चलाएँ।",
+    );
+    m.insert("rate_limited", "अनुरोध सीमा");
+    m.insert("server_error", "सर्वर त्रुटि");
+    m.insert(
+        "server_error_desc",
+        "Anthropic API अस्थायी रूप से अनुपलब्ध है। स्वचालित रूप से पुनः प्रयास होगा।",
+    );
     m.insert(
         "run_claude_login_desc",
         "Claude Code \u{0907}\u{0902}\u{0938}\u{094d}\u{091f}\u{0949}\u{0932} \u{0939}\u{0948} \u{0932}\u{0947}\u{0915}\u{093f}\u{0928} \u{0932}\u{0949}\u{0917}\u{093f}\u{0928} \u{0928}\u{0939}\u{0940}\u{0902} \u{0939}\u{0948}\u{0964} \u{0905}\u{092a}\u{0928}\u{0947} \u{091f}\u{0930}\u{094d}\u{092e}\u{093f}\u{0928}\u{0932} \u{092e}\u{0947}\u{0902} `claude login` \u{091a}\u{0932}\u{093e}\u{090f}\u{0902}\u{0964}",

@@ -19,6 +19,18 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
         "credentials_not_found",
         "Hiteles\u{00ed}t\u{0151} adatok nem tal\u{00e1}lhat\u{00f3}k",
     );
+    m.insert("connection_error", "Csatlakoz\u{00e1}si hiba");
+    m.insert("token_expired", "Token lejárt");
+    m.insert(
+        "token_expired_desc",
+        "Az OAuth tokenje lejárt. Futtassa a `claude login` parancsot a terminálban a megújításhoz.",
+    );
+    m.insert("rate_limited", "Kéréskorlát");
+    m.insert("server_error", "Szerverhiba");
+    m.insert(
+        "server_error_desc",
+        "Az Anthropic API átmenetileg nem érhető el. Automatikusan újrapróbálkozik.",
+    );
     m.insert(
         "run_claude_login_desc",
         "A Claude Code telep\u{00ed}tve van, de nincs bejelentkezve. Futtasd a `claude login` parancsot a termin\u{00e1}lban a fi\u{00f3}kod \u{00f6}sszekapcsol\u{00e1}s\u{00e1}hoz.",

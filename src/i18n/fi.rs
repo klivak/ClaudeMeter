@@ -22,6 +22,18 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
         "credentials_not_found",
         "Tunnistetietoja ei l\u{00f6}ytynyt",
     );
+    m.insert("connection_error", "Yhteysvirhe");
+    m.insert("token_expired", "Token vanhentunut");
+    m.insert(
+        "token_expired_desc",
+        "OAuth-tokenisi on vanhentunut. Suorita `claude login` terminaalissa uusiaksesi sen.",
+    );
+    m.insert("rate_limited", "Pyyntöraja");
+    m.insert("server_error", "Palvelinvirhe");
+    m.insert(
+        "server_error_desc",
+        "Anthropic API ei ole tilapäisesti käytettävissä. Yritetään automaattisesti uudelleen.",
+    );
     m.insert(
         "run_claude_login_desc",
         "Claude Code on asennettu, mutta sis\u{00e4}\u{00e4}nkirjautumista ei ole tehty. Suorita `claude login` terminaalissa yhdist\u{00e4}\u{00e4}ksesi tilisi.",

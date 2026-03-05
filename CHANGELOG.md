@@ -5,6 +5,16 @@ All notable changes to ClaudeMeter will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] - 2026-03-05
+
+### Added
+- **Detailed error diagnostics** — instead of a generic "Claude Code not detected" for all failures, the app now shows specific error messages: token expired, network error, rate limited, server error, or credentials not found
+- **Error blink** — tray icon blinks when a poll error occurs and there is no cached data, stops when the user opens the popup
+- **Status link on error screen** — "Status ↗" link to status.claude.com is now shown on the error/not-detected screen, not just on the main dashboard
+
+### Fixed
+- **Data loss on transient errors** — previously, a single failed API poll would wipe all cached usage data and show "not detected"; now previous data is preserved until a successful poll replaces it
+
 ## [1.7.2] - 2026-03-03
 
 ### Added

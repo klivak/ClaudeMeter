@@ -19,6 +19,18 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
         "credentials_not_found",
         "\u{672a}\u{627e}\u{5230}\u{51ed}\u{636e}",
     );
+    m.insert("connection_error", "\u{8fde}\u{63a5}\u{9519}\u{8bef}");
+    m.insert("token_expired", "令牌已过期");
+    m.insert(
+        "token_expired_desc",
+        "您的OAuth令牌已过期。请在终端中运行 `claude login` 以刷新它。",
+    );
+    m.insert("rate_limited", "请求受限");
+    m.insert("server_error", "服务器错误");
+    m.insert(
+        "server_error_desc",
+        "Anthropic API 暂时不可用。将自动重试。",
+    );
     m.insert(
         "run_claude_login_desc",
         "Claude Code \u{5df2}\u{5b89}\u{88c5}\u{4f46}\u{672a}\u{767b}\u{5f55}\u{3002}\u{8bf7}\u{5728}\u{7ec8}\u{7aef}\u{8fd0}\u{884c} `claude login` \u{6765}\u{8fde}\u{63a5}\u{60a8}\u{7684}\u{8d26}\u{6237}\u{3002}",

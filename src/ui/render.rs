@@ -496,7 +496,9 @@ impl PopupRenderer {
                             colors,
                             i18n,
                             last_error,
+                            hovered,
                             install_rect,
+                            status_link_rect,
                         );
                     }
                     Some(u) => {
@@ -1102,26 +1104,78 @@ impl PopupRenderer {
         colors: &ThemeColors,
         i18n: &I18n,
         last_error: &Option<String>,
+        hovered: &HoveredElement,
         install_rect: &mut RECT,
+        status_link_rect: &mut RECT,
     ) -> f32 {
         let pad = self.sf(PADDING);
 
-        let is_cred_error = last_error
-            .as_ref()
-            .is_some_and(|e| e.contains("credentials not found"));
+        let err_str = last_error.as_deref().unwrap_or("");
+        let error_tag = err_str
+            .strip_prefix('[')
+            .and_then(|s| s.split_once(']'))
+            .map(|(tag, _)| tag);
 
-        let (title, desc, btn_label) = if is_cred_error {
-            (
+        let error_detail: String;
+        let (title, desc, btn_label): (&str, &str, &str) = match error_tag {
+            Some("token_expired") => (
+                i18n.t("token_expired"),
+                i18n.t("token_expired_desc"),
+                i18n.t("Open Claude.ai \u{2192}"),
+            ),
+            Some("network_error") => {
+                error_detail = err_str
+                    .strip_prefix("[network_error] ")
+                    .unwrap_or(err_str)
+                    .to_string();
+                (
+                    i18n.t("connection_error"),
+                    &error_detail,
+                    i18n.t("Open Claude.ai \u{2192}"),
+                )
+            }
+            Some("rate_limited") => {
+                error_detail = err_str
+                    .strip_prefix("[rate_limited] ")
+                    .unwrap_or(err_str)
+                    .to_string();
+                (
+                    i18n.t("rate_limited"),
+                    &error_detail,
+                    i18n.t("Open Claude.ai \u{2192}"),
+                )
+            }
+            Some("server_error") => (
+                i18n.t("server_error"),
+                i18n.t("server_error_desc"),
+                i18n.t("Open Claude.ai \u{2192}"),
+            ),
+            Some("api_error") => {
+                error_detail = err_str
+                    .strip_prefix("[api_error] ")
+                    .unwrap_or(err_str)
+                    .to_string();
+                (
+                    i18n.t("connection_error"),
+                    &error_detail,
+                    i18n.t("Open Claude.ai \u{2192}"),
+                )
+            }
+            _ if err_str.contains("credentials not found") => (
                 i18n.t("credentials_not_found"),
                 i18n.t("run_claude_login_desc"),
                 i18n.t("Open Claude.ai \u{2192}"),
-            )
-        } else {
-            (
+            ),
+            _ if err_str.contains("accessToken field not found") => (
+                i18n.t("credentials_not_found"),
+                i18n.t("run_claude_login_desc"),
+                i18n.t("Open Claude.ai \u{2192}"),
+            ),
+            _ => (
                 i18n.t("Claude Code not detected"),
                 i18n.t("install_claude_desc"),
                 i18n.t("Install Claude Code \u{2192}"),
-            )
+            ),
         };
 
         // Warning title
@@ -1212,7 +1266,37 @@ impl PopupRenderer {
             D2D1_DRAW_TEXT_OPTIONS_NONE,
             DWRITE_MEASURING_MODE_NATURAL,
         );
-        y += btn_h + self.sf(8);
+        y += btn_h + self.sf(12);
+
+        // "Status ↗" link
+        let status_str = format!("{} \u{2197}", i18n.t("Status"));
+        let status_text = wide(&status_str);
+        let status_format = d2d.get_text_format(10, false, 1, 1).clone();
+        let is_status_hovered = matches!(hovered, HoveredElement::StatusLink);
+        let status_color = if is_status_hovered {
+            lighten_d2d(&colorref_to_d2d(colors.accent), 0.3)
+        } else {
+            colorref_to_d2d(colors.accent)
+        };
+        let status_brush = rt
+            .CreateSolidColorBrush(&status_color as *const _, None)
+            .unwrap();
+        let sr = D2D_RECT_F {
+            left: pad,
+            top: y,
+            right: pad + self.sf(80),
+            bottom: y + self.sf(20),
+        };
+        *status_link_rect = to_win32_rect(&sr);
+        rt.DrawText(
+            &status_text[..status_text.len() - 1],
+            &status_format,
+            &sr,
+            &status_brush,
+            D2D1_DRAW_TEXT_OPTIONS_NONE,
+            DWRITE_MEASURING_MODE_NATURAL,
+        );
+        y += self.sf(24);
 
         y
     }

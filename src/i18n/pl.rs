@@ -13,6 +13,18 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Max", "Max");
     m.insert("Claude Code not detected", "Claude Code nie wykryto");
     m.insert("credentials_not_found", "Nie znaleziono danych logowania");
+    m.insert("connection_error", "Błąd połączenia");
+    m.insert("token_expired", "Token wygasł");
+    m.insert(
+        "token_expired_desc",
+        "Twój token OAuth wygasł. Uruchom `claude login` w terminalu, aby go odnowić.",
+    );
+    m.insert("rate_limited", "Limit zapytań");
+    m.insert("server_error", "Błąd serwera");
+    m.insert(
+        "server_error_desc",
+        "API Anthropic jest tymczasowo niedostępne. Ponowna próba nastąpi automatycznie.",
+    );
     m.insert(
         "run_claude_login_desc",
         "Claude Code jest zainstalowany, ale nie zalogowany. Uruchom `claude login` w terminalu.",

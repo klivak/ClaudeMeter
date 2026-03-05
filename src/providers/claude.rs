@@ -158,7 +158,7 @@ impl ClaudeClient {
             .header("anthropic-beta", ANTHROPIC_BETA)
             .send()
             .await
-            .map_err(|e| format!("HTTP request failed: {e}"))?;
+            .map_err(|e| format!("[network_error] {e}"))?;
 
         let status = response.status();
         if status.as_u16() == 429 {
@@ -168,11 +168,17 @@ impl ClaudeClient {
                 .and_then(|v| v.to_str().ok())
                 .unwrap_or("60")
                 .to_string();
-            return Err(format!("Rate limited (429). Retry after {retry_after}s"));
+            return Err(format!("[rate_limited] Retry after {retry_after}s"));
+        }
+        if status.as_u16() == 401 || status.as_u16() == 403 {
+            return Err("[token_expired] OAuth token expired or revoked".to_string());
+        }
+        if status.is_server_error() {
+            return Err(format!("[server_error] API returned {status}"));
         }
         if !status.is_success() {
             let body = response.text().await.unwrap_or_default();
-            return Err(format!("API returned {status}: {body}"));
+            return Err(format!("[api_error] API returned {status}: {body}"));
         }
 
         let value: serde_json::Value = response

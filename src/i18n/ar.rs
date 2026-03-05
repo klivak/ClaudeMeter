@@ -25,6 +25,18 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Max", "Max");
     m.insert("Claude Code not detected", "\u{0644}\u{0645} \u{064a}\u{062a}\u{0645} \u{0627}\u{0643}\u{062a}\u{0634}\u{0627}\u{0641} Claude Code");
     m.insert("credentials_not_found", "\u{0644}\u{0645} \u{064a}\u{062a}\u{0645} \u{0627}\u{0644}\u{0639}\u{062b}\u{0648}\u{0631} \u{0639}\u{0644}\u{0649} \u{0628}\u{064a}\u{0627}\u{0646}\u{0627}\u{062a} \u{0627}\u{0644}\u{0627}\u{0639}\u{062a}\u{0645}\u{0627}\u{062f}");
+    m.insert("connection_error", "\u{062e}\u{0637}\u{0623} \u{0641}\u{064a} \u{0627}\u{0644}\u{0627}\u{062a}\u{0635}\u{0627}\u{0644}");
+    m.insert("token_expired", "انتهت صلاحية الرمز");
+    m.insert(
+        "token_expired_desc",
+        "انتهت صلاحية رمز OAuth الخاص بك. قم بتشغيل `claude login` في الطرفية لتجديده.",
+    );
+    m.insert("rate_limited", "تم تجاوز حد الطلبات");
+    m.insert("server_error", "خطأ في الخادم");
+    m.insert(
+        "server_error_desc",
+        "واجهة Anthropic API غير متاحة مؤقتاً. ستتم إعادة المحاولة تلقائياً.",
+    );
     m.insert(
         "run_claude_login_desc",
         "Claude Code \u{0645}\u{062b}\u{0628}\u{062a} \u{0648}\u{0644}\u{0643}\u{0646} \u{0644}\u{0645} \u{064a}\u{062a}\u{0645} \u{062a}\u{0633}\u{062c}\u{064a}\u{0644} \u{0627}\u{0644}\u{062f}\u{062e}\u{0648}\u{0644}. \u{0634}\u{063a}\u{0651}\u{0644} `claude login` \u{0641}\u{064a} \u{0627}\u{0644}\u{0637}\u{0631}\u{0641}\u{064a}\u{0629} \u{0644}\u{0631}\u{0628}\u{0637} \u{062d}\u{0633}\u{0627}\u{0628}\u{0643}.",
