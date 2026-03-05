@@ -388,11 +388,20 @@ impl PopupRenderer {
         show_chatgpt: bool,
         compact: bool,
         dashboard_layout: &str,
+        hide_extra_usage: bool,
     ) -> i32 {
+        let extra_hidden = |u: &UsageResponse| -> usize {
+            if hide_extra_usage && u.extra.contains_key("extra_usage") {
+                1
+            } else {
+                0
+            }
+        };
+
         if compact {
             let metric_count = usage
                 .as_ref()
-                .map(|u| u.all_metrics().len())
+                .map(|u| u.all_metrics().len() - extra_hidden(u))
                 .unwrap_or(1)
                 .max(1) as i32;
             return self.scale(
@@ -424,7 +433,7 @@ impl PopupRenderer {
                     }
                     "detailed" => {
                         h += 24;
-                        let metric_count = u.all_metrics().len() as i32;
+                        let metric_count = (u.all_metrics().len() - extra_hidden(u)) as i32;
                         // Extra 28px per metric for sparkline
                         h += metric_count
                             * (METRIC_LABEL_H
@@ -438,7 +447,7 @@ impl PopupRenderer {
                     _ => {
                         // "standard"
                         h += 24;
-                        let metric_count = u.all_metrics().len() as i32;
+                        let metric_count = (u.all_metrics().len() - extra_hidden(u)) as i32;
                         h += metric_count
                             * (METRIC_LABEL_H + 4 + PROGRESS_H + 4 + RESET_LABEL_H + SECTION_GAP);
                     }
@@ -477,6 +486,7 @@ impl PopupRenderer {
         anim_values: &[f64],
         dashboard_layout: &str,
         rate_of_change: &HashMap<String, f64>,
+        hide_extra_usage: bool,
         settings_rect: &mut RECT,
         close_rect: &mut RECT,
         refresh_rect: &mut RECT,
@@ -515,7 +525,7 @@ impl PopupRenderer {
             y += self.sf(PADDING);
 
             if compact {
-                y = self.draw_compact_metrics(&rt, d2d, w, y, usage, colors);
+                y = self.draw_compact_metrics(&rt, d2d, w, y, usage, colors, hide_extra_usage);
             } else {
                 match usage {
                     None => {
@@ -545,6 +555,7 @@ impl PopupRenderer {
                                 anim_values,
                                 hovered,
                                 status_link_rect,
+                                hide_extra_usage,
                             );
                         }
                         "detailed" => {
@@ -561,6 +572,7 @@ impl PopupRenderer {
                                 chart_data,
                                 hovered,
                                 status_link_rect,
+                                hide_extra_usage,
                             );
                         }
                         _ => {
@@ -576,6 +588,7 @@ impl PopupRenderer {
                                 rate_of_change,
                                 hovered,
                                 status_link_rect,
+                                hide_extra_usage,
                             );
                         }
                     },
@@ -786,6 +799,7 @@ impl PopupRenderer {
         rate_of_change: &HashMap<String, f64>,
         hovered: &HoveredElement,
         status_link_rect: &mut RECT,
+        hide_extra_usage: bool,
     ) -> f32 {
         // Section header
         y = self.draw_section_header(
@@ -801,6 +815,9 @@ impl PopupRenderer {
         );
 
         for (i, (key, metric)) in usage.all_metrics().iter().enumerate() {
+            if hide_extra_usage && key == "extra_usage" {
+                continue;
+            }
             let util = if i < anim_values.len() {
                 anim_values[i]
             } else {
@@ -1099,6 +1116,7 @@ impl PopupRenderer {
         anim_values: &[f64],
         hovered: &HoveredElement,
         status_link_rect: &mut RECT,
+        hide_extra_usage: bool,
     ) -> f32 {
         let pad = self.sf(PADDING);
         let content_w = w - pad * 2.0;
@@ -1117,7 +1135,14 @@ impl PopupRenderer {
         );
 
         // Find highest utilization metric
-        let metrics = usage.all_metrics();
+        let all = usage.all_metrics();
+        let metrics: Vec<_> = if hide_extra_usage {
+            all.into_iter()
+                .filter(|(k, _)| k != "extra_usage")
+                .collect()
+        } else {
+            all
+        };
         let fallback_key = String::new();
         let fallback_metric = crate::providers::claude::UsageMetric {
             utilization: 0.0,
@@ -1305,6 +1330,7 @@ impl PopupRenderer {
         chart_data: &[f64],
         hovered: &HoveredElement,
         status_link_rect: &mut RECT,
+        hide_extra_usage: bool,
     ) -> f32 {
         // Section header
         y = self.draw_section_header(
@@ -1322,6 +1348,9 @@ impl PopupRenderer {
         let pad = self.sf(PADDING);
 
         for (i, (key, metric)) in usage.all_metrics().iter().enumerate() {
+            if hide_extra_usage && key == "extra_usage" {
+                continue;
+            }
             let util = if i < anim_values.len() {
                 anim_values[i]
             } else {
@@ -1478,6 +1507,7 @@ impl PopupRenderer {
         mut y: f32,
         usage: &Option<UsageResponse>,
         colors: &ThemeColors,
+        hide_extra_usage: bool,
     ) -> f32 {
         let pad = self.sf(PADDING);
         let content_w = w - pad * 2.0;
@@ -1486,6 +1516,7 @@ impl PopupRenderer {
             Some(u) => u
                 .all_metrics()
                 .iter()
+                .filter(|(k, _)| !hide_extra_usage || k != "extra_usage")
                 .map(|(k, m)| (format_metric_name(k), m.utilization))
                 .collect(),
             None => vec![("No data".to_string(), 0.0)],
@@ -2423,7 +2454,7 @@ pub unsafe fn draw_settings_panel(
     config: &crate::config::Config,
     back_rect: &mut RECT,
     close_rect: &mut RECT,
-    setting_rects: &mut [RECT; 10],
+    setting_rects: &mut [RECT; 11],
     hovered: &HoveredElement,
 ) {
     let Some(rt) = d2d.render_target.clone() else {
@@ -2650,6 +2681,15 @@ pub unsafe fn draw_settings_panel(
         (
             i18n.t("Dashboard layout").to_string(),
             i18n.t(&capitalize(&config.dashboard_layout)).to_string(),
+        ),
+        (
+            i18n.t("Hide Extra Usage").to_string(),
+            (if config.hide_extra_usage {
+                check_on
+            } else {
+                check_off
+            })
+            .to_string(),
         ),
     ];
 

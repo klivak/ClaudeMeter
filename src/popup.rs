@@ -69,6 +69,7 @@ impl PopupWindow {
             config.show_chatgpt_section,
             config.compact_mode,
             &config.dashboard_layout,
+            config.hide_extra_usage,
         )
     }
 }

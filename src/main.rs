@@ -95,7 +95,7 @@ struct AppState {
     chatgpt_link_rect: RECT,
     status_link_rect: RECT,
     back_rect: RECT,
-    setting_rects: [RECT; 10],
+    setting_rects: [RECT; 11],
     notification_tracker: NotificationTracker,
     exe_dir: std::path::PathBuf,
     chart_data: Vec<f64>,
@@ -248,7 +248,7 @@ unsafe fn run_message_loop(exe_dir: std::path::PathBuf, config_mgr: ConfigManage
         chatgpt_link_rect: RECT::default(),
         status_link_rect: RECT::default(),
         back_rect: RECT::default(),
-        setting_rects: [RECT::default(); 10],
+        setting_rects: [RECT::default(); 11],
         notification_tracker: NotificationTracker::new(),
         exe_dir,
         chart_data: Vec::new(),
@@ -622,6 +622,7 @@ unsafe extern "system" fn popup_wnd_proc(
                                         &state.anim_current,
                                         &state.config_mgr.config.dashboard_layout,
                                         &state.rate_of_change,
+                                        state.config_mgr.config.hide_extra_usage,
                                         &mut state.settings_rect,
                                         &mut state.close_rect,
                                         &mut state.refresh_rect,
@@ -692,6 +693,7 @@ unsafe extern "system" fn popup_wnd_proc(
                                         &state.anim_current,
                                         &state.config_mgr.config.dashboard_layout,
                                         &state.rate_of_change,
+                                        state.config_mgr.config.hide_extra_usage,
                                         &mut state.settings_rect,
                                         &mut state.close_rect,
                                         &mut state.refresh_rect,
@@ -749,6 +751,7 @@ unsafe extern "system" fn popup_wnd_proc(
                                     &state.anim_current,
                                     &state.config_mgr.config.dashboard_layout,
                                     &state.rate_of_change,
+                                    state.config_mgr.config.hide_extra_usage,
                                     &mut state.settings_rect,
                                     &mut state.close_rect,
                                     &mut state.refresh_rect,
@@ -945,6 +948,7 @@ unsafe extern "system" fn popup_wnd_proc(
                         state.config_mgr.config.show_chatgpt_section,
                         state.config_mgr.config.compact_mode,
                         &state.config_mgr.config.dashboard_layout,
+                        state.config_mgr.config.hide_extra_usage,
                     );
                     resize_popup(hwnd, h);
                     state.slide_anim_offset = -(crate::ui::render::POPUP_WIDTH as f32);
@@ -1057,6 +1061,14 @@ unsafe extern "system" fn popup_wnd_proc(
                         _ => "minimal",
                     };
                     state.config_mgr.config.dashboard_layout = next.to_string();
+                    state.config_mgr.save();
+                    let _ = windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, true);
+                } else if state.popup_in_settings
+                    && crate::popup::point_in_rect(pt, state.setting_rects[10])
+                {
+                    // Hide Extra Usage: toggle
+                    state.config_mgr.config.hide_extra_usage =
+                        !state.config_mgr.config.hide_extra_usage;
                     state.config_mgr.save();
                     let _ = windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, true);
                 } else if crate::popup::point_in_rect(pt, state.settings_rect) {
@@ -1237,7 +1249,7 @@ fn is_focus_assist_active() -> bool {
 fn settings_panel_height() -> i32 {
     let header_h = 40;
     let row_h = 38;
-    let num_rows = 10;
+    let num_rows = 11;
     let legend_h = 8 + 1 + 8 + 20 + (4 * 18); // sep + gap + title + 4 icon items
     let footer_h = 44;
     header_h + 8 + (num_rows * row_h) + legend_h + footer_h
@@ -1289,6 +1301,7 @@ unsafe fn show_popup(_main_hwnd: HWND) {
                 state.config_mgr.config.show_chatgpt_section,
                 state.config_mgr.config.compact_mode,
                 &state.config_mgr.config.dashboard_layout,
+                state.config_mgr.config.hide_extra_usage,
             )
         };
 
@@ -1992,6 +2005,7 @@ unsafe fn on_poll_result(hwnd: HWND, result: PollResult) {
                 state.config_mgr.config.show_chatgpt_section,
                 state.config_mgr.config.compact_mode,
                 &state.config_mgr.config.dashboard_layout,
+                state.config_mgr.config.hide_extra_usage,
             );
             resize_popup(state.popup_hwnd, h);
             let _ = windows::Win32::Graphics::Gdi::InvalidateRect(state.popup_hwnd, None, true);

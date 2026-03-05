@@ -158,5 +158,6 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Minimal", "Tối thiểu");
     m.insert("Standard", "Tiêu chuẩn");
     m.insert("Detailed", "Chi tiết");
+    m.insert("Hide Extra Usage", "Ẩn Extra Usage");
     m
 }

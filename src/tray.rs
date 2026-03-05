@@ -249,7 +249,7 @@ fn create_text_icon(text: &str, font_size: i32, color: ColorRef, text_color: u32
 
 /// Create a 16x16 icon with a circular progress ring.
 /// Ring fills clockwise from 12 o'clock based on percentage.
-fn create_ring_icon(pct: f64, color: ColorRef, bg_color: u32) -> Option<HICON> {
+fn create_ring_icon(pct: f64, color: ColorRef) -> Option<HICON> {
     const SIZE: i32 = 16;
 
     unsafe {
@@ -281,11 +281,8 @@ fn create_ring_icon(pct: f64, color: ColorRef, bg_color: u32) -> Option<HICON> {
 
         let pixels = std::slice::from_raw_parts_mut(bits as *mut u32, (SIZE * SIZE) as usize);
 
-        // Background color (ARGB)
-        let bg_r = (bg_color >> 16) & 0xFF;
-        let bg_g = (bg_color >> 8) & 0xFF;
-        let bg_b = bg_color & 0xFF;
-        let bg_pixel = 0xFF000000 | (bg_r << 16) | (bg_g << 8) | bg_b;
+        // Transparent background
+        let bg_pixel: u32 = 0x00000000;
 
         // Ring color from ColorRef (0x00BBGGRR)
         let cr = color.0;
@@ -294,8 +291,8 @@ fn create_ring_icon(pct: f64, color: ColorRef, bg_color: u32) -> Option<HICON> {
         let ring_b = (cr >> 16) & 0xFF;
         let ring_pixel = 0xFF000000 | (ring_r << 16) | (ring_g << 8) | ring_b;
 
-        // Track color (dim version of bg)
-        let track_pixel = 0xFF000000 | (0x50 << 16) | (0x50 << 8) | 0x50;
+        // Track color (semi-transparent gray)
+        let track_pixel = 0x80505050;
 
         let cx = 7.5_f64;
         let cy = 7.5_f64;
@@ -369,7 +366,7 @@ fn create_ring_icon(pct: f64, color: ColorRef, bg_color: u32) -> Option<HICON> {
 }
 
 /// Create a 16x16 icon with a vertical progress bar that fills upward.
-fn create_bar_icon(pct: f64, color: ColorRef, bg_color: u32) -> Option<HICON> {
+fn create_bar_icon(pct: f64, color: ColorRef) -> Option<HICON> {
     const SIZE: i32 = 16;
 
     unsafe {
@@ -401,11 +398,8 @@ fn create_bar_icon(pct: f64, color: ColorRef, bg_color: u32) -> Option<HICON> {
 
         let pixels = std::slice::from_raw_parts_mut(bits as *mut u32, (SIZE * SIZE) as usize);
 
-        // Background color (ARGB)
-        let bg_r = (bg_color >> 16) & 0xFF;
-        let bg_g = (bg_color >> 8) & 0xFF;
-        let bg_b = bg_color & 0xFF;
-        let bg_pixel = 0xFF000000 | (bg_r << 16) | (bg_g << 8) | bg_b;
+        // Transparent background
+        let bg_pixel: u32 = 0x00000000;
 
         // Bar color from ColorRef (0x00BBGGRR)
         let cr = color.0;
@@ -414,8 +408,8 @@ fn create_bar_icon(pct: f64, color: ColorRef, bg_color: u32) -> Option<HICON> {
         let bar_b = (cr >> 16) & 0xFF;
         let bar_pixel = 0xFF000000 | (bar_r << 16) | (bar_g << 8) | bar_b;
 
-        // Track color
-        let track_pixel = 0xFF000000 | (0x50 << 16) | (0x50 << 8) | 0x50;
+        // Track color (semi-transparent gray)
+        let track_pixel = 0x80505050;
 
         // Bar area: x=2..14 (12px wide), y=1..15 (14px tall)
         let bar_left = 2;
@@ -483,7 +477,7 @@ fn create_bar_icon(pct: f64, color: ColorRef, bg_color: u32) -> Option<HICON> {
 }
 
 /// Create a 16x16 icon with a pie chart showing metrics as proportional sectors.
-fn create_pie_icon(metrics: &[(f64, u32)], bg_color: u32) -> Option<HICON> {
+fn create_pie_icon(metrics: &[(f64, u32)]) -> Option<HICON> {
     const SIZE: i32 = 16;
 
     unsafe {
@@ -515,13 +509,11 @@ fn create_pie_icon(metrics: &[(f64, u32)], bg_color: u32) -> Option<HICON> {
 
         let pixels = std::slice::from_raw_parts_mut(bits as *mut u32, (SIZE * SIZE) as usize);
 
-        let bg_r = (bg_color >> 16) & 0xFF;
-        let bg_g = (bg_color >> 8) & 0xFF;
-        let bg_b = bg_color & 0xFF;
-        let bg_pixel = 0xFF000000 | (bg_r << 16) | (bg_g << 8) | bg_b;
+        // Transparent background
+        let bg_pixel: u32 = 0x00000000;
 
-        // Track color for unused portion
-        let track_pixel = 0xFF000000 | (0x50 << 16) | (0x50 << 8) | 0x50;
+        // Track color (semi-transparent gray)
+        let track_pixel = 0x80505050;
 
         let cx = 7.5_f64;
         let cy = 7.5_f64;
@@ -671,11 +663,10 @@ impl TrayIcon {
         let icon = if max_util.is_some() {
             let color_ref = color.to_colorref();
             let text_cr = color.text_colorref();
-            let bg_color: u32 = 0x2e2e2e;
             let pct = session_util.unwrap_or(max_util.unwrap_or(0.0));
             let dyn_icon = match icon_style {
-                "ring" => create_ring_icon(pct, color_ref, bg_color),
-                "bar" => create_bar_icon(pct, color_ref, bg_color),
+                "ring" => create_ring_icon(pct, color_ref),
+                "bar" => create_bar_icon(pct, color_ref),
                 "pie" => {
                     if let Some(u) = usage.as_ref() {
                         let pie_metrics: Vec<(f64, u32)> = u
@@ -686,9 +677,9 @@ impl TrayIcon {
                             .map(|(i, (_, m))| (m.utilization, PIE_PALETTE[i % PIE_PALETTE.len()]))
                             .collect();
                         if pie_metrics.is_empty() {
-                            create_ring_icon(0.0, color_ref, bg_color)
+                            create_ring_icon(0.0, color_ref)
                         } else {
-                            create_pie_icon(&pie_metrics, bg_color)
+                            create_pie_icon(&pie_metrics)
                         }
                     } else {
                         None

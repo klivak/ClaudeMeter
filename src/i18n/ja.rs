@@ -170,5 +170,6 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Minimal", "最小");
     m.insert("Standard", "標準");
     m.insert("Detailed", "詳細");
+    m.insert("Hide Extra Usage", "Extra Usageを非表示");
     m
 }

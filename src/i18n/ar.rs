@@ -179,5 +179,6 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Minimal", "الحد الأدنى");
     m.insert("Standard", "قياسي");
     m.insert("Detailed", "مفصل");
+    m.insert("Hide Extra Usage", "إخفاء Extra Usage");
     m
 }

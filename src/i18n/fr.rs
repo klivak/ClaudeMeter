@@ -116,5 +116,6 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Minimal", "Minimal");
     m.insert("Standard", "Standard");
     m.insert("Detailed", "Détaillé");
+    m.insert("Hide Extra Usage", "Masquer Extra Usage");
     m
 }

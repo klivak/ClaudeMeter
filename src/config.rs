@@ -76,6 +76,8 @@ pub struct Config {
     #[serde(default = "default_dashboard_layout")]
     pub dashboard_layout: String,
     #[serde(default)]
+    pub hide_extra_usage: bool,
+    #[serde(default)]
     pub custom_colors: CustomColors,
     #[serde(default)]
     pub quiet_hours: QuietHoursConfig,
@@ -111,6 +113,7 @@ impl Default for Config {
             accessibility_patterns: false,
             tray_icon_style: "number".to_string(),
             dashboard_layout: "standard".to_string(),
+            hide_extra_usage: false,
             custom_colors: CustomColors::default(),
             quiet_hours: QuietHoursConfig::default(),
         }
@@ -158,7 +161,8 @@ impl Config {
         // Validate language
         if ![
             "auto", "en", "uk", "es", "de", "fr", "pt", "ja", "ko", "zh", "it", "hi", "tr", "nl",
-            "pl", "vi", "ru", "th", "id", "sv", "cs", "ar", "ro", "da", "fi", "hu",
+            "pl", "vi", "ru", "th", "id", "sv", "cs", "ar", "ro", "da", "fi", "hu", "bg", "el",
+            "he", "ms", "no",
         ]
         .contains(&self.language.as_str())
         {

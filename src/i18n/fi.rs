@@ -128,5 +128,6 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Minimal", "Minimaalinen");
     m.insert("Standard", "Vakio");
     m.insert("Detailed", "Yksityiskohtainen");
+    m.insert("Hide Extra Usage", "Piilota Extra Usage");
     m
 }
