@@ -448,7 +448,7 @@ impl PopupRenderer {
         i18n: &I18n,
         chart_data: &[f64],
         reset_lines: &[f64],
-        chart_7d: bool,
+        chart_mode: u8,
         last_error: &Option<String>,
         hovered: &HoveredElement,
         anim_values: &[f64],
@@ -539,7 +539,7 @@ impl PopupRenderer {
                     y,
                     chart_data,
                     reset_lines,
-                    chart_7d,
+                    chart_mode,
                     colors,
                     i18n,
                     hovered,
@@ -1402,7 +1402,7 @@ impl PopupRenderer {
         mut y: f32,
         data: &[f64],
         reset_lines: &[f64],
-        chart_7d: bool,
+        chart_mode: u8,
         colors: &ThemeColors,
         i18n: &I18n,
         hovered: &HoveredElement,
@@ -1412,7 +1412,7 @@ impl PopupRenderer {
     ) -> f32 {
         let pad = self.sf(PADDING);
 
-        // Header with toggle: "Usage History   24h | 7d"
+        // Header with toggle: "Usage History   24h | 7d | 30d"
         let title = i18n.t("Usage History");
         let title_text = wide(title);
         let title_format = d2d.get_text_format(11, true, 0, 1).clone();
@@ -1433,111 +1433,73 @@ impl PopupRenderer {
             DWRITE_MEASURING_MODE_NATURAL,
         );
 
-        // Draw "24h | 7d" toggle on the right side
+        // Draw "24h | 7d | 30d" toggle on the right side
         let toggle_h = self.sf(18);
-        let toggle_w = self.sf(60);
+        let toggle_w = self.sf(96);
         let toggle_x = w - pad - toggle_w;
         let toggle_y = y;
 
         let is_hovered = matches!(hovered, HoveredElement::ChartToggle);
 
-        // "24h" label
-        let label_24h = "24h";
-        let label_7d = "7d";
-        let sep = " | ";
-        let toggle_str = format!("{}{}{}", label_24h, sep, label_7d);
-        let toggle_wide = wide(&toggle_str);
-
         let active_color = colorref_to_d2d(colors.accent);
         let inactive_color = colorref_to_d2d(colors.text_secondary);
 
-        // Draw the full toggle text, but highlight the active part
-        // First draw "24h" in active/inactive color
         let fmt_bold = d2d.get_text_format(10, true, 0, 0).clone();
         let fmt_normal = d2d.get_text_format(10, false, 0, 0).clone();
 
-        let label_24h_wide = wide(label_24h);
-        let brush_24h = if !chart_7d {
-            rt.CreateSolidColorBrush(&active_color as *const _, None)
-                .unwrap()
-        } else if is_hovered {
-            rt.CreateSolidColorBrush(&lighten_d2d(&inactive_color, 0.3) as *const _, None)
-                .unwrap()
-        } else {
-            rt.CreateSolidColorBrush(&inactive_color as *const _, None)
-                .unwrap()
-        };
-        let fmt_24h = if !chart_7d { &fmt_bold } else { &fmt_normal };
-        rt.DrawText(
-            &label_24h_wide[..label_24h_wide.len() - 1],
-            fmt_24h,
-            &D2D_RECT_F {
-                left: toggle_x,
-                top: toggle_y,
-                right: toggle_x + self.sf(22),
-                bottom: toggle_y + toggle_h,
-            },
-            &brush_24h,
-            D2D1_DRAW_TEXT_OPTIONS_NONE,
-            DWRITE_MEASURING_MODE_NATURAL,
-        );
+        let segments: &[(&str, u8)] = &[("24h", 0), (" | ", 255), ("7d", 1), (" | ", 255), ("30d", 2)];
+        let mut sx = toggle_x;
+        let seg_widths: &[i32] = &[22, 16, 14, 16, 24];
 
-        // Separator " | "
-        let sep_wide = wide(sep);
-        let sep_brush = rt
-            .CreateSolidColorBrush(&inactive_color as *const _, None)
-            .unwrap();
-        rt.DrawText(
-            &sep_wide[..sep_wide.len() - 1],
-            &fmt_normal,
-            &D2D_RECT_F {
-                left: toggle_x + self.sf(22),
-                top: toggle_y,
-                right: toggle_x + self.sf(38),
-                bottom: toggle_y + toggle_h,
-            },
-            &sep_brush,
-            D2D1_DRAW_TEXT_OPTIONS_NONE,
-            DWRITE_MEASURING_MODE_NATURAL,
-        );
+        for (i, &(label, mode)) in segments.iter().enumerate() {
+            let seg_w = self.sf(seg_widths[i]);
+            let label_wide = wide(label);
 
-        // "7d" label
-        let label_7d_wide = wide(label_7d);
-        let brush_7d = if chart_7d {
-            rt.CreateSolidColorBrush(&active_color as *const _, None)
-                .unwrap()
-        } else if is_hovered {
-            rt.CreateSolidColorBrush(&lighten_d2d(&inactive_color, 0.3) as *const _, None)
-                .unwrap()
-        } else {
-            rt.CreateSolidColorBrush(&inactive_color as *const _, None)
-                .unwrap()
-        };
-        let fmt_7d = if chart_7d { &fmt_bold } else { &fmt_normal };
-        rt.DrawText(
-            &label_7d_wide[..label_7d_wide.len() - 1],
-            fmt_7d,
-            &D2D_RECT_F {
-                left: toggle_x + self.sf(38),
-                top: toggle_y,
-                right: toggle_x + toggle_w,
-                bottom: toggle_y + toggle_h,
-            },
-            &brush_7d,
-            D2D1_DRAW_TEXT_OPTIONS_NONE,
-            DWRITE_MEASURING_MODE_NATURAL,
-        );
+            let (brush, fmt) = if mode == 255 {
+                // Separator
+                let b = rt
+                    .CreateSolidColorBrush(&inactive_color as *const _, None)
+                    .unwrap();
+                (b, fmt_normal.clone())
+            } else if chart_mode == mode {
+                let b = rt
+                    .CreateSolidColorBrush(&active_color as *const _, None)
+                    .unwrap();
+                (b, fmt_bold.clone())
+            } else if is_hovered {
+                let b = rt
+                    .CreateSolidColorBrush(&lighten_d2d(&inactive_color, 0.3) as *const _, None)
+                    .unwrap();
+                (b, fmt_normal.clone())
+            } else {
+                let b = rt
+                    .CreateSolidColorBrush(&inactive_color as *const _, None)
+                    .unwrap();
+                (b, fmt_normal.clone())
+            };
 
-        // Output toggle rect for hit-testing
+            rt.DrawText(
+                &label_wide[..label_wide.len() - 1],
+                &fmt,
+                &D2D_RECT_F {
+                    left: sx,
+                    top: toggle_y,
+                    right: sx + seg_w,
+                    bottom: toggle_y + toggle_h,
+                },
+                &brush,
+                D2D1_DRAW_TEXT_OPTIONS_NONE,
+                DWRITE_MEASURING_MODE_NATURAL,
+            );
+            sx += seg_w;
+        }
+
         *chart_toggle_rect_out = RECT {
             left: toggle_x as i32,
             top: toggle_y as i32,
             right: (toggle_x + toggle_w) as i32,
             bottom: (toggle_y + toggle_h) as i32,
         };
-
-        // Suppress unused variable warning
-        let _ = toggle_wide;
 
         y += self.sf(22);
 
@@ -1614,7 +1576,7 @@ impl PopupRenderer {
         }
 
         // Reset lines (dashed vertical) — only for 24h view
-        if !chart_7d && !reset_lines.is_empty() {
+        if chart_mode == 0 && !reset_lines.is_empty() {
             let reset_brush = rt
                 .CreateSolidColorBrush(&colorref_to_d2d(colors.accent) as *const _, None)
                 .unwrap();
@@ -1646,15 +1608,17 @@ impl PopupRenderer {
                 let val = data[idx];
                 let bar_w = (chart_w / data.len() as f32).max(2.0);
                 let bar_cx = pad + idx as f32 * bar_w + bar_w / 2.0;
-                let total_hours = if chart_7d { 168.0 } else { 24.0 };
+                let total_hours = match chart_mode {
+                    1 => 168.0,
+                    2 => 720.0,
+                    _ => 24.0,
+                };
                 let hours_ago = total_hours * (1.0 - (idx as f64 + 0.5) / data.len() as f64);
 
-                // Show actual clock time for this bar
                 let bar_time =
                     chrono::Local::now() - chrono::Duration::seconds((hours_ago * 3600.0) as i64);
-                let time_str = if chart_7d {
-                    // For 7d chart, show day + time
-                    bar_time.format("%a %H:%M").to_string()
+                let time_str = if chart_mode >= 1 {
+                    bar_time.format("%b %d").to_string()
                 } else if is_system_24h() {
                     bar_time.format("%H:%M").to_string()
                 } else {
@@ -1713,10 +1677,10 @@ impl PopupRenderer {
         y += chart_h + self.sf(4);
 
         // X-axis labels
-        let labels: &[&str] = if chart_7d {
-            &["7d", "5d", "4d", "2d", "now"]
-        } else {
-            &["24h", "18h", "12h", "6h", "now"]
+        let labels: &[&str] = match chart_mode {
+            1 => &["7d", "5d", "4d", "2d", "now"],
+            2 => &["30d", "22d", "15d", "7d", "now"],
+            _ => &["24h", "18h", "12h", "6h", "now"],
         };
         for (i, label) in labels.iter().enumerate() {
             let lx = pad + (i as f32 * chart_w / 4.0);

@@ -99,7 +99,8 @@ struct AppState {
     exe_dir: std::path::PathBuf,
     chart_data: Vec<f64>,
     chart_data_7d: Vec<f64>,
-    chart_7d: bool,
+    chart_data_30d: Vec<f64>,
+    chart_mode: u8, // 0=24h, 1=7d, 2=30d
     chart_reset_lines: Vec<f64>,
     // Chart hit-testing
     chart_rect: RECT,
@@ -245,7 +246,8 @@ unsafe fn run_message_loop(exe_dir: std::path::PathBuf, config_mgr: ConfigManage
         exe_dir,
         chart_data: Vec::new(),
         chart_data_7d: Vec::new(),
-        chart_7d: false,
+        chart_data_30d: Vec::new(),
+        chart_mode: 0,
         chart_reset_lines: Vec::new(),
         chart_rect: RECT::default(),
         chart_bar_count: 0,
@@ -368,6 +370,9 @@ unsafe fn run_message_loop(exe_dir: std::path::PathBuf, config_mgr: ConfigManage
             }
             if let Ok(slots) = db.query_7d_chart() {
                 state.chart_data_7d = slots;
+            }
+            if let Ok(slots) = db.query_30d_chart() {
+                state.chart_data_30d = slots;
             }
         }
     }
@@ -585,13 +590,13 @@ unsafe extern "system" fn popup_wnd_proc(
                                     state.config_mgr.config.compact_mode,
                                     &colors,
                                     &state.i18n,
-                                    if state.chart_7d {
-                                        &state.chart_data_7d
-                                    } else {
-                                        &state.chart_data
+                                    match state.chart_mode {
+                                        1 => &state.chart_data_7d,
+                                        2 => &state.chart_data_30d,
+                                        _ => &state.chart_data,
                                     },
                                     &state.chart_reset_lines,
-                                    state.chart_7d,
+                                    state.chart_mode,
                                     &state.last_error,
                                     &state.hovered_element,
                                     &state.anim_current,
@@ -879,7 +884,7 @@ unsafe extern "system" fn popup_wnd_proc(
                     resize_popup(hwnd, h);
                     let _ = windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, true);
                 } else if crate::popup::point_in_rect(pt, state.chart_toggle_rect) {
-                    state.chart_7d = !state.chart_7d;
+                    state.chart_mode = (state.chart_mode + 1) % 3;
                     let _ = windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, true);
                 } else if crate::popup::point_in_rect(pt, state.copy_rect) {
                     // Copy usage metrics to clipboard
@@ -1599,12 +1604,14 @@ unsafe fn on_poll_result(hwnd: HWND, result: PollResult) {
                         metric.resets_at.as_deref(),
                     );
                 }
-                // Load chart data (fixed 48-slot array, oldest first)
                 if let Ok(slots) = db.query_24h_chart() {
                     state.chart_data = slots;
                 }
                 if let Ok(slots) = db.query_7d_chart() {
                     state.chart_data_7d = slots;
+                }
+                if let Ok(slots) = db.query_30d_chart() {
+                    state.chart_data_30d = slots;
                 }
             }
 
