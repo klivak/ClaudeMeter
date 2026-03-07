@@ -167,6 +167,16 @@ fn main() {
         log::warn!("Database open check failed: {e}. History will not be saved.");
     }
 
+    // Sync autostart registry entry with current exe path on every launch.
+    // This handles the case where the user moved the exe to a different folder
+    // (e.g., after downloading a new release from GitHub).
+    if config_mgr.config.autostart {
+        let exe_path = exe_dir.join("claudemeter.exe").to_string_lossy().to_string();
+        if let Err(e) = autostart::set_autostart(true, &exe_path) {
+            log::warn!("Failed to sync autostart registry entry: {e}");
+        }
+    }
+
     unsafe { run_message_loop(exe_dir, config_mgr, i18n) };
 }
 
@@ -1014,7 +1024,9 @@ unsafe extern "system" fn popup_wnd_proc(
                         .join("claudemeter.exe")
                         .to_string_lossy()
                         .to_string();
-                    let _ = autostart::set_autostart(state.config_mgr.config.autostart, &exe_path);
+                    if let Err(e) = autostart::set_autostart(state.config_mgr.config.autostart, &exe_path) {
+                        log::warn!("Failed to set autostart: {e}");
+                    }
                     state.config_mgr.save();
                     let _ = windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, true);
                 } else if state.popup_in_settings
@@ -1641,7 +1653,9 @@ unsafe fn handle_menu_command(hwnd: HWND, cmd: u32) {
                     .ok()
                     .and_then(|p| p.to_str().map(|s| s.to_string()))
                     .unwrap_or_default();
-                let _ = autostart::set_autostart(new_val, &exe_path);
+                if let Err(e) = autostart::set_autostart(new_val, &exe_path) {
+                    log::warn!("Failed to set autostart: {e}");
+                }
             }
         }
         IDM_EXPORT_CSV => {
