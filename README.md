@@ -2,6 +2,8 @@
 
 # ⚡ ClaudeMeter
 
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/klivak)
+
 **Real-time Claude AI usage monitor for Windows — track your subscription limits from the system tray**
 
 Ultra-lightweight Rust app that monitors Claude Pro & Max usage caps in real time.
@@ -24,6 +26,9 @@ See your 5-hour session, weekly limits, Sonnet & Opus quotas — without opening
 <img src="screenshots/main.png" alt="ClaudeMeter dashboard showing Claude AI usage bars and reset timers" width="360"> <img src="screenshots/main2.png" alt="ClaudeMeter light theme with usage history chart" width="360">
 
 </div>
+
+---
+☕ [Buy me a coffee](https://ko-fi.com/klivak) if this project helped you
 
 ---
 
