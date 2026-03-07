@@ -171,7 +171,10 @@ fn main() {
     // This handles the case where the user moved the exe to a different folder
     // (e.g., after downloading a new release from GitHub).
     if config_mgr.config.autostart {
-        let exe_path = exe_dir.join("claudemeter.exe").to_string_lossy().to_string();
+        let exe_path = exe_dir
+            .join("claudemeter.exe")
+            .to_string_lossy()
+            .to_string();
         if let Err(e) = autostart::set_autostart(true, &exe_path) {
             log::warn!("Failed to sync autostart registry entry: {e}");
         }
@@ -1024,7 +1027,9 @@ unsafe extern "system" fn popup_wnd_proc(
                         .join("claudemeter.exe")
                         .to_string_lossy()
                         .to_string();
-                    if let Err(e) = autostart::set_autostart(state.config_mgr.config.autostart, &exe_path) {
+                    if let Err(e) =
+                        autostart::set_autostart(state.config_mgr.config.autostart, &exe_path)
+                    {
                         log::warn!("Failed to set autostart: {e}");
                     }
                     state.config_mgr.save();
