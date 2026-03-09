@@ -121,14 +121,25 @@ impl Default for Config {
 }
 
 impl Config {
-    /// Generate a random polling interval between 90-180 seconds.
+    /// Generate a random polling interval.
+    /// Within 15 minutes before the top of the hour: 120-180 seconds.
+    /// Otherwise: 120-300 seconds.
     /// Uses system time nanoseconds for simple randomness without external crate.
     pub fn random_polling_interval() -> u64 {
-        let nanos = std::time::SystemTime::now()
+        let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.subsec_nanos())
-            .unwrap_or(0);
-        90 + (nanos as u64 % 91) // 90 to 180 inclusive
+            .unwrap_or_default();
+        let secs = now.as_secs();
+        let minute_of_hour = (secs % 3600) / 60;
+        let nanos = now.subsec_nanos() as u64;
+
+        if minute_of_hour >= 45 {
+            // Last 15 minutes of the hour: 120-180s
+            120 + (nanos % 61)
+        } else {
+            // Normal: 120-300s
+            120 + (nanos % 181)
+        }
     }
 
     /// Validate and fix config values to safe ranges.
@@ -315,7 +326,7 @@ mod tests {
     fn test_random_polling_interval_range() {
         for _ in 0..100 {
             let interval = Config::random_polling_interval();
-            assert!((90..=180).contains(&interval));
+            assert!((120..=300).contains(&interval));
         }
     }
 

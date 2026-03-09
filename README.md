@@ -206,6 +206,8 @@ OpenAI does not provide a public API for checking ChatGPT Plus/Pro subscription 
 
 ### ⚙ Smart Polling
 
+- **Adaptive interval** — polls every 120–300s normally; tightens to 120–180s in the last 15 minutes before each hour (when limits are about to reset)
+- **Randomized timing** — each poll interval is randomly chosen to avoid predictable patterns
 - **Idle detection** — pauses API polling when PC is idle for 5+ minutes
 - **Exponential backoff** — on API errors, interval doubles (2x, 4x, 8x) up to 10 min cap
 - **Rate-limit handling** — graceful 429 response parsing with retry-after
