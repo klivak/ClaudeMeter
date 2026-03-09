@@ -67,12 +67,15 @@ const TIMER_ANIM: usize = 2;
 const TIMER_BLINK: usize = 3;
 const TIMER_FADE: usize = 4;
 const TIMER_SLIDE: usize = 5;
+const TIMER_CONFIG: usize = 6;
 const ANIM_INTERVAL_MS: u32 = 16; // ~60fps
+const CONFIG_CHECK_INTERVAL_MS: u32 = 5_000; // 5 seconds
 const BLINK_INTERVAL_MS: u32 = 500;
 const FADE_INTERVAL_MS: u32 = 16;
 const IDLE_TIMEOUT_MS: u32 = 5 * 60 * 1000; // 5 minutes
 const WM_POLL_RESULT: u32 = 0x0400 + 20; // WM_USER + 20
 const WM_UPDATE_AVAILABLE: u32 = 0x0400 + 21; // WM_USER + 21
+const WM_DB_RESULT: u32 = 0x0400 + 22; // WM_USER + 22
 
 /// Shared application state accessible from the window proc.
 struct AppState {
@@ -137,6 +140,8 @@ struct AppState {
     slide_anim_offset: f32,
     slide_anim_target: f32,
     slide_anim_active: bool,
+    // Cached resolved theme (updated by TIMER_CONFIG, not every paint)
+    cached_theme: crate::theme::ResolvedTheme,
 }
 
 // Safety: AppState is accessed only from the main thread via raw pointer.
@@ -242,6 +247,9 @@ unsafe fn run_message_loop(exe_dir: std::path::PathBuf, config_mgr: ConfigManage
         }
     };
 
+    // Resolve initial theme
+    let initial_theme = resolve_theme(ThemeMode::from_str(&config_mgr.config.theme));
+
     // Initialize app state
     APP_STATE = Some(AppState {
         config_mgr,
@@ -292,6 +300,7 @@ unsafe fn run_message_loop(exe_dir: std::path::PathBuf, config_mgr: ConfigManage
         slide_anim_offset: 0.0,
         slide_anim_target: 0.0,
         slide_anim_active: false,
+        cached_theme: initial_theme,
     });
 
     // Create tray icon
@@ -410,6 +419,14 @@ unsafe fn run_message_loop(exe_dir: std::path::PathBuf, config_mgr: ConfigManage
     let interval = crate::config::Config::random_polling_interval() as u32 * 1000;
     windows::Win32::UI::WindowsAndMessaging::SetTimer(main_hwnd, TIMER_POLL, interval, None);
 
+    // Config/theme refresh timer (every 5 seconds)
+    windows::Win32::UI::WindowsAndMessaging::SetTimer(
+        main_hwnd,
+        TIMER_CONFIG,
+        CONFIG_CHECK_INTERVAL_MS,
+        None,
+    );
+
     // Message loop
     let mut msg = MSG::default();
     loop {
@@ -506,6 +523,31 @@ unsafe extern "system" fn main_wnd_proc(
                         }
                     }
                 }
+            } else if wparam.0 == TIMER_CONFIG {
+                // Periodically check config file changes and refresh theme
+                if let Some(state) = APP_STATE.as_mut() {
+                    state.config_mgr.reload_if_changed();
+                    let theme_mode = ThemeMode::from_str(&state.config_mgr.config.theme);
+                    let resolved = resolve_theme(theme_mode);
+                    if resolved != state.cached_theme {
+                        state.cached_theme = resolved;
+                        // Repaint popup if visible
+                        if state.popup_visible {
+                            let _ = windows::Win32::Graphics::Gdi::InvalidateRect(
+                                state.popup_hwnd,
+                                None,
+                                true,
+                            );
+                        }
+                        // Refresh widget
+                        if let Some(w) = state.widget_hwnd {
+                            widget::invalidate_widget(w);
+                        }
+                    }
+                    // Update i18n if language changed
+                    let new_i18n = I18n::from_config(&state.config_mgr.config.language);
+                    state.i18n = new_i18n;
+                }
             }
             LRESULT(0)
         }
@@ -516,6 +558,29 @@ unsafe extern "system" fn main_wnd_proc(
             if !result_ptr.is_null() {
                 let result = *Box::from_raw(result_ptr);
                 on_poll_result(hwnd, result);
+            }
+            LRESULT(0)
+        }
+        WM_DB_RESULT => {
+            // DB query results received from background thread
+            let result_ptr = wparam.0 as *mut DbResult;
+            if !result_ptr.is_null() {
+                let db_result = *Box::from_raw(result_ptr);
+                if let Some(state) = APP_STATE.as_mut() {
+                    state.chart_data = db_result.chart_data;
+                    state.chart_data_7d = db_result.chart_data_7d;
+                    state.chart_data_30d = db_result.chart_data_30d;
+                    state.rate_of_change = db_result.rate_of_change;
+
+                    // Repaint popup if visible to show updated charts
+                    if state.popup_visible {
+                        let _ = windows::Win32::Graphics::Gdi::InvalidateRect(
+                            state.popup_hwnd,
+                            None,
+                            true,
+                        );
+                    }
+                }
             }
             LRESULT(0)
         }
@@ -574,9 +639,7 @@ unsafe extern "system" fn popup_wnd_proc(
             let _ = windows::Win32::UI::WindowsAndMessaging::GetClientRect(hwnd, &mut rect);
 
             if let Some(state) = APP_STATE.as_mut() {
-                state.config_mgr.reload_if_changed();
-                let theme_mode = ThemeMode::from_str(&state.config_mgr.config.theme);
-                let resolved = resolve_theme(theme_mode);
+                let resolved = state.cached_theme;
                 let colors = crate::ui::colors::ThemeColors::for_theme(resolved)
                     .with_overrides(&state.config_mgr.config.custom_colors);
 
@@ -1332,11 +1395,6 @@ unsafe fn resize_popup(popup_hwnd: HWND, h: i32) {
 
 unsafe fn show_popup(_main_hwnd: HWND) {
     if let Some(state) = APP_STATE.as_mut() {
-        state.config_mgr.reload_if_changed();
-
-        let theme_mode = ThemeMode::from_str(&state.config_mgr.config.theme);
-        let _resolved = resolve_theme(theme_mode);
-
         // Calculate height based on current mode
         let h = if state.popup_in_settings {
             settings_panel_height()
@@ -1764,6 +1822,14 @@ struct PollResult {
     token_expires_in_ms: Option<u64>,
 }
 
+/// Result of background DB operations, posted back to main thread via WM_DB_RESULT.
+struct DbResult {
+    chart_data: Vec<f64>,
+    chart_data_7d: Vec<f64>,
+    chart_data_30d: Vec<f64>,
+    rate_of_change: std::collections::HashMap<String, f64>,
+}
+
 async fn do_poll() -> PollResult {
     let cred_info = match credentials::read_claude_token() {
         Ok(info) => info,
@@ -1865,34 +1931,36 @@ unsafe fn on_poll_result(hwnd: HWND, result: PollResult) {
             state.consecutive_failures = 0;
             state.last_updated = Local::now().format("%H:%M:%S").to_string();
 
-            // Store to DB (best effort)
-            if let Ok(db) = Database::open(&state.exe_dir) {
-                for (key, metric) in u.all_metrics() {
-                    // Skip five_hour when no active session (resets_at is None)
-                    if key == "five_hour" && metric.resets_at.is_none() {
-                        continue;
+            // Store to DB and query charts on background thread
+            let metrics: Vec<(String, f64, Option<String>)> = u
+                .all_metrics()
+                .iter()
+                .filter(|(key, metric)| !(key == "five_hour" && metric.resets_at.is_none()))
+                .map(|(key, metric)| (key.clone(), metric.utilization, metric.resets_at.clone()))
+                .collect();
+            let exe_dir = state.exe_dir.clone();
+            let hwnd_val = hwnd.0 as isize;
+            std::thread::spawn(move || {
+                if let Ok(db) = Database::open(&exe_dir) {
+                    for (key, utilization, resets_at) in &metrics {
+                        let _ = db.insert("claude", key, *utilization, resets_at.as_deref());
                     }
-                    let _ = db.insert(
-                        "claude",
-                        &key,
-                        metric.utilization,
-                        metric.resets_at.as_deref(),
-                    );
+                    let chart_data = db.query_24h_chart().unwrap_or_default();
+                    let chart_data_7d = db.query_7d_chart().unwrap_or_default();
+                    let chart_data_30d = db.query_30d_chart().unwrap_or_default();
+                    let rate_of_change = db.query_rate_of_change(60).unwrap_or_default();
+                    let result = Box::new(DbResult {
+                        chart_data,
+                        chart_data_7d,
+                        chart_data_30d,
+                        rate_of_change,
+                    });
+                    let result_ptr = Box::into_raw(result) as isize;
+                    let hwnd = HWND(hwnd_val as *mut _);
+                    let _ =
+                        PostMessageW(hwnd, WM_DB_RESULT, WPARAM(result_ptr as usize), LPARAM(0));
                 }
-                if let Ok(slots) = db.query_24h_chart() {
-                    state.chart_data = slots;
-                }
-                if let Ok(slots) = db.query_7d_chart() {
-                    state.chart_data_7d = slots;
-                }
-                if let Ok(slots) = db.query_30d_chart() {
-                    state.chart_data_30d = slots;
-                }
-                // Compute rate of change
-                if let Ok(rates) = db.query_rate_of_change(60) {
-                    state.rate_of_change = rates;
-                }
-            }
+            });
 
             // Calculate 5-hour session reset lines for chart
             state.chart_reset_lines.clear();
