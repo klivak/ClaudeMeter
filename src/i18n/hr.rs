@@ -32,8 +32,8 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     );
     strings.insert("Install Claude Code →", "Instaliraj Claude Code →");
     strings.insert(
-        "codex_no_api",
-        "OpenAI ne nudi javni API za programsko praćenje potrošnje pretplate na Codex.",
+        "codex_no_data",
+        "Nema aktivnog prozora ograničenja za Codex. Potrošnja se čita iz lokalnih zapisa Codex sesija \u{2014} pokrenite ili nastavite sesiju i pojavit će se ovdje.",
     );
     strings.insert("Check your usage manually:", "Ručno provjerite potrošnju:");
     strings.insert("Open Codex Usage →", "Otvori potrošnju Codexa →");
@@ -119,5 +119,14 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
         "Show login expiry warning",
         "Prikaži upozorenje o isteku prijave",
     );
+    strings.insert("Alert thresholds", "Pragovi upozorenja");
+    strings.insert("Notification sound", "Zvuk obavijesti");
+    strings.insert("Test notification", "Probna obavijest");
+    strings.insert("Send", "Pošalji");
+    strings.insert("Pro", "Pro");
+    strings.insert("Max", "Max");
+    strings.insert("ClaudeMeter", "ClaudeMeter");
+    strings.insert("CLAUDE", "CLAUDE");
+    strings.insert("CODEX", "CODEX");
     strings
 }

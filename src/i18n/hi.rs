@@ -196,5 +196,22 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Standard", "मानक");
     m.insert("Detailed", "विस्तृत");
     m.insert("Hide Extra Usage", "Extra Usage छिपाएँ");
+    m.insert("stale_token_expired", "पुराना डेटा — टोकन समाप्त");
+    m.insert("stale_data", "पुराना डेटा — अंतिम ज्ञात");
+    m.insert("codex_no_data", "कोई सक्रिय Codex सीमा विंडो नहीं है। उपयोग स्थानीय Codex सत्र लॉग से पढ़ा जाता है — कोई सत्र शुरू करें या जारी रखें, यह यहाँ दिखेगा।");
+    m.insert("Open Codex Usage →", "Codex उपयोग खोलें →");
+    m.insert("Midnight", "मध्यरात्रि");
+    m.insert("Sunset", "सूर्यास्त");
+    m.insert("Show Codex section", "Codex अनुभाग दिखाएँ");
+    m.insert(
+        "Reopen the tray popup to refresh",
+        "रिफ़्रेश करने के लिए पॉपअप फिर खोलें",
+    );
+    m.insert("Show startup notification", "स्टार्टअप सूचना दिखाएँ");
+    m.insert("Show login expiry warning", "लॉगिन समाप्ति चेतावनी दिखाएँ");
+    m.insert("Alert thresholds", "अलर्ट सीमाएँ");
+    m.insert("Notification sound", "सूचना ध्वनि");
+    m.insert("Test notification", "परीक्षण सूचना");
+    m.insert("Send", "भेजें");
     m
 }

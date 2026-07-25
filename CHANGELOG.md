@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [5.7.0] - 2026-07-26
+
+### Added
+
+- **Cached data is now visible in the tray** — when the numbers on screen are not confirmed live (OAuth token expired, or no successful poll since launch), the tray icon turns gray instead of showing a stale percentage in a confident green/yellow/red. The tooltip explains why: *"Cached — token expired, run: claude login"* or *"Cached — last known values"*. Previously the tray silently displayed the last known limit as if it were current.
+
+### Changed
+
+- **Clearer Codex empty state** — when no Codex limit window is active the panel said "OpenAI does not provide a public API…", which read as "this will never work". It now explains that usage is read from local Codex session logs and appears as soon as you start or continue a Codex session.
+- **Full translation coverage in all 40 languages** — 39 locales were silently falling back to English for up to 14 strings (stale-data labels, Codex section, alert thresholds, notification settings, theme names). Every locale now carries its own translation for every key, and a test (`test_all_locales_have_full_key_coverage`) fails the build if a new key is added without translating it everywhere.
+
 ## [5.6.0] - 2026-07-23
 
 ### Fixed

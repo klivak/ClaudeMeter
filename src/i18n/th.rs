@@ -115,5 +115,19 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Standard", "มาตรฐาน");
     m.insert("Detailed", "ละเอียด");
     m.insert("Hide Extra Usage", "ซ่อน Extra Usage");
+    m.insert("stale_token_expired", "ข้อมูลเก่า — โทเคนหมดอายุ");
+    m.insert("stale_data", "ข้อมูลเก่า — ค่าที่ทราบล่าสุด");
+    m.insert("codex_no_data", "ไม่มีหน้าต่างลิมิตของ Codex ที่ใช้งานอยู่ ข้อมูลการใช้งานอ่านจากบันทึกเซสชัน Codex ในเครื่อง — เริ่มหรือทำเซสชันต่อ แล้วข้อมูลจะปรากฏที่นี่");
+    m.insert("Open Codex Usage →", "เปิดการใช้งาน Codex →");
+    m.insert("Midnight", "เที่ยงคืน");
+    m.insert("Sunset", "พระอาทิตย์ตก");
+    m.insert("Show Codex section", "แสดงส่วน Codex");
+    m.insert("Reopen the tray popup to refresh", "เปิดหน้าต่างใหม่เพื่อรีเฟรช");
+    m.insert("Show startup notification", "แสดงการแจ้งเตือนเมื่อเริ่มทำงาน");
+    m.insert("Show login expiry warning", "เตือนเมื่อการเข้าสู่ระบบหมดอายุ");
+    m.insert("Alert thresholds", "เกณฑ์การแจ้งเตือน");
+    m.insert("Notification sound", "เสียงแจ้งเตือน");
+    m.insert("Test notification", "ทดสอบการแจ้งเตือน");
+    m.insert("Send", "ส่ง");
     m
 }

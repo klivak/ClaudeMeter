@@ -136,5 +136,25 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Standard", "Vakio");
     m.insert("Detailed", "Yksityiskohtainen");
     m.insert("Hide Extra Usage", "Piilota Extra Usage");
+    m.insert("stale_token_expired", "Vanhentunut — token vanhentui");
+    m.insert("stale_data", "Vanhentunut — viimeksi tiedetyt");
+    m.insert("codex_no_data", "Ei aktiivista Codexin rajaikkunaa. Käyttö luetaan paikallisista Codex-istuntolokeista — aloita tai jatka istuntoa, niin se näkyy tässä.");
+    m.insert("Open Codex Usage →", "Avaa Codexin käyttö →");
+    m.insert("Midnight", "Keskiyö");
+    m.insert("Sunset", "Auringonlasku");
+    m.insert("Show Codex section", "Näytä Codex-osio");
+    m.insert(
+        "Reopen the tray popup to refresh",
+        "Avaa ikkuna uudelleen päivittääksesi",
+    );
+    m.insert("Show startup notification", "Näytä käynnistysilmoitus");
+    m.insert(
+        "Show login expiry warning",
+        "Varoita kirjautumisen vanhenemisesta",
+    );
+    m.insert("Alert thresholds", "Hälytysrajat");
+    m.insert("Notification sound", "Ilmoitusääni");
+    m.insert("Test notification", "Testi-ilmoitus");
+    m.insert("Send", "Lähetä");
     m
 }

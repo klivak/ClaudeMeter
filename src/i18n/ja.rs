@@ -181,5 +181,22 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Standard", "標準");
     m.insert("Detailed", "詳細");
     m.insert("Hide Extra Usage", "Extra Usageを非表示");
+    m.insert("stale_token_expired", "古いデータ — トークンの期限切れ");
+    m.insert("stale_data", "古いデータ — 最後に取得した値");
+    m.insert("codex_no_data", "有効な Codex の制限ウィンドウがありません。使用量はローカルの Codex セッションログから読み取られます。セッションを開始または再開するとここに表示されます。");
+    m.insert("Open Codex Usage →", "Codex の使用状況を開く →");
+    m.insert("Midnight", "ミッドナイト");
+    m.insert("Sunset", "サンセット");
+    m.insert("Show Codex section", "Codex セクションを表示");
+    m.insert(
+        "Reopen the tray popup to refresh",
+        "更新するにはポップアップを開き直してください",
+    );
+    m.insert("Show startup notification", "起動時の通知を表示");
+    m.insert("Show login expiry warning", "ログイン期限切れの警告を表示");
+    m.insert("Alert thresholds", "アラートのしきい値");
+    m.insert("Notification sound", "通知音");
+    m.insert("Test notification", "テスト通知");
+    m.insert("Send", "送信");
     m
 }

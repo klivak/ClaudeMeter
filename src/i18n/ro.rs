@@ -130,5 +130,28 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Standard", "Standard");
     m.insert("Detailed", "Detaliat");
     m.insert("Hide Extra Usage", "Ascunde Extra Usage");
+    m.insert("stale_token_expired", "Învechit — token expirat");
+    m.insert("stale_data", "Învechit — ultimele valori cunoscute");
+    m.insert("codex_no_data", "Nicio fereastră activă de limite Codex. Utilizarea este citită din jurnalele locale ale sesiunilor Codex — începe sau continuă o sesiune și va apărea aici.");
+    m.insert("Open Codex Usage →", "Deschide utilizarea Codex →");
+    m.insert("Midnight", "Miezul nopții");
+    m.insert("Sunset", "Apus");
+    m.insert("Show Codex section", "Afișează secțiunea Codex");
+    m.insert(
+        "Reopen the tray popup to refresh",
+        "Redeschide fereastra pentru reîmprospătare",
+    );
+    m.insert(
+        "Show startup notification",
+        "Afișează notificarea la pornire",
+    );
+    m.insert(
+        "Show login expiry warning",
+        "Avertizează la expirarea autentificării",
+    );
+    m.insert("Alert thresholds", "Praguri de alertă");
+    m.insert("Notification sound", "Sunet de notificare");
+    m.insert("Test notification", "Notificare de test");
+    m.insert("Send", "Trimite");
     m
 }

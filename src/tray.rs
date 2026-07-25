@@ -647,7 +647,20 @@ impl TrayIcon {
         Ok(())
     }
 
-    pub fn update(&mut self, usage: &Option<UsageResponse>, tooltip: &str, icon_style: &str) {
+    /// Update the tray icon.
+    ///
+    /// `stale` means the numbers shown are cached, not confirmed live (expired
+    /// OAuth token, or no successful poll this session). In that case the icon
+    /// is drawn in gray regardless of utilization so the tray itself signals
+    /// "this is last known data", instead of silently showing a stale percent
+    /// in a confident green/yellow/red.
+    pub fn update(
+        &mut self,
+        usage: &Option<UsageResponse>,
+        tooltip: &str,
+        icon_style: &str,
+        stale: bool,
+    ) {
         let max_util = usage.as_ref().and_then(|u| u.max_utilization());
 
         // If active session (five_hour with resets_at), show its %; otherwise show "..."
@@ -659,7 +672,11 @@ impl TrayIcon {
 
         // Icon color matches the displayed value: session % when active, max otherwise
         let displayed_util = session_util.or(max_util);
-        let color = TrayIconColor::from_utilization(displayed_util);
+        let color = if stale {
+            TrayIconColor::Gray
+        } else {
+            TrayIconColor::from_utilization(displayed_util)
+        };
 
         let icon = if max_util.is_some() {
             let color_ref = color.to_colorref();
@@ -799,11 +816,37 @@ fn error_tooltip_label(err: &str) -> &'static str {
     }
 }
 
+/// Whether the displayed numbers are cached rather than confirmed live.
+///
+/// Mirrors the popup footer logic: the data is stale when the OAuth token is
+/// expired (no refresh possible until `claude login`), or when no successful
+/// poll has happened this session. A transient error right after a successful
+/// refresh is not stale — those numbers are seconds old.
+pub fn is_stale(last_error: &Option<String>, last_updated: &str) -> bool {
+    let token_expired = last_error.as_deref().is_some_and(|error| {
+        crate::errors::classify(error) == crate::errors::ErrorKind::TokenExpired
+    });
+    token_expired || (last_error.is_some() && last_updated == "(cached)")
+}
+
+/// Short "why is this cached" line for the tray/widget tooltip.
+fn stale_tooltip_label(last_error: &Option<String>) -> &'static str {
+    let token_expired = last_error.as_deref().is_some_and(|error| {
+        crate::errors::classify(error) == crate::errors::ErrorKind::TokenExpired
+    });
+    if token_expired {
+        "\u{26a0} Cached \u{2014} token expired, run: claude login"
+    } else {
+        "\u{26a0} Cached \u{2014} last known values"
+    }
+}
+
 /// Build full tooltip text without truncation (used by widget tooltip).
 pub fn build_tooltip_full(
     usage: &Option<UsageResponse>,
     show_chatgpt: bool,
     last_error: &Option<String>,
+    last_updated: &str,
 ) -> String {
     use crate::i18n::format_duration;
     use crate::providers::claude::format_metric_name;
@@ -824,6 +867,9 @@ pub fn build_tooltip_full(
         }
         Some(u) => {
             lines.push(format!("Claude ({})", u.detected_plan()));
+            if is_stale(last_error, last_updated) {
+                lines.push(stale_tooltip_label(last_error).to_string());
+            }
             for (key, metric) in u.all_metrics() {
                 let name = format_metric_name(&key);
                 let reset_str = metric
@@ -850,6 +896,7 @@ pub fn build_tooltip(
     usage: &Option<UsageResponse>,
     _show_chatgpt: bool,
     last_error: &Option<String>,
+    last_updated: &str,
 ) -> String {
     use crate::i18n::format_duration;
     use crate::providers::claude::format_metric_name;
@@ -873,12 +920,16 @@ pub fn build_tooltip(
             } else {
                 plan
             };
+            let stale = is_stale(last_error, last_updated);
             let header = if last_error.is_some() {
                 format!("Claude ({}) \u{26a0}", compact_plan)
             } else {
                 format!("Claude ({})", compact_plan)
             };
             lines.push(header);
+            if stale {
+                lines.push(stale_tooltip_label(last_error).to_string());
+            }
 
             let all = u.all_metrics();
             let extra_metrics: Vec<_> = all

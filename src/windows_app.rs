@@ -75,7 +75,7 @@ pub(crate) struct AppState {
     i18n: I18n,
     tray: Option<TrayIcon>,
     pub(crate) usage: Option<UsageResponse>,
-    last_updated: String,
+    pub(crate) last_updated: String,
     pub(crate) last_error: Option<String>,
     pub(crate) main_hwnd: HWND,
     popup_hwnd: HWND,
@@ -595,10 +595,13 @@ unsafe extern "system" fn main_wnd_proc(
                                 &state.usage,
                                 state.config_mgr.config.show_chatgpt_section,
                                 &state.last_error,
+                                &state.last_updated,
                             );
-                            tray.update(&state.usage, &tooltip, style);
+                            let stale =
+                                crate::tray::is_stale(&state.last_error, &state.last_updated);
+                            tray.update(&state.usage, &tooltip, style, stale);
                         } else {
-                            tray.update(&None, "ClaudeMeter", style);
+                            tray.update(&None, "ClaudeMeter", style, false);
                         }
                     }
                 }
@@ -1359,9 +1362,11 @@ unsafe extern "system" fn popup_wnd_proc(
                         &state.usage,
                         state.config_mgr.config.show_chatgpt_section,
                         &state.last_error,
+                        &state.last_updated,
                     );
+                    let stale = crate::tray::is_stale(&state.last_error, &state.last_updated);
                     if let Some(tray) = &mut state.tray {
-                        tray.update(&state.usage, &tooltip, next);
+                        tray.update(&state.usage, &tooltip, next, stale);
                     }
                     let _ = windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, true);
                 } else if state.popup_in_settings
@@ -1780,10 +1785,12 @@ unsafe fn show_popup(_main_hwnd: HWND) {
                 &state.usage,
                 state.config_mgr.config.show_chatgpt_section,
                 &state.last_error,
+                &state.last_updated,
             );
+            let stale = crate::tray::is_stale(&state.last_error, &state.last_updated);
             if let Some(tray) = &mut state.tray {
                 let style = &state.config_mgr.config.tray_icon_style.clone();
-                tray.update(&state.usage, &tooltip, style);
+                tray.update(&state.usage, &tooltip, style, stale);
             }
         }
 
@@ -2672,10 +2679,12 @@ unsafe fn on_poll_result(hwnd: HWND, result: PollResult) {
             &state.usage,
             state.config_mgr.config.show_chatgpt_section,
             &state.last_error,
+            &state.last_updated,
         );
+        let stale = crate::tray::is_stale(&state.last_error, &state.last_updated);
         if let Some(tray) = &mut state.tray {
             let style = &state.config_mgr.config.tray_icon_style.clone();
-            tray.update(&state.usage, &tooltip, style);
+            tray.update(&state.usage, &tooltip, style, stale);
         }
 
         // Refresh popup if visible (resize + repaint)

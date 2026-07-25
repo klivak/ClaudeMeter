@@ -29,8 +29,8 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     strings.insert("install_claude_desc", "Instalējiet Claude Code un palaidiet `claude login`, lai iespējotu automātisku lietojuma uzskaiti.");
     strings.insert("Install Claude Code →", "Instalēt Claude Code →");
     strings.insert(
-        "codex_no_api",
-        "OpenAI nepiedāvā publisku API Codex abonementa lietojuma programmatiskai uzskaitei.",
+        "codex_no_data",
+        "Nav aktīva Codex limitu loga. Lietojums tiek nolasīts no vietējiem Codex sesiju žurnāliem \u{2014} sāciet vai turpiniet sesiju, un tas parādīsies šeit.",
     );
     strings.insert(
         "Check your usage manually:",
@@ -116,5 +116,14 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
         "Show login expiry warning",
         "Rādīt pieteikšanās termiņa brīdinājumu",
     );
+    strings.insert("Alert thresholds", "Brīdinājumu sliekšņi");
+    strings.insert("Notification sound", "Paziņojuma skaņa");
+    strings.insert("Test notification", "Testa paziņojums");
+    strings.insert("Send", "Sūtīt");
+    strings.insert("Pro", "Pro");
+    strings.insert("Max", "Max");
+    strings.insert("ClaudeMeter", "ClaudeMeter");
+    strings.insert("CLAUDE", "CLAUDE");
+    strings.insert("CODEX", "CODEX");
     strings
 }

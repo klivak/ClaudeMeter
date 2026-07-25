@@ -294,6 +294,7 @@ unsafe extern "system" fn widget_wnd_proc(
                         &state.usage,
                         state.config_mgr.config.show_chatgpt_section,
                         &state.last_error,
+                        &state.last_updated,
                     )
                 } else {
                     "ClaudeMeter".to_string()

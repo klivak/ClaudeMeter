@@ -133,5 +133,22 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Standard", "Standart");
     m.insert("Detailed", "Detaylı");
     m.insert("Hide Extra Usage", "Extra Usage gizle");
+    m.insert("stale_token_expired", "Eski veri — belirteç süresi doldu");
+    m.insert("stale_data", "Eski veri — son bilinen değerler");
+    m.insert("codex_no_data", "Etkin bir Codex limit penceresi yok. Kullanım, yerel Codex oturum günlüklerinden okunur — bir oturum başlatın veya sürdürün, burada görünecektir.");
+    m.insert("Open Codex Usage →", "Codex kullanımını aç →");
+    m.insert("Midnight", "Gece yarısı");
+    m.insert("Sunset", "Gün batımı");
+    m.insert("Show Codex section", "Codex bölümünü göster");
+    m.insert(
+        "Reopen the tray popup to refresh",
+        "Yenilemek için pencereyi yeniden açın",
+    );
+    m.insert("Show startup notification", "Başlangıç bildirimini göster");
+    m.insert("Show login expiry warning", "Oturum süresi dolma uyarısı");
+    m.insert("Alert thresholds", "Uyarı eşikleri");
+    m.insert("Notification sound", "Bildirim sesi");
+    m.insert("Test notification", "Test bildirimi");
+    m.insert("Send", "Gönder");
     m
 }

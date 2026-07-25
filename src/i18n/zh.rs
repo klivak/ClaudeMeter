@@ -151,5 +151,19 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Standard", "标准");
     m.insert("Detailed", "详细");
     m.insert("Hide Extra Usage", "隐藏Extra Usage");
+    m.insert("stale_token_expired", "数据已过时 — 令牌已过期");
+    m.insert("stale_data", "数据已过时 — 最后已知值");
+    m.insert("codex_no_data", "当前没有活动的 Codex 限额窗口。用量读取自本地 Codex 会话日志 — 开始或继续一个会话后即会显示在这里。");
+    m.insert("Open Codex Usage →", "打开 Codex 用量 →");
+    m.insert("Midnight", "午夜");
+    m.insert("Sunset", "日落");
+    m.insert("Show Codex section", "显示 Codex 区块");
+    m.insert("Reopen the tray popup to refresh", "重新打开弹窗以刷新");
+    m.insert("Show startup notification", "显示启动通知");
+    m.insert("Show login expiry warning", "显示登录过期警告");
+    m.insert("Alert thresholds", "提醒阈值");
+    m.insert("Notification sound", "通知声音");
+    m.insert("Test notification", "测试通知");
+    m.insert("Send", "发送");
     m
 }

@@ -169,5 +169,22 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Standard", "표준");
     m.insert("Detailed", "상세");
     m.insert("Hide Extra Usage", "Extra Usage 숨기기");
+    m.insert("stale_token_expired", "오래된 데이터 — 토큰 만료");
+    m.insert("stale_data", "오래된 데이터 — 마지막 확인 값");
+    m.insert("codex_no_data", "활성화된 Codex 제한 창이 없습니다. 사용량은 로컬 Codex 세션 로그에서 읽습니다. 세션을 시작하거나 이어가면 여기에 표시됩니다.");
+    m.insert("Open Codex Usage →", "Codex 사용량 열기 →");
+    m.insert("Midnight", "미드나이트");
+    m.insert("Sunset", "선셋");
+    m.insert("Show Codex section", "Codex 섹션 표시");
+    m.insert(
+        "Reopen the tray popup to refresh",
+        "새로 고치려면 팝업을 다시 여세요",
+    );
+    m.insert("Show startup notification", "시작 알림 표시");
+    m.insert("Show login expiry warning", "로그인 만료 경고 표시");
+    m.insert("Alert thresholds", "알림 임계값");
+    m.insert("Notification sound", "알림 소리");
+    m.insert("Test notification", "테스트 알림");
+    m.insert("Send", "보내기");
     m
 }

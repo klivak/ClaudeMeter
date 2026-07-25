@@ -124,5 +124,28 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Standard", "Standard");
     m.insert("Detailed", "Détaillé");
     m.insert("Hide Extra Usage", "Masquer Extra Usage");
+    m.insert("stale_token_expired", "Obsolète — jeton expiré");
+    m.insert("stale_data", "Obsolète — dernières valeurs connues");
+    m.insert("codex_no_data", "Aucune fenêtre de limites Codex active. L'utilisation est lue dans les journaux locaux des sessions Codex : lancez ou poursuivez une session et elle apparaîtra ici.");
+    m.insert("Open Codex Usage →", "Ouvrir l'utilisation de Codex →");
+    m.insert("Midnight", "Minuit");
+    m.insert("Sunset", "Coucher de soleil");
+    m.insert("Show Codex section", "Afficher la section Codex");
+    m.insert(
+        "Reopen the tray popup to refresh",
+        "Rouvrez la fenêtre pour actualiser",
+    );
+    m.insert(
+        "Show startup notification",
+        "Afficher la notification au démarrage",
+    );
+    m.insert(
+        "Show login expiry warning",
+        "Alerter à l'expiration de la connexion",
+    );
+    m.insert("Alert thresholds", "Seuils d'alerte");
+    m.insert("Notification sound", "Son de notification");
+    m.insert("Test notification", "Notification de test");
+    m.insert("Send", "Envoyer");
     m
 }

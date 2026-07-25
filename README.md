@@ -152,14 +152,15 @@ On macOS, use the menu bar item → **Enable Autostart**. The app uses a LaunchA
 
 ### Codex (Optional)
 
-OpenAI does not provide a public API for checking Codex subscription usage. Instead, ClaudeMeter reads your local `~/.codex` logs to show **live Codex usage** directly in the dashboard — a "CODEX · Plan" header with rolling-window progress bars, rendered in a distinct teal hue so they read as a different provider from Claude's bars. Codex also appears in compact mode, where every row is prefixed with `CLAUDE ·` or `CODEX ·` for clarity. If no local Codex logs are found, the panel falls back to a direct Codex usage link. Enable the panel in Settings; a small hint reminds you to reopen the tray popup so its size refreshes.
+OpenAI does not provide a public API for checking Codex subscription usage. Instead, ClaudeMeter reads your local `~/.codex` logs to show **live Codex usage** directly in the dashboard — a "CODEX · Plan" header with rolling-window progress bars, rendered in a distinct teal hue so they read as a different provider from Claude's bars. Codex also appears in compact mode, where every row is prefixed with `CLAUDE ·` or `CODEX ·` for clarity. If no Codex limit window is currently active, the panel says so and explains that usage is read from local session logs — start or continue a Codex session and it appears — alongside a direct Codex usage link. Enable the panel in Settings; a small hint reminds you to reopen the tray popup so its size refreshes.
 
 ### System Tray
 
 - **🔢 Dynamic % icon** — shows actual utilization number (e.g. "42") with color-coded background
 - **⭕ Icon styles** — choose between Number (default), Ring (circular progress), Bar (vertical fill), or Pie (multi-metric pie chart) in Settings
 - **🟢🟡🔴 Color coding** — green (<50%), yellow (50-79%), red (>=80%), gray (no data) with transparent icon backgrounds
-- **💬 Rich tooltip** — hover to see all metrics, reset times, and plan info
+- **⚪ Gray when cached** — if the token expired or no live poll has succeeded, the icon turns gray so a stale percentage is never shown as if it were current
+- **💬 Rich tooltip** — hover to see all metrics, reset times, and plan info; cached data adds a line explaining why (e.g. *"Cached — token expired, run: claude login"*)
 - **📋 Context menu** — right-click for refresh, export CSV, settings, links
 - **📊 Dashboard** — left-click to open the detailed popup
 - **⚠ Blink on critical** — tray icon blinks when usage exceeds 90%

@@ -40,8 +40,8 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
         "Встановити Claude Code \u{2192}",
     );
     m.insert(
-        "codex_no_api",
-        "OpenAI не надає публічного API для відстеження використання підписки Codex.",
+        "codex_no_data",
+        "Немає активного вікна лімітів Codex. Дані беруться з локальних логів сесій Codex \u{2014} почніть або продовжте сесію, і вони з'являться тут.",
     );
     m.insert(
         "Check your usage manually:",

@@ -214,5 +214,22 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
         "Hide Extra Usage",
         "\u{067e}\u{0646}\u{0647}\u{0627}\u{0646} \u{06a9}\u{0631}\u{062f}\u{0646} Extra Usage",
     );
+    m.insert("stale_token_expired", "داده قدیمی — توکن منقضی شده");
+    m.insert("stale_data", "داده قدیمی — آخرین مقادیر");
+    m.insert("codex_no_data", "هیچ بازهٔ محدودیت فعالی برای Codex وجود ندارد. مصرف از گزارش‌های محلی جلسات Codex خوانده می‌شود — جلسه‌ای را آغاز یا ادامه دهید تا اینجا نمایش داده شود.");
+    m.insert("Open Codex Usage →", "باز کردن مصرف Codex →");
+    m.insert("Midnight", "نیمه‌شب");
+    m.insert("Sunset", "غروب");
+    m.insert("Show Codex section", "نمایش بخش Codex");
+    m.insert(
+        "Reopen the tray popup to refresh",
+        "برای به‌روزرسانی پنجره را دوباره باز کنید",
+    );
+    m.insert("Show startup notification", "نمایش اعلان هنگام شروع");
+    m.insert("Show login expiry warning", "هشدار انقضای ورود");
+    m.insert("Alert thresholds", "آستانه‌های هشدار");
+    m.insert("Notification sound", "صدای اعلان");
+    m.insert("Test notification", "اعلان آزمایشی");
+    m.insert("Send", "ارسال");
     m
 }

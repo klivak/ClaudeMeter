@@ -193,5 +193,25 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
         "Hide Extra Usage",
         "\u{0421}\u{043a}\u{0440}\u{0438}\u{0439} Extra Usage",
     );
+    m.insert("stale_token_expired", "Остарели — токенът е изтекъл");
+    m.insert("stale_data", "Остарели — последно известни");
+    m.insert("codex_no_data", "Няма активен прозорец с лимити на Codex. Данните се четат от локалните дневници на сесиите на Codex — започнете или продължете сесия и ще се появят тук.");
+    m.insert("Open Codex Usage →", "Отвори използването на Codex →");
+    m.insert("Midnight", "Полунощ");
+    m.insert("Sunset", "Залез");
+    m.insert("Show Codex section", "Показвай секцията Codex");
+    m.insert(
+        "Reopen the tray popup to refresh",
+        "Отворете прозореца отново за обновяване",
+    );
+    m.insert("Show startup notification", "Известие при стартиране");
+    m.insert(
+        "Show login expiry warning",
+        "Предупреждение за изтичащ вход",
+    );
+    m.insert("Alert thresholds", "Прагове за предупреждение");
+    m.insert("Notification sound", "Звук на известията");
+    m.insert("Test notification", "Тестово известие");
+    m.insert("Send", "Изпрати");
     m
 }

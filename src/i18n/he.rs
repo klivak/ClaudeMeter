@@ -220,5 +220,22 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
         "Hide Extra Usage",
         "\u{05d4}\u{05e1}\u{05ea}\u{05e8} Extra Usage",
     );
+    m.insert("stale_token_expired", "נתונים ישנים — הטוקן פג");
+    m.insert("stale_data", "נתונים ישנים — הערכים האחרונים");
+    m.insert("codex_no_data", "אין חלון מגבלות פעיל ל-Codex. השימוש נקרא מיומני הסשנים המקומיים של Codex — התחילו או המשיכו סשן והוא יופיע כאן.");
+    m.insert("Open Codex Usage →", "פתח שימוש ב-Codex →");
+    m.insert("Midnight", "חצות");
+    m.insert("Sunset", "שקיעה");
+    m.insert("Show Codex section", "הצג את מקטע Codex");
+    m.insert(
+        "Reopen the tray popup to refresh",
+        "פתחו שוב את החלון כדי לרענן",
+    );
+    m.insert("Show startup notification", "הצג התראה בהפעלה");
+    m.insert("Show login expiry warning", "התראה על פקיעת ההתחברות");
+    m.insert("Alert thresholds", "ספי התראה");
+    m.insert("Notification sound", "צליל התראה");
+    m.insert("Test notification", "התראת בדיקה");
+    m.insert("Send", "שלח");
     m
 }

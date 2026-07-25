@@ -205,5 +205,25 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
         "Hide Extra Usage",
         "\u{0391}\u{03c0}\u{03cc}\u{03ba}\u{03c1}\u{03c5}\u{03c8}\u{03b7} Extra Usage",
     );
+    m.insert("stale_token_expired", "Παλαιά δεδομένα — το token έληξε");
+    m.insert("stale_data", "Παλαιά δεδομένα — τελευταία γνωστά");
+    m.insert("codex_no_data", "Δεν υπάρχει ενεργό παράθυρο ορίων Codex. Η χρήση διαβάζεται από τα τοπικά αρχεία καταγραφής συνεδριών Codex — ξεκινήστε ή συνεχίστε μια συνεδρία και θα εμφανιστεί εδώ.");
+    m.insert("Open Codex Usage →", "Άνοιγμα χρήσης Codex →");
+    m.insert("Midnight", "Μεσάνυχτα");
+    m.insert("Sunset", "Ηλιοβασίλεμα");
+    m.insert("Show Codex section", "Εμφάνιση ενότητας Codex");
+    m.insert(
+        "Reopen the tray popup to refresh",
+        "Ανοίξτε ξανά το παράθυρο για ανανέωση",
+    );
+    m.insert(
+        "Show startup notification",
+        "Εμφάνιση ειδοποίησης εκκίνησης",
+    );
+    m.insert("Show login expiry warning", "Προειδοποίηση λήξης σύνδεσης");
+    m.insert("Alert thresholds", "Όρια ειδοποιήσεων");
+    m.insert("Notification sound", "Ήχος ειδοποίησης");
+    m.insert("Test notification", "Δοκιμαστική ειδοποίηση");
+    m.insert("Send", "Αποστολή");
     m
 }

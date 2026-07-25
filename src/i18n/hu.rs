@@ -160,5 +160,28 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Standard", "Alapértelmezett");
     m.insert("Detailed", "Részletes");
     m.insert("Hide Extra Usage", "Extra Usage elrejtése");
+    m.insert("stale_token_expired", "Elavult — a token lejárt");
+    m.insert("stale_data", "Elavult — utolsó ismert");
+    m.insert("codex_no_data", "Nincs aktív Codex limitablak. A használat a helyi Codex munkamenet-naplókból olvasható — indíts vagy folytass egy munkamenetet, és itt megjelenik.");
+    m.insert("Open Codex Usage →", "Codex-használat megnyitása →");
+    m.insert("Midnight", "Éjfél");
+    m.insert("Sunset", "Naplemente");
+    m.insert("Show Codex section", "Codex szakasz megjelenítése");
+    m.insert(
+        "Reopen the tray popup to refresh",
+        "A frissítéshez nyisd meg újra az ablakot",
+    );
+    m.insert(
+        "Show startup notification",
+        "Indítási értesítés megjelenítése",
+    );
+    m.insert(
+        "Show login expiry warning",
+        "Figyelmeztetés a bejelentkezés lejártára",
+    );
+    m.insert("Alert thresholds", "Riasztási küszöbök");
+    m.insert("Notification sound", "Értesítési hang");
+    m.insert("Test notification", "Teszt értesítés");
+    m.insert("Send", "Küldés");
     m
 }

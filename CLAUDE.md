@@ -75,6 +75,13 @@ cargo audit
 - **Logging:** Use `log` crate with `env_logger`. Default level: `warn`. Set `RUST_LOG=debug` for verbose.
 - **Config:** All user-facing settings in `config.json` next to .exe. No registry for config. No AppData.
 - **i18n:** All user-visible strings must go through `t("key")` function. Never hardcode display text.
+- **i18n coverage:** Every locale must carry its **own** translation for every key in `en.rs` —
+  the English fallback in `t()` is a safety net, never an accepted state. Whenever you add,
+  rename, or remove a key in `src/i18n/en.rs`, update **all** locale files in the same change.
+  Helpers: `python scripts/i18n_missing.py missing.json` reports per-locale gaps, and
+  `scripts/i18n_fill.json` + `python scripts/i18n_fill.py` append new translations in bulk.
+  The `test_all_locales_have_full_key_coverage` test in `src/i18n/mod.rs` enforces this — it
+  fails the build if any locale is missing a key.
 - **Theme:** All colors must come from `colors.rs` theme palette. Never hardcode color values in rendering code.
 - **Memory:** Keep allocations minimal. No caching of large data structures. Target: under 10 MB RSS.
 - **Naming:** snake_case for files/functions, PascalCase for types/structs, SCREAMING_SNAKE for constants.

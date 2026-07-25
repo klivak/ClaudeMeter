@@ -2513,7 +2513,7 @@ impl PopupRenderer {
             }
             y += self.sf(24);
 
-            let info = format!("\u{24D8} {}", i18n.t("codex_no_api"));
+            let info = format!("\u{24D8} {}", i18n.t("codex_no_data"));
             let info_text = wide(&info);
             let info_format = d2d.get_text_format_wrap(11, false);
             let info_brush = rt

@@ -575,16 +575,27 @@ mod tests {
         assert_eq!(en.metric_name("seven_day_fable"), "Fable (7-day)");
     }
 
+    /// Every locale must translate every English key — no locale is allowed to
+    /// fall back to English for a string that exists in `en.rs`.
     #[test]
-    fn test_new_locales_have_full_key_coverage() {
+    fn test_all_locales_have_full_key_coverage() {
         let english = en::strings();
-        for locale in [Locale::Ca, Locale::Hr, Locale::Et, Locale::Lv, Locale::Lt] {
-            let localized = I18n::new(locale);
-            assert_eq!(localized.strings.len(), english.len());
-            assert!(english
+        for locale in Locale::all() {
+            let localized = I18n::new(*locale);
+            let missing: Vec<&str> = english
                 .keys()
-                .all(|key| localized.strings.contains_key(key)));
-            assert_ne!(localized.t("Settings"), "Settings");
+                .filter(|key| !localized.strings.contains_key(*key))
+                .copied()
+                .collect();
+            assert!(
+                missing.is_empty(),
+                "locale {:?} is missing translations for {:?}",
+                locale,
+                missing
+            );
+            if *locale != Locale::En {
+                assert_ne!(localized.t("Settings"), "Settings");
+            }
         }
         assert_eq!(Locale::all().len(), 40);
     }

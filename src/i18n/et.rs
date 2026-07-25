@@ -32,8 +32,8 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     );
     strings.insert("Install Claude Code →", "Installi Claude Code →");
     strings.insert(
-        "codex_no_api",
-        "OpenAI ei paku avalikku API-t Codexi tellimuse kasutuse programmiliseks jälgimiseks.",
+        "codex_no_data",
+        "Aktiivset Codexi limiidiakent pole. Kasutus loetakse kohalikest Codexi seansilogidest \u{2014} alusta või jätka seanssi ja see ilmub siia.",
     );
     strings.insert("Check your usage manually:", "Kontrolli kasutust käsitsi:");
     strings.insert("Open Codex Usage →", "Ava Codexi kasutus →");
@@ -116,5 +116,14 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
         "Show login expiry warning",
         "Kuva sisselogimise aegumise hoiatus",
     );
+    strings.insert("Alert thresholds", "Hoiatuse lävendid");
+    strings.insert("Notification sound", "Teavituse heli");
+    strings.insert("Test notification", "Testteavitus");
+    strings.insert("Send", "Saada");
+    strings.insert("Pro", "Pro");
+    strings.insert("Max", "Max");
+    strings.insert("ClaudeMeter", "ClaudeMeter");
+    strings.insert("CLAUDE", "CLAUDE");
+    strings.insert("CODEX", "CODEX");
     strings
 }

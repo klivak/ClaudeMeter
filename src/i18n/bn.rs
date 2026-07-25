@@ -202,5 +202,22 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
         "Hide Extra Usage",
         "Extra Usage \u{09b2}\u{09c1}\u{0995}\u{09be}\u{09a8}",
     );
+    m.insert("stale_token_expired", "পুরোনো — টোকেনের মেয়াদ শেষ");
+    m.insert("stale_data", "পুরোনো — সর্বশেষ জানা মান");
+    m.insert("codex_no_data", "কোনো সক্রিয় Codex সীমা উইন্ডো নেই। ব্যবহার স্থানীয় Codex সেশন লগ থেকে পড়া হয় — একটি সেশন শুরু বা চালিয়ে যান, তখন এটি এখানে দেখা যাবে।");
+    m.insert("Open Codex Usage →", "Codex ব্যবহার খুলুন →");
+    m.insert("Midnight", "মধ্যরাত");
+    m.insert("Sunset", "সূর্যাস্ত");
+    m.insert("Show Codex section", "Codex বিভাগ দেখান");
+    m.insert(
+        "Reopen the tray popup to refresh",
+        "রিফ্রেশ করতে পপআপ আবার খুলুন",
+    );
+    m.insert("Show startup notification", "চালুর বিজ্ঞপ্তি দেখান");
+    m.insert("Show login expiry warning", "লগইন মেয়াদ শেষের সতর্কতা দেখান");
+    m.insert("Alert thresholds", "সতর্কতার সীমা");
+    m.insert("Notification sound", "বিজ্ঞপ্তির শব্দ");
+    m.insert("Test notification", "পরীক্ষামূলক বিজ্ঞপ্তি");
+    m.insert("Send", "পাঠান");
     m
 }

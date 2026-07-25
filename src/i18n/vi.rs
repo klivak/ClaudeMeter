@@ -169,5 +169,25 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Standard", "Tiêu chuẩn");
     m.insert("Detailed", "Chi tiết");
     m.insert("Hide Extra Usage", "Ẩn Extra Usage");
+    m.insert("stale_token_expired", "Dữ liệu cũ — token đã hết hạn");
+    m.insert("stale_data", "Dữ liệu cũ — giá trị biết cuối cùng");
+    m.insert("codex_no_data", "Không có cửa sổ giới hạn Codex đang hoạt động. Mức dùng được đọc từ nhật ký phiên Codex cục bộ — hãy bắt đầu hoặc tiếp tục một phiên, dữ liệu sẽ hiện ở đây.");
+    m.insert("Open Codex Usage →", "Mở mức dùng Codex →");
+    m.insert("Midnight", "Nửa đêm");
+    m.insert("Sunset", "Hoàng hôn");
+    m.insert("Show Codex section", "Hiện mục Codex");
+    m.insert(
+        "Reopen the tray popup to refresh",
+        "Mở lại cửa sổ để làm mới",
+    );
+    m.insert("Show startup notification", "Hiện thông báo khi khởi động");
+    m.insert(
+        "Show login expiry warning",
+        "Cảnh báo khi đăng nhập hết hạn",
+    );
+    m.insert("Alert thresholds", "Ngưỡng cảnh báo");
+    m.insert("Notification sound", "Âm thanh thông báo");
+    m.insert("Test notification", "Thông báo thử");
+    m.insert("Send", "Gửi");
     m
 }

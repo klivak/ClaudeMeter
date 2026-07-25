@@ -121,5 +121,28 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Standard", "Standard");
     m.insert("Detailed", "Detalyado");
     m.insert("Hide Extra Usage", "Itago ang Extra Usage");
+    m.insert("stale_token_expired", "Luma na — expired ang token");
+    m.insert("stale_data", "Luma na — huling alam na halaga");
+    m.insert("codex_no_data", "Walang aktibong window ng limitasyon ng Codex. Binabasa ang paggamit mula sa lokal na mga log ng session ng Codex — magsimula o magpatuloy ng session at lilitaw ito rito.");
+    m.insert("Open Codex Usage →", "Buksan ang paggamit ng Codex →");
+    m.insert("Midnight", "Hatinggabi");
+    m.insert("Sunset", "Paglubog ng araw");
+    m.insert("Show Codex section", "Ipakita ang seksyong Codex");
+    m.insert(
+        "Reopen the tray popup to refresh",
+        "Buksang muli ang popup para mag-refresh",
+    );
+    m.insert(
+        "Show startup notification",
+        "Ipakita ang abiso sa pagsisimula",
+    );
+    m.insert(
+        "Show login expiry warning",
+        "Babala kapag mag-e-expire ang login",
+    );
+    m.insert("Alert thresholds", "Mga threshold ng alerto");
+    m.insert("Notification sound", "Tunog ng abiso");
+    m.insert("Test notification", "Pagsubok na abiso");
+    m.insert("Send", "Ipadala");
     m
 }

@@ -118,5 +118,28 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Standard", "Standardní");
     m.insert("Detailed", "Podrobný");
     m.insert("Hide Extra Usage", "Skrýt Extra Usage");
+    m.insert("stale_token_expired", "Neaktuální — token vypršel");
+    m.insert("stale_data", "Neaktuální — poslední známé");
+    m.insert("codex_no_data", "Žádné aktivní okno limitů Codexu. Využití se načítá z místních záznamů relací Codexu — spusťte nebo pokračujte v relaci a objeví se zde.");
+    m.insert("Open Codex Usage →", "Otevřít využití Codexu →");
+    m.insert("Midnight", "Půlnoc");
+    m.insert("Sunset", "Západ slunce");
+    m.insert("Show Codex section", "Zobrazit sekci Codex");
+    m.insert(
+        "Reopen the tray popup to refresh",
+        "Pro obnovení znovu otevřete okno",
+    );
+    m.insert(
+        "Show startup notification",
+        "Zobrazit oznámení při spuštění",
+    );
+    m.insert(
+        "Show login expiry warning",
+        "Upozornit na vypršení přihlášení",
+    );
+    m.insert("Alert thresholds", "Prahy upozornění");
+    m.insert("Notification sound", "Zvuk oznámení");
+    m.insert("Test notification", "Testovací oznámení");
+    m.insert("Send", "Odeslat");
     m
 }

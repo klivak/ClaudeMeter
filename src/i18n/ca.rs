@@ -28,7 +28,7 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     strings.insert("run_claude_login_desc", "Claude Code està instal·lat però no has iniciat sessió. Executa `claude login` al terminal per connectar el compte.");
     strings.insert("install_claude_desc", "Instal·la Claude Code i executa `claude login` per activar el seguiment automàtic de l'ús.");
     strings.insert("Install Claude Code →", "Instal·la Claude Code →");
-    strings.insert("codex_no_api", "OpenAI no ofereix una API pública per consultar programàticament l'ús de la subscripció de Codex.");
+    strings.insert("codex_no_data", "No hi ha cap finestra de límits de Codex activa. L'ús es llegeix dels registres locals de sessions de Codex: inicia o continua una sessió i apareixerà aquí.");
     strings.insert("Check your usage manually:", "Consulta l'ús manualment:");
     strings.insert("Open Codex Usage →", "Obre l'ús de Codex →");
     strings.insert("Refresh Now", "Actualitza ara");
@@ -110,5 +110,14 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
         "Show login expiry warning",
         "Mostra l'avís de caducitat de la sessió",
     );
+    strings.insert("Alert thresholds", "Llindars d'alerta");
+    strings.insert("Notification sound", "So de notificació");
+    strings.insert("Test notification", "Notificació de prova");
+    strings.insert("Send", "Envia");
+    strings.insert("Pro", "Pro");
+    strings.insert("Max", "Max");
+    strings.insert("ClaudeMeter", "ClaudeMeter");
+    strings.insert("CLAUDE", "CLAUDE");
+    strings.insert("CODEX", "CODEX");
     strings
 }

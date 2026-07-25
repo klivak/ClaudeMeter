@@ -40,8 +40,8 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
         "Install Claude Code \u{2192}",
     );
     m.insert(
-        "codex_no_api",
-        "OpenAI does not provide a public API to track Codex subscription usage programmatically.",
+        "codex_no_data",
+        "No active Codex limit window. Usage is read from local Codex session logs \u{2014} start or continue a Codex session and it will appear here.",
     );
     m.insert("Check your usage manually:", "Check your usage manually:");
     m.insert("Open Codex Usage \u{2192}", "Open Codex Usage \u{2192}");
