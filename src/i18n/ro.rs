@@ -153,5 +153,26 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Notification sound", "Sunet de notificare");
     m.insert("Test notification", "Notificare de test");
     m.insert("Send", "Trimite");
+    m.insert(
+        "pace_projection",
+        "Ritm: se îndreaptă spre ~{}% la resetare",
+    );
+    m.insert("pace_too_early", "Ritm: prea devreme pentru o estimare");
+    m.insert("Open Claude Usage", "Deschide utilizarea Claude");
+    m.insert("Open Config", "Deschide configurația");
+    m.insert("Export Config", "Exportă configurația...");
+    m.insert("Import Config", "Importă configurația...");
+    m.insert("Enable Autostart", "Activează pornirea automată");
+    m.insert("Disable Autostart", "Dezactivează pornirea automată");
+    m.insert("Open Logs", "Deschide jurnalele");
+    m.insert("Quit", "Ieșire");
+    m.insert("Freshness", "Prospețimea datelor");
+    m.insert("Live", "În direct");
+    m.insert("Cached", "Din cache / încă fără date din API");
+    m.insert("api_error", "Eroare API");
+    m.insert("Refreshing", "Se actualizează...");
+    m.insert("time_ago", "acum {}");
+    m.insert("latest_version", "Folosești cea mai recentă versiune.");
+    m.insert("update_check_failed", "Verificarea actualizărilor a eșuat.");
     m
 }

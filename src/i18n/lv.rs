@@ -125,5 +125,26 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     strings.insert("ClaudeMeter", "ClaudeMeter");
     strings.insert("CLAUDE", "CLAUDE");
     strings.insert("CODEX", "CODEX");
+    strings.insert(
+        "pace_projection",
+        "Temps: līdz atiestatīšanai sasniegs ~{}%",
+    );
+    strings.insert("pace_too_early", "Temps: vēl par agru prognozēt");
+    strings.insert("Open Claude Usage", "Atvērt Claude lietojumu");
+    strings.insert("Open Config", "Atvērt konfigurāciju");
+    strings.insert("Export Config", "Eksportēt konfigurāciju...");
+    strings.insert("Import Config", "Importēt konfigurāciju...");
+    strings.insert("Enable Autostart", "Ieslēgt automātisko startēšanu");
+    strings.insert("Disable Autostart", "Izslēgt automātisko startēšanu");
+    strings.insert("Open Logs", "Atvērt žurnālus");
+    strings.insert("Quit", "Iziet");
+    strings.insert("Freshness", "Datu svaigums");
+    strings.insert("Live", "Tiešraidē");
+    strings.insert("Cached", "No kešatmiņas / API datu vēl nav");
+    strings.insert("api_error", "API kļūda");
+    strings.insert("Refreshing", "Atsvaidzina...");
+    strings.insert("time_ago", "pirms {}");
+    strings.insert("latest_version", "Jums ir jaunākā versija.");
+    strings.insert("update_check_failed", "Neizdevās pārbaudīt atjauninājumus.");
     strings
 }

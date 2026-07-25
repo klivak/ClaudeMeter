@@ -271,7 +271,46 @@ impl Locale {
         ]
     }
 
+    /// Detect locale from the macOS user preference.
+    ///
+    /// `defaults read -g AppleLocale` yields identifiers like `uk_UA`,
+    /// `pt_BR`, or `zh-Hans_CN`; only the leading language subtag matters here.
+    /// Falls back to the POSIX `LANG`/`LC_ALL` environment (e.g. `de_DE.UTF-8`)
+    /// when the preference is unset, and to English when nothing parses.
+    #[cfg(target_os = "macos")]
+    pub fn detect_from_macos() -> Self {
+        let from_defaults = std::process::Command::new("defaults")
+            .args(["read", "-g", "AppleLocale"])
+            .output()
+            .ok()
+            .filter(|out| out.status.success())
+            .and_then(|out| String::from_utf8(out.stdout).ok());
+
+        let raw = from_defaults
+            .or_else(|| std::env::var("LC_ALL").ok())
+            .or_else(|| std::env::var("LANG").ok())
+            .unwrap_or_default();
+
+        Self::from_locale_identifier(&raw).unwrap_or(Self::En)
+    }
+
+    /// Language subtag of a POSIX/CFLocale identifier (`uk_UA.UTF-8`,
+    /// `zh-Hans_CN`, `pt-BR`) mapped to a supported locale.
+    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+    pub fn from_locale_identifier(identifier: &str) -> Option<Self> {
+        let language = identifier
+            .trim()
+            .split(['_', '.', '@', '-'])
+            .next()?
+            .to_lowercase();
+        if language.is_empty() {
+            return None;
+        }
+        Self::from_str(&language)
+    }
+
     /// Detect locale from Windows UI language (LANGID).
+    #[cfg(windows)]
     pub fn detect_from_windows() -> Self {
         use windows::Win32::Globalization::GetUserDefaultUILanguage;
         let lang_id = unsafe { GetUserDefaultUILanguage() };
@@ -385,11 +424,26 @@ impl I18n {
 
     pub fn from_config(language: &str) -> Self {
         let locale = if language == "auto" {
-            Locale::detect_from_windows()
+            Self::detect_system_locale()
         } else {
             Locale::from_str(language).unwrap_or(Locale::En)
         };
         Self::new(locale)
+    }
+
+    fn detect_system_locale() -> Locale {
+        #[cfg(windows)]
+        {
+            Locale::detect_from_windows()
+        }
+        #[cfg(target_os = "macos")]
+        {
+            Locale::detect_from_macos()
+        }
+        #[cfg(not(any(windows, target_os = "macos")))]
+        {
+            Locale::En
+        }
     }
 
     /// Translate a key. Falls back to English, then returns the key itself.
@@ -573,6 +627,21 @@ mod tests {
 
         let en = I18n::new(Locale::En);
         assert_eq!(en.metric_name("seven_day_fable"), "Fable (7-day)");
+    }
+
+    #[test]
+    fn test_locale_identifier_parsing() {
+        assert_eq!(
+            Locale::from_locale_identifier("uk_UA.UTF-8"),
+            Some(Locale::Uk)
+        );
+        assert_eq!(Locale::from_locale_identifier("pt-BR"), Some(Locale::Pt));
+        assert_eq!(
+            Locale::from_locale_identifier(" zh-Hans_CN \n"),
+            Some(Locale::Zh)
+        );
+        assert_eq!(Locale::from_locale_identifier("C"), None);
+        assert_eq!(Locale::from_locale_identifier(""), None);
     }
 
     /// Every locale must translate every English key — no locale is allowed to

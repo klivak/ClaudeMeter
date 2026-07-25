@@ -8,6 +8,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 
+## [5.8.0] - 2026-07-26
+
+### Added
+
+- **Weekly pace projection on Windows** — the dashboard now shows where the weekly limit lands at reset if the current rate holds, under the weekly bar (✓ within budget, ⚠ at the limit, 🔥 overshooting). Ported from the macOS menu bar, sharing one projection implementation (`src/pace.rs`) so both platforms report the same number.
+- **macOS: localized menu bar** — the menu is translated into all 40 languages. The agent publishes localized strings in `status.json`, and `language: auto` follows the macOS system language (`AppleLocale`, falling back to `LANG`).
+- **macOS: Settings submenu** — toggle the Codex panel, model limits, extra usage, notification sound, startup notification, and login-expiry warning; cycle alert threshold presets; switch language. Changes go through the agent's new `--set key=value` command, so validation stays in one place.
+- **macOS: Codex panel** — optional, reading the same local `~/.codex` session logs as the Windows build. Codex rows appear after the Claude limits and remain available when the Claude API is unreachable, since they need no token or network.
+- **macOS: history export** — export the collected usage history to CSV or JSON from the menu (new `--export-csv` / `--export-json` agent commands).
+
+### Fixed
+
+- **macOS: repeated high-usage notifications** — the agent fired a notification on *every* poll while usage was above 90%. Alerts now follow the configured thresholds (50/75/90% by default), fire once per threshold per limit, re-arm after usage drops, and respect the notification sound setting. State is persisted, so a manual refresh does not re-fire an alert the running agent already sent.
+- **macOS: metric visibility settings ignored** — `show_model_limits` and `show_extra_usage` had no effect on the menu bar; the agent published every limit regardless. Both settings now apply on macOS exactly as on Windows.
+
+
 
 
 ## [5.7.0] - 2026-07-26

@@ -231,5 +231,23 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Notification sound", "صدای اعلان");
     m.insert("Test notification", "اعلان آزمایشی");
     m.insert("Send", "ارسال");
+    m.insert("pace_projection", "آهنگ مصرف: تا بازنشانی حدود ~{}% می‌شود");
+    m.insert("pace_too_early", "آهنگ مصرف: برای پیش‌بینی خیلی زود است");
+    m.insert("Open Claude Usage", "باز کردن مصرف Claude");
+    m.insert("Open Config", "باز کردن پیکربندی");
+    m.insert("Export Config", "برون‌بری پیکربندی...");
+    m.insert("Import Config", "درون‌ریزی پیکربندی...");
+    m.insert("Enable Autostart", "فعال‌سازی اجرای خودکار");
+    m.insert("Disable Autostart", "غیرفعال‌سازی اجرای خودکار");
+    m.insert("Open Logs", "باز کردن گزارش‌ها");
+    m.insert("Quit", "خروج");
+    m.insert("Freshness", "تازگی داده");
+    m.insert("Live", "زنده");
+    m.insert("Cached", "از حافظه پنهان / هنوز داده‌ای از API نیست");
+    m.insert("api_error", "خطای API");
+    m.insert("Refreshing", "در حال به‌روزرسانی...");
+    m.insert("time_ago", "{} پیش");
+    m.insert("latest_version", "شما آخرین نسخه را دارید.");
+    m.insert("update_check_failed", "بررسی به‌روزرسانی ناموفق بود.");
     m
 }

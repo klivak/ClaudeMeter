@@ -171,8 +171,14 @@ OpenAI does not provide a public API for checking Codex subscription usage. Inst
 ### macOS Menu Bar
 
 - **Native `NSStatusItem`** — shows current Claude usage directly in the macOS menu bar
+- **Fully localized** — the menu is translated into all 40 languages; `auto` follows the macOS system language (`AppleLocale`), or pick one under Settings → Language
+- **Settings submenu** — toggle the Codex panel, model limits, extra usage, notification sound, startup notification, and login-expiry warning; cycle alert thresholds; switch language — all without editing `config.json`
+- **Threshold alerts** — notifications fire once per configured threshold (50/75/90% by default) per limit and re-arm after usage drops, instead of repeating every poll
+- **Optional Codex panel** — the same local `~/.codex` session-log source as Windows; shown after the Claude limits and still available when the Claude API is down
+- **Weekly pace projection** — where the weekly limit lands at reset if the current rate holds, with a 🔥 menu bar indicator when on track to overshoot
 - **Freshness state** — displays whether data is live, refreshing, cached, stale, or blocked by an API error
 - **Manual refresh** — `Refresh Now` forces a new poll instead of relying on cached data
+- **History export** — export the collected usage history to CSV or JSON straight from the menu
 - **Quick actions** — open Claude usage, check for updates, open config, import/export config, toggle autostart, and open logs
 - **Portable logs** — writes `claudemeter.log` under `~/Library/Application Support/ClaudeMeter`
 - **Agent status file** — writes `status.json` for the menu bar UI under `~/Library/Application Support/ClaudeMeter`
@@ -180,6 +186,7 @@ OpenAI does not provide a public API for checking Codex subscription usage. Inst
 ### 📊 Dashboard
 
 - **Dashboard layouts** — three modes: Minimal (single largest metric), Standard (all bars), Detailed (metrics with inline sparkline charts)
+- **Weekly pace projection** — a line under the weekly bar showing where usage lands at reset at the current rate (✓ within budget, ⚠ at the limit, 🔥 overshooting)
 - **Gradient progress bars** — full-spectrum green→amber→coral gradient with rate-of-change trend arrows (↑↗→↘↓)
 - **Easing animations** — smooth ease-out progress bars with cascading staggered appearance (~60fps)
 - **Fade-in animation** — popup appears with accelerating opacity transition

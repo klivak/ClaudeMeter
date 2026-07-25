@@ -125,5 +125,26 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     strings.insert("ClaudeMeter", "ClaudeMeter");
     strings.insert("CLAUDE", "CLAUDE");
     strings.insert("CODEX", "CODEX");
+    strings.insert(
+        "pace_projection",
+        "Tempo: suundub ~{}% poole lähtestumiseks",
+    );
+    strings.insert("pace_too_early", "Tempo: prognoosiks on veel liiga vara");
+    strings.insert("Open Claude Usage", "Ava Claude'i kasutus");
+    strings.insert("Open Config", "Ava seadistus");
+    strings.insert("Export Config", "Ekspordi seadistus...");
+    strings.insert("Import Config", "Impordi seadistus...");
+    strings.insert("Enable Autostart", "Luba automaatkäivitus");
+    strings.insert("Disable Autostart", "Keela automaatkäivitus");
+    strings.insert("Open Logs", "Ava logid");
+    strings.insert("Quit", "Välju");
+    strings.insert("Freshness", "Värskus");
+    strings.insert("Live", "Reaalajas");
+    strings.insert("Cached", "Vahemälust / API andmeid veel pole");
+    strings.insert("api_error", "API viga");
+    strings.insert("Refreshing", "Värskendan...");
+    strings.insert("time_ago", "{} tagasi");
+    strings.insert("latest_version", "Kasutad uusimat versiooni.");
+    strings.insert("update_check_failed", "Uuenduste kontroll ebaõnnestus.");
     strings
 }

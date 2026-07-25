@@ -144,5 +144,23 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Notification sound", "Sonido de notificación");
     m.insert("Test notification", "Notificación de prueba");
     m.insert("Send", "Enviar");
+    m.insert("pace_projection", "Ritmo: rumbo a ~{}% al reiniciarse");
+    m.insert("pace_too_early", "Ritmo: aún es pronto para proyectar");
+    m.insert("Open Claude Usage", "Abrir uso de Claude");
+    m.insert("Open Config", "Abrir configuración");
+    m.insert("Export Config", "Exportar configuración...");
+    m.insert("Import Config", "Importar configuración...");
+    m.insert("Enable Autostart", "Activar inicio automático");
+    m.insert("Disable Autostart", "Desactivar inicio automático");
+    m.insert("Open Logs", "Abrir registros");
+    m.insert("Quit", "Salir");
+    m.insert("Freshness", "Actualidad");
+    m.insert("Live", "En vivo");
+    m.insert("Cached", "En caché / aún sin datos de la API");
+    m.insert("api_error", "Error de la API");
+    m.insert("Refreshing", "Actualizando...");
+    m.insert("time_ago", "hace {}");
+    m.insert("latest_version", "Tienes la última versión.");
+    m.insert("update_check_failed", "No se pudo buscar actualizaciones.");
     m
 }

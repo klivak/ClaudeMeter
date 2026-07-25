@@ -183,5 +183,26 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Notification sound", "Értesítési hang");
     m.insert("Test notification", "Teszt értesítés");
     m.insert("Send", "Küldés");
+    m.insert("pace_projection", "Tempó: ~{}% felé tart a visszaállításig");
+    m.insert("pace_too_early", "Tempó: még túl korai előrejelezni");
+    m.insert("Open Claude Usage", "Claude-használat megnyitása");
+    m.insert("Open Config", "Konfiguráció megnyitása");
+    m.insert("Export Config", "Konfiguráció exportálása...");
+    m.insert("Import Config", "Konfiguráció importálása...");
+    m.insert("Enable Autostart", "Automatikus indítás bekapcsolása");
+    m.insert("Disable Autostart", "Automatikus indítás kikapcsolása");
+    m.insert("Open Logs", "Naplók megnyitása");
+    m.insert("Quit", "Kilépés");
+    m.insert("Freshness", "Frissesség");
+    m.insert("Live", "Élő");
+    m.insert("Cached", "Gyorsítótárból / még nincs API-adat");
+    m.insert("api_error", "API-hiba");
+    m.insert("Refreshing", "Frissítés...");
+    m.insert("time_ago", "{} óta");
+    m.insert("latest_version", "A legfrissebb verziót használod.");
+    m.insert(
+        "update_check_failed",
+        "A frissítés-ellenőrzés nem sikerült.",
+    );
     m
 }

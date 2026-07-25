@@ -150,5 +150,23 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Notification sound", "Bildirim sesi");
     m.insert("Test notification", "Test bildirimi");
     m.insert("Send", "Gönder");
+    m.insert("pace_projection", "Tempo: sıfırlamaya kadar ~%{} olacak");
+    m.insert("pace_too_early", "Tempo: tahmin için henüz çok erken");
+    m.insert("Open Claude Usage", "Claude kullanımını aç");
+    m.insert("Open Config", "Yapılandırmayı aç");
+    m.insert("Export Config", "Yapılandırmayı dışa aktar...");
+    m.insert("Import Config", "Yapılandırmayı içe aktar...");
+    m.insert("Enable Autostart", "Otomatik başlatmayı aç");
+    m.insert("Disable Autostart", "Otomatik başlatmayı kapat");
+    m.insert("Open Logs", "Günlükleri aç");
+    m.insert("Quit", "Çıkış");
+    m.insert("Freshness", "Veri tazeliği");
+    m.insert("Live", "Canlı");
+    m.insert("Cached", "Önbellekten / henüz API verisi yok");
+    m.insert("api_error", "API hatası");
+    m.insert("Refreshing", "Yenileniyor...");
+    m.insert("time_ago", "{} önce");
+    m.insert("latest_version", "En son sürümü kullanıyorsunuz.");
+    m.insert("update_check_failed", "Güncellemeler denetlenemedi.");
     m
 }

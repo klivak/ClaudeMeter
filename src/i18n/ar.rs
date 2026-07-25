@@ -207,5 +207,26 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Notification sound", "صوت الإشعار");
     m.insert("Test notification", "إشعار تجريبي");
     m.insert("Send", "إرسال");
+    m.insert(
+        "pace_projection",
+        "الوتيرة: متجه نحو ~{}% عند إعادة التعيين",
+    );
+    m.insert("pace_too_early", "الوتيرة: من المبكر التنبؤ");
+    m.insert("Open Claude Usage", "فتح استخدام Claude");
+    m.insert("Open Config", "فتح الإعدادات");
+    m.insert("Export Config", "تصدير الإعدادات...");
+    m.insert("Import Config", "استيراد الإعدادات...");
+    m.insert("Enable Autostart", "تفعيل التشغيل التلقائي");
+    m.insert("Disable Autostart", "تعطيل التشغيل التلقائي");
+    m.insert("Open Logs", "فتح السجلات");
+    m.insert("Quit", "إنهاء");
+    m.insert("Freshness", "حداثة البيانات");
+    m.insert("Live", "مباشر");
+    m.insert("Cached", "من الذاكرة / لا بيانات من API بعد");
+    m.insert("api_error", "خطأ في API");
+    m.insert("Refreshing", "جارٍ التحديث...");
+    m.insert("time_ago", "قبل {}");
+    m.insert("latest_version", "أنت تستخدم أحدث إصدار.");
+    m.insert("update_check_failed", "تعذر التحقق من التحديثات.");
     m
 }

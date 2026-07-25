@@ -22,6 +22,21 @@ struct Status {
     let chart: [Int]
     // Past 5-hour session reset points as "hours ago" (0-24), for dashed lines.
     let chartResets: [Double]
+    // Localized menu strings and current setting values, published by the Rust
+    // agent. Missing keys fall back to the English literals below.
+    let labels: [String: String]
+
+    /// Localized string for `key`, or `fallback` when the agent has not
+    /// published it (older agent, or first launch before the first poll).
+    func label(_ key: String, _ fallback: String) -> String {
+        let value = labels[key]
+        return (value?.isEmpty == false) ? value! : fallback
+    }
+
+    /// Boolean setting value published alongside the labels.
+    func flag(_ key: String) -> Bool {
+        labels["value_" + key] == "true"
+    }
 
     static let loading = Status(
         state: "refreshing",
@@ -33,7 +48,8 @@ struct Status {
         lastApiUpdate: nil,
         error: nil,
         chart: [],
-        chartResets: []
+        chartResets: [],
+        labels: [:]
     )
 }
 
@@ -113,7 +129,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func refreshNow() {
-        currentStatus = Status(state: "refreshing", title: "...", detail: "Refreshing...", percent: nil, metrics: [], tierNote: nil, lastApiUpdate: nil, error: nil, chart: currentStatus.chart, chartResets: currentStatus.chartResets)
+        currentStatus = Status(state: "refreshing", title: "...", detail: currentStatus.label("refreshing", "Refreshing..."), percent: nil, metrics: [], tierNote: nil, lastApiUpdate: nil, error: nil, chart: currentStatus.chart, chartResets: currentStatus.chartResets, labels: currentStatus.labels)
         renderMenu()
 
         DispatchQueue.global(qos: .utility).async {
@@ -164,7 +180,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             lastApiUpdate: object["last_api_update"] as? String,
             error: object["error"] as? String,
             chart: (object["chart"] as? [Int]) ?? [],
-            chartResets: (object["chart_resets"] as? [Double]) ?? []
+            chartResets: (object["chart_resets"] as? [Double]) ?? [],
+            labels: (object["labels"] as? [String: String]) ?? [:]
         )
         renderMenu()
     }
@@ -187,9 +204,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(disabled("ClaudeMeter — \(currentStatus.detail)"))
         if !currentStatus.metrics.isEmpty {
             menu.addItem(NSMenuItem.separator())
+            var codexSeparatorAdded = false
             for metric in currentStatus.metrics {
+                // Codex rows (optional panel) are grouped after the Claude ones.
+                if metric.key.hasPrefix("codex_"), !codexSeparatorAdded {
+                    menu.addItem(NSMenuItem.separator())
+                    codexSeparatorAdded = true
+                }
                 if let left = timeLeftLong(metric.resetsAt) {
-                    menu.addItem(disabled("\(metric.name): \(metric.percent)%  ·  resets in \(left)"))
+                    menu.addItem(disabled("\(metric.name): \(metric.percent)%  ·  \(currentStatus.label("resets_in", "resets in")) \(left)"))
                 } else {
                     menu.addItem(disabled("\(metric.name): \(metric.percent)%"))
                 }
@@ -204,32 +227,109 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         if currentStatus.chart.contains(where: { $0 > 0 }) {
             menu.addItem(NSMenuItem.separator())
-            menu.addItem(disabled("Usage History (24h)"))
+            menu.addItem(disabled(currentStatus.label("usage_history_24h", "Usage History (24h)")))
             let chartItem = NSMenuItem()
             chartItem.view = ChartView(data: currentStatus.chart, resets: currentStatus.chartResets)
             menu.addItem(chartItem)
         }
         menu.addItem(NSMenuItem.separator())
-        menu.addItem(disabled("Freshness: \(freshnessText())"))
+        menu.addItem(disabled("\(currentStatus.label("freshness", "Freshness")): \(freshnessText())"))
         if let err = currentStatus.error, !err.isEmpty {
             menu.addItem(disabled("\u{26A0}\u{FE0E} \(err)"))
         }
         menu.addItem(NSMenuItem.separator())
-        menu.addItem(item("Refresh Now", #selector(refreshAction)))
-        menu.addItem(item("Open Claude Usage", #selector(openClaude)))
-        menu.addItem(item("Check for Updates", #selector(checkForUpdates)))
+        menu.addItem(item(currentStatus.label("refresh_now", "Refresh Now"), #selector(refreshAction)))
+        menu.addItem(item(currentStatus.label("open_claude_usage", "Open Claude Usage"), #selector(openClaude)))
+        menu.addItem(item(currentStatus.label("check_for_updates", "Check for Updates"), #selector(checkForUpdates)))
         menu.addItem(NSMenuItem.separator())
-        menu.addItem(item("Open Config", #selector(openConfig)))
-        menu.addItem(item("Export Config...", #selector(exportConfig)))
-        menu.addItem(item("Import Config...", #selector(importConfig)))
+        menu.addItem(settingsMenuItem())
+        menu.addItem(item(currentStatus.label("export_csv", "Export History (CSV)"), #selector(exportHistoryCSV)))
+        menu.addItem(item(currentStatus.label("export_json", "Export History (JSON)"), #selector(exportHistoryJSON)))
         menu.addItem(NSMenuItem.separator())
-        menu.addItem(item(autostartInstalled() ? "Disable Autostart" : "Enable Autostart", #selector(toggleAutostart)))
-        menu.addItem(item("Open Logs", #selector(openLogs)))
+        menu.addItem(item(currentStatus.label("open_config", "Open Config"), #selector(openConfig)))
+        menu.addItem(item(currentStatus.label("export_config", "Export Config..."), #selector(exportConfig)))
+        menu.addItem(item(currentStatus.label("import_config", "Import Config..."), #selector(importConfig)))
         menu.addItem(NSMenuItem.separator())
-        menu.addItem(item("Quit", #selector(quit)))
+        menu.addItem(item(autostartInstalled()
+            ? currentStatus.label("disable_autostart", "Disable Autostart")
+            : currentStatus.label("enable_autostart", "Enable Autostart"), #selector(toggleAutostart)))
+        menu.addItem(item(currentStatus.label("open_logs", "Open Logs"), #selector(openLogs)))
+        menu.addItem(NSMenuItem.separator())
+        menu.addItem(item(currentStatus.label("quit", "Quit"), #selector(quit)))
 
         statusItem.menu = menu
     }
+
+    /// Settings submenu. Every row shells out to the agent's `--set` command so
+    /// validation and defaults stay in one place (Rust), then restarts the
+    /// agent to pick the change up.
+    private func settingsMenuItem() -> NSMenuItem {
+        let root = NSMenuItem(title: currentStatus.label("settings", "Settings"), action: nil, keyEquivalent: "")
+        let submenu = NSMenu()
+
+        let toggles: [(String, String, String)] = [
+            ("show_codex_section", "show_chatgpt_section", "Show Codex section"),
+            ("show_model_limits", "show_model_limits", "Show model limits"),
+            ("show_extra_usage", "show_extra_usage", "Show extra usage"),
+            ("notification_sound", "notifications.sound", "Notification sound"),
+            ("show_startup_notification", "show_startup_notification", "Show startup notification"),
+            ("show_login_expiry_warning", "token_expiry_warning", "Show login expiry warning"),
+        ]
+        for (labelKey, configKey, fallback) in toggles {
+            let entry = NSMenuItem(title: currentStatus.label(labelKey, fallback),
+                                   action: #selector(toggleSetting(_:)),
+                                   keyEquivalent: "")
+            entry.target = self
+            entry.state = currentStatus.flag(labelKey) ? .on : .off
+            entry.representedObject = "\(configKey)=\(currentStatus.flag(labelKey) ? "false" : "true")"
+            submenu.addItem(entry)
+        }
+
+        submenu.addItem(NSMenuItem.separator())
+
+        // Cycles through the same threshold presets as the Windows settings.
+        let thresholds = NSMenuItem(
+            title: "\(currentStatus.label("alert_thresholds", "Alert thresholds")): \(currentStatus.label("value_thresholds", "50% / 75% / 90%"))",
+            action: #selector(toggleSetting(_:)),
+            keyEquivalent: "")
+        thresholds.target = self
+        thresholds.representedObject = "notifications.thresholds=cycle"
+        submenu.addItem(thresholds)
+
+        submenu.addItem(NSMenuItem.separator())
+
+        // Language: Auto plus every locale the agent ships.
+        let language = NSMenuItem(title: currentStatus.label("language", "Language"), action: nil, keyEquivalent: "")
+        let languageMenu = NSMenu()
+        let current = currentStatus.label("value_language", "auto")
+        for (code, name) in Self.languages {
+            let entry = NSMenuItem(title: name, action: #selector(toggleSetting(_:)), keyEquivalent: "")
+            entry.target = self
+            entry.state = (code == current) ? .on : .off
+            entry.representedObject = "language=\(code)"
+            languageMenu.addItem(entry)
+        }
+        language.submenu = languageMenu
+        submenu.addItem(language)
+
+        root.submenu = submenu
+        return root
+    }
+
+    /// Locale codes accepted by the agent's config, with native display names.
+    private static let languages: [(String, String)] = [
+        ("auto", "Auto"), ("en", "English"), ("uk", "Українська"), ("es", "Español"),
+        ("de", "Deutsch"), ("fr", "Français"), ("pt", "Português"), ("it", "Italiano"),
+        ("nl", "Nederlands"), ("pl", "Polski"), ("cs", "Čeština"), ("sk", "Slovenčina"),
+        ("hr", "Hrvatski"), ("sr", "Српски"), ("ro", "Română"), ("hu", "Magyar"),
+        ("bg", "Български"), ("el", "Ελληνικά"), ("sv", "Svenska"), ("da", "Dansk"),
+        ("no", "Norsk"), ("fi", "Suomi"), ("et", "Eesti"), ("lv", "Latviešu"),
+        ("lt", "Lietuvių"), ("ca", "Català"), ("tr", "Türkçe"), ("ru", "Русский"),
+        ("he", "עברית"), ("ar", "العربية"), ("fa", "فارسی"), ("hi", "हिन्दी"),
+        ("bn", "বাংলা"), ("th", "ภาษาไทย"), ("vi", "Tiếng Việt"), ("id", "Indonesia"),
+        ("ms", "Melayu"), ("tl", "Filipino"), ("ja", "日本語"), ("ko", "한국어"),
+        ("zh", "中文"),
+    ]
 
     /// Menu bar text: 5-hour session usage with time left, then the weekly
     /// percent (no label), e.g. "30% · 1h03m | 24%". The leading severity dot
@@ -287,9 +387,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func weeklyPaceLine() -> String? {
         guard weeklyMetric() != nil else { return nil }
-        guard let pj = weeklyProjection() else { return "Pace: too early to project" }
+        guard let pj = weeklyProjection() else {
+            return currentStatus.label("pace_too_early", "Pace: too early to project")
+        }
         let indicator = paceIsHot() ? "🔥" : (pj.proj >= 100 ? "🟡" : "🟢")
-        return "Pace: on track for ~\(pj.proj)% by reset  \(indicator)"
+        let text = currentStatus.label("pace_projection", "Pace: on track for ~{}% by reset")
+            .replacingOccurrences(of: "{}", with: "\(pj.proj)")
+        return "\(text)  \(indicator)"
     }
 
     /// Current-level dot by the worst (max) raw limit. Pace/trajectory is shown
@@ -344,12 +448,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func freshnessText() -> String {
         guard let iso = currentStatus.lastApiUpdate,
               let date = parseISO(iso) else {
-            return currentStatus.state == "error" ? "API error" : "Cached / no API data yet"
+            return currentStatus.state == "error"
+                ? currentStatus.label("api_error", "API error")
+                : currentStatus.label("cached", "Cached / no API data yet")
         }
         let age = max(0, Int(Date().timeIntervalSince(date)))
-        if age < 20 { return "Live" }
-        if age < 60 { return "\(age)s old" }
-        return "\(age / 60)m old"
+        if age < 20 { return currentStatus.label("live", "Live") }
+        let amount = age < 60 ? "\(age)s" : "\(age / 60)m"
+        return currentStatus.label("time_ago", "{} ago").replacingOccurrences(of: "{}", with: amount)
     }
 
     private func disabled(_ title: String) -> NSMenuItem {
@@ -379,15 +485,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                   let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let tag = object["tag_name"] as? String,
                   let html = object["html_url"] as? String else {
-                self.notify("ClaudeMeter", "Could not check for updates.")
+                self.notify("ClaudeMeter", self.currentStatus.label("update_check_failed", "Could not check for updates."))
                 return
             }
             let current = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.0.0"
             let remote = tag.trimmingCharacters(in: CharacterSet(charactersIn: "v"))
             if !Self.isNewerVersion(remote, than: current) {
-                self.notify("ClaudeMeter", "You are running the latest version.")
+                self.notify("ClaudeMeter", self.currentStatus.label("latest_version", "You are running the latest version."))
             } else {
-                self.notify("ClaudeMeter Update", "\(tag) is available.")
+                self.notify(self.currentStatus.label("update_available", "Update available"), "\(tag) is available.")
                 if let url = URL(string: html) {
                     NSWorkspace.shared.open(url)
                 }
@@ -408,6 +514,66 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func openConfig() {
         openFile(appSupport.appendingPathComponent("config.json"))
+    }
+
+    /// Apply a `key=value` change through the agent, then restart it so the new
+    /// config takes effect and a fresh status.json (with new labels) is written.
+    @objc private func toggleSetting(_ sender: NSMenuItem) {
+        guard let assignment = sender.representedObject as? String else { return }
+        DispatchQueue.global(qos: .utility).async {
+            self.runAgent(["--set", assignment])
+            DispatchQueue.main.async {
+                self.agent?.terminate()
+                self.agent = nil
+                self.startAgent()
+                self.refreshNow()
+            }
+        }
+    }
+
+    @objc private func exportHistoryCSV() {
+        exportHistory(flag: "--export-csv", suggestedName: "claudemeter-history.csv")
+    }
+
+    @objc private func exportHistoryJSON() {
+        exportHistory(flag: "--export-json", suggestedName: "claudemeter-history.json")
+    }
+
+    /// The agent owns the SQLite history, so exporting means asking it to write
+    /// the file the user picked.
+    private func exportHistory(flag: String, suggestedName: String) {
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = suggestedName
+        panel.begin { response in
+            guard response == .OK, let url = panel.url else { return }
+            DispatchQueue.global(qos: .utility).async {
+                let output = self.runAgent([flag, url.path])
+                DispatchQueue.main.async {
+                    self.notify("ClaudeMeter", output.isEmpty ? "Export finished." : output)
+                }
+            }
+        }
+    }
+
+    /// Run the agent binary with arguments and return its trimmed stdout.
+    @discardableResult
+    private func runAgent(_ arguments: [String]) -> String {
+        let process = Process()
+        process.executableURL = agentURL()
+        process.arguments = arguments
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+        do {
+            try process.run()
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            process.waitUntilExit()
+            return String(data: data, encoding: .utf8)?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        } catch {
+            writeLog("Agent command failed: \(error)")
+            return ""
+        }
     }
 
     @objc private func exportConfig() {

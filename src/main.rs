@@ -1,4 +1,4 @@
-#![cfg_attr(windows, windows_subsystem = "windows")]
+﻿#![cfg_attr(windows, windows_subsystem = "windows")]
 #![allow(static_mut_refs)]
 #![allow(clippy::too_many_arguments)]
 
@@ -6,11 +6,11 @@ mod config;
 mod credentials;
 mod db;
 mod errors;
+mod pace;
 mod providers;
 
 #[cfg(windows)]
 mod autostart;
-#[cfg(windows)]
 mod i18n;
 #[cfg(windows)]
 mod notifications;

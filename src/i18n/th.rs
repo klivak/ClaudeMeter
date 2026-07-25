@@ -129,5 +129,23 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Notification sound", "เสียงแจ้งเตือน");
     m.insert("Test notification", "ทดสอบการแจ้งเตือน");
     m.insert("Send", "ส่ง");
+    m.insert("pace_projection", "อัตราการใช้: จะถึงราว ~{}% เมื่อรีเซ็ต");
+    m.insert("pace_too_early", "อัตราการใช้: ยังเร็วเกินไปที่จะคาดการณ์");
+    m.insert("Open Claude Usage", "เปิดการใช้งาน Claude");
+    m.insert("Open Config", "เปิดไฟล์ตั้งค่า");
+    m.insert("Export Config", "ส่งออกการตั้งค่า...");
+    m.insert("Import Config", "นำเข้าการตั้งค่า...");
+    m.insert("Enable Autostart", "เปิดการเริ่มอัตโนมัติ");
+    m.insert("Disable Autostart", "ปิดการเริ่มอัตโนมัติ");
+    m.insert("Open Logs", "เปิดบันทึก");
+    m.insert("Quit", "ออก");
+    m.insert("Freshness", "ความสดของข้อมูล");
+    m.insert("Live", "สด");
+    m.insert("Cached", "จากแคช / ยังไม่มีข้อมูลจาก API");
+    m.insert("api_error", "ข้อผิดพลาด API");
+    m.insert("Refreshing", "กำลังรีเฟรช...");
+    m.insert("time_ago", "{} ที่แล้ว");
+    m.insert("latest_version", "คุณใช้เวอร์ชันล่าสุดอยู่แล้ว");
+    m.insert("update_check_failed", "ตรวจสอบการอัปเดตไม่สำเร็จ");
     m
 }

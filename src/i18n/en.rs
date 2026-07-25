@@ -15,6 +15,25 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("credentials_not_found", "Credentials not found");
     m.insert("connection_error", "Connection error");
     m.insert("token_expired", "Token expired");
+    // macOS menu bar strings
+    m.insert("Open Claude Usage", "Open Claude Usage");
+    m.insert("Open Config", "Open Config");
+    m.insert("Export Config", "Export Config...");
+    m.insert("Import Config", "Import Config...");
+    m.insert("Enable Autostart", "Enable Autostart");
+    m.insert("Disable Autostart", "Disable Autostart");
+    m.insert("Open Logs", "Open Logs");
+    m.insert("Quit", "Quit");
+    m.insert("Freshness", "Freshness");
+    m.insert("Live", "Live");
+    m.insert("Cached", "Cached / no API data yet");
+    m.insert("api_error", "API error");
+    m.insert("Refreshing", "Refreshing...");
+    m.insert("time_ago", "{} ago");
+    m.insert("latest_version", "You are running the latest version.");
+    m.insert("update_check_failed", "Could not check for updates.");
+    m.insert("pace_projection", "Pace: on track for ~{}% by reset");
+    m.insert("pace_too_early", "Pace: too early to project");
     m.insert("stale_token_expired", "Stale \u{2014} token expired");
     m.insert("stale_data", "Stale \u{2014} last known");
     m.insert(

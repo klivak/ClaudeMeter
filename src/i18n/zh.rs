@@ -165,5 +165,23 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Notification sound", "通知声音");
     m.insert("Test notification", "测试通知");
     m.insert("Send", "发送");
+    m.insert("pace_projection", "用量节奏：按此速度重置时约 {}%");
+    m.insert("pace_too_early", "用量节奏：现在预测还太早");
+    m.insert("Open Claude Usage", "打开 Claude 用量");
+    m.insert("Open Config", "打开配置文件");
+    m.insert("Export Config", "导出配置...");
+    m.insert("Import Config", "导入配置...");
+    m.insert("Enable Autostart", "启用开机自启");
+    m.insert("Disable Autostart", "停用开机自启");
+    m.insert("Open Logs", "打开日志");
+    m.insert("Quit", "退出");
+    m.insert("Freshness", "数据新鲜度");
+    m.insert("Live", "实时");
+    m.insert("Cached", "来自缓存 / 尚无 API 数据");
+    m.insert("api_error", "API 错误");
+    m.insert("Refreshing", "正在刷新...");
+    m.insert("time_ago", "{} 前");
+    m.insert("latest_version", "你正在使用最新版本。");
+    m.insert("update_check_failed", "无法检查更新。");
     m
 }

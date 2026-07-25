@@ -219,5 +219,23 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Notification sound", "বিজ্ঞপ্তির শব্দ");
     m.insert("Test notification", "পরীক্ষামূলক বিজ্ঞপ্তি");
     m.insert("Send", "পাঠান");
+    m.insert("pace_projection", "গতি: রিসেটের সময় প্রায় ~{}% হবে");
+    m.insert("pace_too_early", "গতি: পূর্বাভাসের জন্য এখনও খুব তাড়াতাড়ি");
+    m.insert("Open Claude Usage", "Claude ব্যবহার খুলুন");
+    m.insert("Open Config", "কনফিগ খুলুন");
+    m.insert("Export Config", "কনফিগ রপ্তানি...");
+    m.insert("Import Config", "কনফিগ আমদানি...");
+    m.insert("Enable Autostart", "স্বয়ংক্রিয় চালু সক্ষম করুন");
+    m.insert("Disable Autostart", "স্বয়ংক্রিয় চালু বন্ধ করুন");
+    m.insert("Open Logs", "লগ খুলুন");
+    m.insert("Quit", "প্রস্থান");
+    m.insert("Freshness", "সতেজতা");
+    m.insert("Live", "লাইভ");
+    m.insert("Cached", "ক্যাশ থেকে / এখনও API ডেটা নেই");
+    m.insert("api_error", "API ত্রুটি");
+    m.insert("Refreshing", "রিফ্রেশ হচ্ছে...");
+    m.insert("time_ago", "{} আগে");
+    m.insert("latest_version", "আপনি সর্বশেষ সংস্করণ ব্যবহার করছেন।");
+    m.insert("update_check_failed", "আপডেট পরীক্ষা করা যায়নি।");
     m
 }

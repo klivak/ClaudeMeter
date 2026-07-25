@@ -39,6 +39,8 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
         "Install Claude Code \u{2192}",
         "Встановити Claude Code \u{2192}",
     );
+    m.insert("pace_projection", "Темп: до скидання вийде ~{}%");
+    m.insert("pace_too_early", "Темп: ще зарано прогнозувати");
     m.insert(
         "codex_no_data",
         "Немає активного вікна лімітів Codex. Дані беруться з локальних логів сесій Codex \u{2014} почніть або продовжте сесію, і вони з'являться тут.",
@@ -134,5 +136,21 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Notification sound", "Звук сповіщень");
     m.insert("Test notification", "Тестове сповіщення");
     m.insert("Send", "Надіслати");
+    m.insert("Open Claude Usage", "Відкрити використання Claude");
+    m.insert("Open Config", "Відкрити конфіг");
+    m.insert("Export Config", "Експорт конфігу...");
+    m.insert("Import Config", "Імпорт конфігу...");
+    m.insert("Enable Autostart", "Увімкнути автозапуск");
+    m.insert("Disable Autostart", "Вимкнути автозапуск");
+    m.insert("Open Logs", "Відкрити логи");
+    m.insert("Quit", "Вийти");
+    m.insert("Freshness", "Актуальність");
+    m.insert("Live", "Наживо");
+    m.insert("Cached", "З кешу / ще немає даних API");
+    m.insert("api_error", "Помилка API");
+    m.insert("Refreshing", "Оновлення...");
+    m.insert("time_ago", "{} тому");
+    m.insert("latest_version", "У вас найновіша версія.");
+    m.insert("update_check_failed", "Не вдалося перевірити оновлення.");
     m
 }

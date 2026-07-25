@@ -237,5 +237,23 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Notification sound", "צליל התראה");
     m.insert("Test notification", "התראת בדיקה");
     m.insert("Send", "שלח");
+    m.insert("pace_projection", "קצב: בדרך ל-~{}% עד האיפוס");
+    m.insert("pace_too_early", "קצב: מוקדם מדי לחזות");
+    m.insert("Open Claude Usage", "פתח שימוש ב-Claude");
+    m.insert("Open Config", "פתח את קובץ ההגדרות");
+    m.insert("Export Config", "ייצוא הגדרות...");
+    m.insert("Import Config", "ייבוא הגדרות...");
+    m.insert("Enable Autostart", "הפעל הפעלה אוטומטית");
+    m.insert("Disable Autostart", "בטל הפעלה אוטומטית");
+    m.insert("Open Logs", "פתח יומנים");
+    m.insert("Quit", "יציאה");
+    m.insert("Freshness", "טריות הנתונים");
+    m.insert("Live", "בזמן אמת");
+    m.insert("Cached", "מהמטמון / אין עדיין נתוני API");
+    m.insert("api_error", "שגיאת API");
+    m.insert("Refreshing", "מרענן...");
+    m.insert("time_ago", "לפני {}");
+    m.insert("latest_version", "אתה משתמש בגרסה העדכנית ביותר.");
+    m.insert("update_check_failed", "לא ניתן היה לבדוק עדכונים.");
     m
 }

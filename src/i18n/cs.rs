@@ -141,5 +141,23 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Notification sound", "Zvuk oznámení");
     m.insert("Test notification", "Testovací oznámení");
     m.insert("Send", "Odeslat");
+    m.insert("pace_projection", "Tempo: směřuje k ~{}% do resetu");
+    m.insert("pace_too_early", "Tempo: zatím příliš brzy na odhad");
+    m.insert("Open Claude Usage", "Otevřít využití Claude");
+    m.insert("Open Config", "Otevřít konfiguraci");
+    m.insert("Export Config", "Exportovat konfiguraci...");
+    m.insert("Import Config", "Importovat konfiguraci...");
+    m.insert("Enable Autostart", "Zapnout automatické spuštění");
+    m.insert("Disable Autostart", "Vypnout automatické spuštění");
+    m.insert("Open Logs", "Otevřít protokoly");
+    m.insert("Quit", "Ukončit");
+    m.insert("Freshness", "Aktuálnost");
+    m.insert("Live", "Živě");
+    m.insert("Cached", "Z mezipaměti / zatím žádná data z API");
+    m.insert("api_error", "Chyba API");
+    m.insert("Refreshing", "Aktualizuji...");
+    m.insert("time_ago", "před {}");
+    m.insert("latest_version", "Máte nejnovější verzi.");
+    m.insert("update_check_failed", "Kontrola aktualizací se nezdařila.");
     m
 }

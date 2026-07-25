@@ -144,5 +144,23 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Notification sound", "Tunog ng abiso");
     m.insert("Test notification", "Pagsubok na abiso");
     m.insert("Send", "Ipadala");
+    m.insert("pace_projection", "Bilis: patungo sa ~{}% sa pag-reset");
+    m.insert("pace_too_early", "Bilis: masyadong maaga pang mahulaan");
+    m.insert("Open Claude Usage", "Buksan ang paggamit ng Claude");
+    m.insert("Open Config", "Buksan ang config");
+    m.insert("Export Config", "I-export ang config...");
+    m.insert("Import Config", "I-import ang config...");
+    m.insert("Enable Autostart", "Paganahin ang autostart");
+    m.insert("Disable Autostart", "Huwag paganahin ang autostart");
+    m.insert("Open Logs", "Buksan ang mga log");
+    m.insert("Quit", "Umalis");
+    m.insert("Freshness", "Pagiging sariwa");
+    m.insert("Live", "Live");
+    m.insert("Cached", "Mula sa cache / wala pang datos ng API");
+    m.insert("api_error", "Error sa API");
+    m.insert("Refreshing", "Nagre-refresh...");
+    m.insert("time_ago", "{} ang nakalipas");
+    m.insert("latest_version", "Ginagamit mo ang pinakabagong bersyon.");
+    m.insert("update_check_failed", "Hindi masuri ang mga update.");
     m
 }

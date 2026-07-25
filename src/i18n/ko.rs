@@ -186,5 +186,23 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Notification sound", "알림 소리");
     m.insert("Test notification", "테스트 알림");
     m.insert("Send", "보내기");
+    m.insert("pace_projection", "사용 속도: 초기화 시점에 약 {}% 예상");
+    m.insert("pace_too_early", "사용 속도: 아직 예측하기 이릅니다");
+    m.insert("Open Claude Usage", "Claude 사용량 열기");
+    m.insert("Open Config", "설정 파일 열기");
+    m.insert("Export Config", "설정 내보내기...");
+    m.insert("Import Config", "설정 가져오기...");
+    m.insert("Enable Autostart", "자동 시작 켜기");
+    m.insert("Disable Autostart", "자동 시작 끄기");
+    m.insert("Open Logs", "로그 열기");
+    m.insert("Quit", "종료");
+    m.insert("Freshness", "데이터 최신성");
+    m.insert("Live", "실시간");
+    m.insert("Cached", "캐시 / 아직 API 데이터 없음");
+    m.insert("api_error", "API 오류");
+    m.insert("Refreshing", "새로 고치는 중...");
+    m.insert("time_ago", "{} 전");
+    m.insert("latest_version", "최신 버전을 사용 중입니다.");
+    m.insert("update_check_failed", "업데이트를 확인할 수 없습니다.");
     m
 }

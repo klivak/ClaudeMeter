@@ -138,5 +138,23 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Notification sound", "Varsellyd");
     m.insert("Test notification", "Testvarsel");
     m.insert("Send", "Send");
+    m.insert("pace_projection", "Tempo: på vei mot ~{}% ved nullstilling");
+    m.insert("pace_too_early", "Tempo: for tidlig å anslå");
+    m.insert("Open Claude Usage", "Åpne Claude-bruk");
+    m.insert("Open Config", "Åpne konfigurasjon");
+    m.insert("Export Config", "Eksporter konfigurasjon...");
+    m.insert("Import Config", "Importer konfigurasjon...");
+    m.insert("Enable Autostart", "Slå på autostart");
+    m.insert("Disable Autostart", "Slå av autostart");
+    m.insert("Open Logs", "Åpne logger");
+    m.insert("Quit", "Avslutt");
+    m.insert("Freshness", "Ferskhet");
+    m.insert("Live", "Live");
+    m.insert("Cached", "Fra hurtigbuffer / ingen API-data ennå");
+    m.insert("api_error", "API-feil");
+    m.insert("Refreshing", "Oppdaterer...");
+    m.insert("time_ago", "for {} siden");
+    m.insert("latest_version", "Du kjører den nyeste versjonen.");
+    m.insert("update_check_failed", "Kunne ikke se etter oppdateringer.");
     m
 }

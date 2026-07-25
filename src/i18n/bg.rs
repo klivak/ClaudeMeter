@@ -213,5 +213,26 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Notification sound", "Звук на известията");
     m.insert("Test notification", "Тестово известие");
     m.insert("Send", "Изпрати");
+    m.insert("pace_projection", "Темп: към ~{}% до нулирането");
+    m.insert("pace_too_early", "Темп: твърде рано за прогноза");
+    m.insert("Open Claude Usage", "Отвори използването на Claude");
+    m.insert("Open Config", "Отвори конфигурацията");
+    m.insert("Export Config", "Експорт на конфигурация...");
+    m.insert("Import Config", "Импорт на конфигурация...");
+    m.insert("Enable Autostart", "Включи автостарт");
+    m.insert("Disable Autostart", "Изключи автостарт");
+    m.insert("Open Logs", "Отвори дневниците");
+    m.insert("Quit", "Изход");
+    m.insert("Freshness", "Актуалност");
+    m.insert("Live", "На живо");
+    m.insert("Cached", "От кеша / още няма данни от API");
+    m.insert("api_error", "Грешка в API");
+    m.insert("Refreshing", "Обновяване...");
+    m.insert("time_ago", "преди {}");
+    m.insert("latest_version", "Използвате най-новата версия.");
+    m.insert(
+        "update_check_failed",
+        "Проверката за обновления не бе успешна.",
+    );
     m
 }

@@ -125,5 +125,23 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     strings.insert("ClaudeMeter", "ClaudeMeter");
     strings.insert("CLAUDE", "CLAUDE");
     strings.insert("CODEX", "CODEX");
+    strings.insert("pace_projection", "Tempas: iki atstatymo pasieks ~{}%");
+    strings.insert("pace_too_early", "Tempas: dar per anksti prognozuoti");
+    strings.insert("Open Claude Usage", "Atverti Claude naudojimą");
+    strings.insert("Open Config", "Atverti konfigūraciją");
+    strings.insert("Export Config", "Eksportuoti konfigūraciją...");
+    strings.insert("Import Config", "Importuoti konfigūraciją...");
+    strings.insert("Enable Autostart", "Įjungti automatinį paleidimą");
+    strings.insert("Disable Autostart", "Išjungti automatinį paleidimą");
+    strings.insert("Open Logs", "Atverti žurnalus");
+    strings.insert("Quit", "Išeiti");
+    strings.insert("Freshness", "Duomenų šviežumas");
+    strings.insert("Live", "Tiesiogiai");
+    strings.insert("Cached", "Iš podėlio / API duomenų dar nėra");
+    strings.insert("api_error", "API klaida");
+    strings.insert("Refreshing", "Atnaujinama...");
+    strings.insert("time_ago", "prieš {}");
+    strings.insert("latest_version", "Naudojate naujausią versiją.");
+    strings.insert("update_check_failed", "Nepavyko patikrinti atnaujinimų.");
     strings
 }

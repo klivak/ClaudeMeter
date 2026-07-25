@@ -156,5 +156,26 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Notification sound", "Ilmoitusääni");
     m.insert("Test notification", "Testi-ilmoitus");
     m.insert("Send", "Lähetä");
+    m.insert(
+        "pace_projection",
+        "Tahti: matkalla ~{}% nollaukseen mennessä",
+    );
+    m.insert("pace_too_early", "Tahti: liian aikaista ennustaa");
+    m.insert("Open Claude Usage", "Avaa Clauden käyttö");
+    m.insert("Open Config", "Avaa asetustiedosto");
+    m.insert("Export Config", "Vie asetukset...");
+    m.insert("Import Config", "Tuo asetukset...");
+    m.insert("Enable Autostart", "Ota automaattikäynnistys käyttöön");
+    m.insert("Disable Autostart", "Poista automaattikäynnistys");
+    m.insert("Open Logs", "Avaa lokit");
+    m.insert("Quit", "Lopeta");
+    m.insert("Freshness", "Tuoreus");
+    m.insert("Live", "Live");
+    m.insert("Cached", "Välimuistista / ei vielä API-dataa");
+    m.insert("api_error", "API-virhe");
+    m.insert("Refreshing", "Päivitetään...");
+    m.insert("time_ago", "{} sitten");
+    m.insert("latest_version", "Käytössäsi on uusin versio.");
+    m.insert("update_check_failed", "Päivitysten tarkistus epäonnistui.");
     m
 }

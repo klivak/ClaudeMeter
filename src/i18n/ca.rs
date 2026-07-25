@@ -119,5 +119,26 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     strings.insert("ClaudeMeter", "ClaudeMeter");
     strings.insert("CLAUDE", "CLAUDE");
     strings.insert("CODEX", "CODEX");
+    strings.insert("pace_projection", "Ritme: cap a ~{}% en reiniciar-se");
+    strings.insert("pace_too_early", "Ritme: encara és aviat per projectar");
+    strings.insert("Open Claude Usage", "Obre l'ús de Claude");
+    strings.insert("Open Config", "Obre la configuració");
+    strings.insert("Export Config", "Exporta la configuració...");
+    strings.insert("Import Config", "Importa la configuració...");
+    strings.insert("Enable Autostart", "Activa l'inici automàtic");
+    strings.insert("Disable Autostart", "Desactiva l'inici automàtic");
+    strings.insert("Open Logs", "Obre els registres");
+    strings.insert("Quit", "Surt");
+    strings.insert("Freshness", "Actualitat");
+    strings.insert("Live", "En directe");
+    strings.insert("Cached", "De la memòria cau / encara sense dades de l'API");
+    strings.insert("api_error", "Error de l'API");
+    strings.insert("Refreshing", "Actualitzant...");
+    strings.insert("time_ago", "fa {}");
+    strings.insert("latest_version", "Tens la darrera versió.");
+    strings.insert(
+        "update_check_failed",
+        "No s'han pogut comprovar les actualitzacions.",
+    );
     strings
 }

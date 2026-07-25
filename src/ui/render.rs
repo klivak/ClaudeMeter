@@ -49,6 +49,58 @@ fn rounded_progress_fill_width(content_width: f32, bar_height: f32, utilization:
     }
 }
 pub const RESET_LABEL_H: i32 = 18;
+/// Height of the weekly burn-rate line drawn under the weekly progress bar.
+pub const PACE_LABEL_H: i32 = 16;
+
+/// Height the weekly burn-rate line occupies in the section (0 when the weekly
+/// metric is absent, hidden, or has no reset time, so nothing is drawn).
+pub fn weekly_pace_line_height(usage: &UsageResponse, metric_filter: MetricFilter) -> i32 {
+    if metric_filter.hides("seven_day") {
+        return 0;
+    }
+    let has_weekly = usage
+        .all_metrics()
+        .iter()
+        .any(|(key, metric)| key == "seven_day" && metric.resets_at.is_some());
+    if has_weekly {
+        PACE_LABEL_H
+    } else {
+        0
+    }
+}
+
+/// Text for the weekly burn-rate line, or `None` when this metric is not the
+/// all-models weekly window (the only one worth projecting) or has no reset
+/// time. Shared by the renderer and `calculate_height` so the reserved height
+/// always matches what gets drawn.
+pub fn weekly_pace_text(
+    key: &str,
+    metric: &crate::providers::claude::UsageMetric,
+    i18n: &I18n,
+) -> Option<String> {
+    if key != "seven_day" {
+        return None;
+    }
+    let resets_at = metric.resets_at.as_deref()?;
+    match crate::pace::weekly_pace(metric.utilization, resets_at, chrono::Utc::now()) {
+        Some(pace) => {
+            let indicator = if pace.is_hot() {
+                "\u{1F525}"
+            } else if pace.is_over_budget() {
+                "\u{26A0}"
+            } else {
+                "\u{2713}"
+            };
+            Some(format!(
+                "{} {}",
+                i18n.t("pace_projection")
+                    .replace("{}", &pace.projected_percent.to_string()),
+                indicator
+            ))
+        }
+        None => Some(i18n.t("pace_too_early").to_string()),
+    }
+}
 pub const SECTION_GAP: i32 = 14;
 pub const ITEM_GAP: i32 = 8;
 pub const SEPARATOR_H: i32 = 1;
@@ -519,6 +571,7 @@ impl PopupRenderer {
                                 + RESET_LABEL_H
                                 + 28
                                 + SECTION_GAP);
+                        h += weekly_pace_line_height(u, metric_filter);
                     }
                     _ => {
                         // "standard"
@@ -526,6 +579,7 @@ impl PopupRenderer {
                         let metric_count = (u.all_metrics().len() - extra_hidden(u)) as i32;
                         h += metric_count
                             * (METRIC_LABEL_H + 4 + PROGRESS_H + 4 + RESET_LABEL_H + SECTION_GAP);
+                        h += weekly_pace_line_height(u, metric_filter);
                     }
                 }
             }
@@ -1065,10 +1119,62 @@ impl PopupRenderer {
                 rate,
                 None,
             );
+            y = self.draw_weekly_pace(rt, d2d, w, y, key, metric, colors, i18n);
             y += self.sf(SECTION_GAP);
         }
 
         y
+    }
+
+    /// Burn-rate line under the weekly bar: where the week lands at reset if
+    /// the current rate holds. Only drawn for the all-models weekly metric —
+    /// the 5-hour window is too short for the projection to mean anything.
+    #[allow(clippy::too_many_arguments)]
+    unsafe fn draw_weekly_pace(
+        &self,
+        rt: &ID2D1HwndRenderTarget,
+        d2d: &mut D2DResources,
+        w: f32,
+        y: f32,
+        key: &str,
+        metric: &crate::providers::claude::UsageMetric,
+        colors: &ThemeColors,
+        i18n: &I18n,
+    ) -> f32 {
+        let Some(text) = weekly_pace_text(key, metric, i18n) else {
+            return y;
+        };
+        let pace = crate::pace::weekly_pace(
+            metric.utilization,
+            metric.resets_at.as_deref().unwrap_or_default(),
+            chrono::Utc::now(),
+        );
+        let color = match pace {
+            Some(p) if p.is_hot() => colors.red,
+            Some(p) if p.is_over_budget() => colors.yellow,
+            _ => colors.text_secondary,
+        };
+
+        let pad = self.sf(PADDING);
+        let text_wide = wide(&text);
+        let format = d2d.get_text_format(10, false, 0, 1).clone();
+        let brush = rt
+            .CreateSolidColorBrush(&colorref_to_d2d(color) as *const _, None)
+            .unwrap();
+        rt.DrawText(
+            &text_wide[..text_wide.len() - 1],
+            &format,
+            &D2D_RECT_F {
+                left: pad,
+                top: y,
+                right: w - pad,
+                bottom: y + self.sf(PACE_LABEL_H),
+            },
+            &brush,
+            D2D1_DRAW_TEXT_OPTIONS_NONE,
+            DWRITE_MEASURING_MODE_NATURAL,
+        );
+        y + self.sf(PACE_LABEL_H)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -1606,6 +1712,7 @@ impl PopupRenderer {
                 rate,
                 None,
             );
+            y = self.draw_weekly_pace(rt, d2d, w, y, key, metric, colors, i18n);
 
             // Mini sparkline for five_hour metric (we have chart_data for it)
             if key == "five_hour" && !chart_data.is_empty() {

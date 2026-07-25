@@ -225,5 +225,26 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Notification sound", "Ήχος ειδοποίησης");
     m.insert("Test notification", "Δοκιμαστική ειδοποίηση");
     m.insert("Send", "Αποστολή");
+    m.insert(
+        "pace_projection",
+        "Ρυθμός: πορεία για ~{}% έως την επαναφορά",
+    );
+    m.insert("pace_too_early", "Ρυθμός: πολύ νωρίς για πρόβλεψη");
+    m.insert("Open Claude Usage", "Άνοιγμα χρήσης Claude");
+    m.insert("Open Config", "Άνοιγμα ρυθμίσεων");
+    m.insert("Export Config", "Εξαγωγή ρυθμίσεων...");
+    m.insert("Import Config", "Εισαγωγή ρυθμίσεων...");
+    m.insert("Enable Autostart", "Ενεργοποίηση αυτόματης εκκίνησης");
+    m.insert("Disable Autostart", "Απενεργοποίηση αυτόματης εκκίνησης");
+    m.insert("Open Logs", "Άνοιγμα αρχείων καταγραφής");
+    m.insert("Quit", "Έξοδος");
+    m.insert("Freshness", "Φρεσκάδα δεδομένων");
+    m.insert("Live", "Ζωντανά");
+    m.insert("Cached", "Από την cache / χωρίς δεδομένα API ακόμη");
+    m.insert("api_error", "Σφάλμα API");
+    m.insert("Refreshing", "Ανανέωση...");
+    m.insert("time_ago", "πριν από {}");
+    m.insert("latest_version", "Χρησιμοποιείτε την πιο πρόσφατη έκδοση.");
+    m.insert("update_check_failed", "Ο έλεγχος ενημερώσεων απέτυχε.");
     m
 }

@@ -141,5 +141,23 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Notification sound", "Suara notifikasi");
     m.insert("Test notification", "Notifikasi uji");
     m.insert("Send", "Kirim");
+    m.insert("pace_projection", "Laju: menuju ~{}% saat reset");
+    m.insert("pace_too_early", "Laju: terlalu awal untuk diproyeksikan");
+    m.insert("Open Claude Usage", "Buka penggunaan Claude");
+    m.insert("Open Config", "Buka konfigurasi");
+    m.insert("Export Config", "Ekspor konfigurasi...");
+    m.insert("Import Config", "Impor konfigurasi...");
+    m.insert("Enable Autostart", "Aktifkan mulai otomatis");
+    m.insert("Disable Autostart", "Nonaktifkan mulai otomatis");
+    m.insert("Open Logs", "Buka log");
+    m.insert("Quit", "Keluar");
+    m.insert("Freshness", "Kesegaran data");
+    m.insert("Live", "Langsung");
+    m.insert("Cached", "Dari cache / belum ada data API");
+    m.insert("api_error", "Kesalahan API");
+    m.insert("Refreshing", "Menyegarkan...");
+    m.insert("time_ago", "{} lalu");
+    m.insert("latest_version", "Anda menggunakan versi terbaru.");
+    m.insert("update_check_failed", "Gagal memeriksa pembaruan.");
     m
 }

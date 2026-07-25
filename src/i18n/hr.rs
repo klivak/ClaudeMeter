@@ -128,5 +128,23 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     strings.insert("ClaudeMeter", "ClaudeMeter");
     strings.insert("CLAUDE", "CLAUDE");
     strings.insert("CODEX", "CODEX");
+    strings.insert("pace_projection", "Tempo: ide prema ~{}% do resetiranja");
+    strings.insert("pace_too_early", "Tempo: prerano za procjenu");
+    strings.insert("Open Claude Usage", "Otvori potrošnju Claudea");
+    strings.insert("Open Config", "Otvori konfiguraciju");
+    strings.insert("Export Config", "Izvezi konfiguraciju...");
+    strings.insert("Import Config", "Uvezi konfiguraciju...");
+    strings.insert("Enable Autostart", "Uključi automatsko pokretanje");
+    strings.insert("Disable Autostart", "Isključi automatsko pokretanje");
+    strings.insert("Open Logs", "Otvori zapisnike");
+    strings.insert("Quit", "Izađi");
+    strings.insert("Freshness", "Svježina podataka");
+    strings.insert("Live", "Uživo");
+    strings.insert("Cached", "Iz predmemorije / još nema podataka s API-ja");
+    strings.insert("api_error", "Pogreška API-ja");
+    strings.insert("Refreshing", "Osvježavanje...");
+    strings.insert("time_ago", "prije {}");
+    strings.insert("latest_version", "Koristite najnoviju verziju.");
+    strings.insert("update_check_failed", "Provjera ažuriranja nije uspjela.");
     strings
 }

@@ -189,5 +189,23 @@ pub fn strings() -> HashMap<&'static str, &'static str> {
     m.insert("Notification sound", "Âm thanh thông báo");
     m.insert("Test notification", "Thông báo thử");
     m.insert("Send", "Gửi");
+    m.insert("pace_projection", "Nhịp dùng: hướng tới ~{}% khi đặt lại");
+    m.insert("pace_too_early", "Nhịp dùng: còn quá sớm để dự báo");
+    m.insert("Open Claude Usage", "Mở mức dùng Claude");
+    m.insert("Open Config", "Mở tệp cấu hình");
+    m.insert("Export Config", "Xuất cấu hình...");
+    m.insert("Import Config", "Nhập cấu hình...");
+    m.insert("Enable Autostart", "Bật khởi động cùng hệ thống");
+    m.insert("Disable Autostart", "Tắt khởi động cùng hệ thống");
+    m.insert("Open Logs", "Mở nhật ký");
+    m.insert("Quit", "Thoát");
+    m.insert("Freshness", "Độ mới của dữ liệu");
+    m.insert("Live", "Trực tiếp");
+    m.insert("Cached", "Từ bộ nhớ đệm / chưa có dữ liệu API");
+    m.insert("api_error", "Lỗi API");
+    m.insert("Refreshing", "Đang làm mới...");
+    m.insert("time_ago", "{} trước");
+    m.insert("latest_version", "Bạn đang dùng phiên bản mới nhất.");
+    m.insert("update_check_failed", "Không thể kiểm tra cập nhật.");
     m
 }
