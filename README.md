@@ -29,6 +29,14 @@ See your 5-hour session, weekly limits, Sonnet & Opus quotas — without opening
 
 <br>
 
+### 🎬 See it in action — 56 seconds
+
+<video src="https://github.com/klivak/claude-meter/raw/main/marketing/promo-video/preview/claudemeter-promo.mp4" poster="marketing/promo-video/preview/promo-poster.png" width="720" controls muted playsinline></video>
+
+<sub><a href="https://github.com/klivak/claude-meter/raw/main/marketing/promo-video/preview/claudemeter-promo.mp4">▶ Watch the promo video</a> — if the player above doesn't load in your Markdown viewer</sub>
+
+<br>
+
 <img src="screenshots/dashboard-light-v5.1.png" alt="ClaudeMeter Light theme dashboard with Claude and Codex usage" width="360"> <img src="screenshots/dashboard-dark-v5.1.png" alt="ClaudeMeter Dark theme dashboard with Claude and Codex usage" width="360">
 
 ### 📊 Project Pulse

@@ -14,5 +14,9 @@ config.json
 Thumbs.db
 Desktop.ini
 
-# Promo video project (Remotion): node_modules-sized assets, not part of the app
-/marketing/
+# Promo video project (Remotion): source is tracked, build output is not
+# (marketing/promo-video/.gitignore covers node_modules/, out/, .remotion/)
+# Publishing copy stays local — drafts, not part of the shipped project
+/marketing/promo-video/YOUTUBE.md
+/marketing/promo-video/THUMBNAIL_PROMPTS.md
+/marketing/promo-video/MUSIC_PROMPT.md
