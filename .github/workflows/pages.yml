@@ -8,6 +8,7 @@ on:
       - "site/**"
       - "assets/icon_app.png"
       - "screenshots/**"
+      - "marketing/promo-video/preview/**"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
   workflow_run:
@@ -41,13 +42,17 @@ jobs:
       - name: Assemble static site
         shell: bash
         run: |
-          mkdir -p _site/assets _site/screenshots
+          mkdir -p _site/assets _site/screenshots _site/promo
           cp site/index.html site/styles.css site/app.js site/metrics.json _site/
           cp assets/icon_app.ico _site/assets/
           cp screenshots/dashboard-light-v5.1.png _site/screenshots/
           cp screenshots/dashboard-dark-v5.1.png _site/screenshots/
           cp screenshots/theme-sunset.png _site/screenshots/
           cp screenshots/theme-midnight.png _site/screenshots/
+          # Pages serves .mp4 as video/mp4, so the README <video> player works
+          # (raw.githubusercontent.com serves it as application/octet-stream and won't play)
+          cp marketing/promo-video/preview/claudemeter-promo.mp4 _site/promo/
+          cp marketing/promo-video/preview/promo-poster.png _site/promo/
           touch _site/.nojekyll
 
       - name: Refresh public project metrics
