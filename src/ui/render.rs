@@ -33,6 +33,15 @@ use windows::Win32::Graphics::Dxgi::Common::DXGI_FORMAT_B8G8R8A8_UNORM;
 use windows::Win32::Graphics::Gdi::{GetDC, GetDeviceCaps, ReleaseDC, LOGPIXELSX};
 
 pub const POPUP_WIDTH: i32 = 380;
+/// Number of interactive rows in the settings panel.
+///
+/// The panel's drawn height and the window height computed in `windows_app`
+/// must agree — when they drifted apart the footer ended up painted on top of
+/// the tray-colour legend, so both sides derive from this one constant.
+pub const SETTINGS_ROW_COUNT: usize = 19;
+/// Row pitch of the settings list, in unscaled pixels.
+pub const SETTINGS_ROW_H: i32 = 34;
+
 pub const HEADER_HEIGHT: i32 = 40;
 pub const PADDING: i32 = 16;
 pub const METRIC_LABEL_H: i32 = 22;
@@ -3077,7 +3086,13 @@ impl PopupRenderer {
             let msg = if token_expired {
                 i18n.t("stale_token_expired").to_string()
             } else {
-                format!("{} ({})", i18n.t("stale_data"), last_updated)
+                // `last_updated` is the literal "(cached)" sentinel when no live
+                // poll has landed yet, so wrapping it again would print "((cached))".
+                let detail = last_updated
+                    .strip_prefix('(')
+                    .and_then(|s| s.strip_suffix(')'))
+                    .unwrap_or(last_updated);
+                format!("{} ({})", i18n.t("stale_data"), detail)
             };
             (format!("\u{26A0} {}", msg), colors.yellow, true)
         } else {
@@ -3285,7 +3300,7 @@ pub unsafe fn draw_settings_panel(
     config: &crate::config::Config,
     back_rect: &mut RECT,
     close_rect: &mut RECT,
-    setting_rects: &mut [RECT; 19],
+    setting_rects: &mut [RECT; SETTINGS_ROW_COUNT],
     hovered: &HoveredElement,
 ) {
     let Some(rt) = d2d.render_target.clone() else {
@@ -3294,7 +3309,7 @@ pub unsafe fn draw_settings_panel(
     let w = (rect.right - rect.left) as f32;
     let pad = 16.0f32;
     let header_h = 40.0f32;
-    let row_h = 34.0f32;
+    let row_h = SETTINGS_ROW_H as f32;
 
     // Header background
     let surf_brush = rt

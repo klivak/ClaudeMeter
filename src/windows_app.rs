@@ -95,7 +95,7 @@ pub(crate) struct AppState {
     codex_plan_rect: RECT,
     codex_status_rect: RECT,
     back_rect: RECT,
-    setting_rects: [RECT; 19],
+    setting_rects: [RECT; crate::ui::render::SETTINGS_ROW_COUNT],
     notification_tracker: NotificationTracker,
     exe_dir: std::path::PathBuf,
     chart_data: Vec<f64>,
@@ -281,7 +281,7 @@ unsafe fn run_message_loop(exe_dir: std::path::PathBuf, config_mgr: ConfigManage
         codex_plan_rect: RECT::default(),
         codex_status_rect: RECT::default(),
         back_rect: RECT::default(),
-        setting_rects: [RECT::default(); 19],
+        setting_rects: [RECT::default(); crate::ui::render::SETTINGS_ROW_COUNT],
         notification_tracker: NotificationTracker::new(),
         exe_dir,
         chart_data: Vec::new(),
@@ -1668,8 +1668,8 @@ fn is_focus_assist_active() -> bool {
 
 fn settings_panel_height() -> i32 {
     let header_h = 40;
-    let row_h = 34;
-    let num_rows = 18;
+    let row_h = crate::ui::render::SETTINGS_ROW_H;
+    let num_rows = crate::ui::render::SETTINGS_ROW_COUNT as i32;
     let legend_h = 10 + 1 + 10 + 18 + (4 * 18) + 10; // gap + sep + gap + title + 4 rows + bottom padding
     let footer_h = 44;
     header_h + 8 + (num_rows * row_h) + legend_h + footer_h
