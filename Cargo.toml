@@ -16,6 +16,16 @@ rust-version = "1.75"
 name = "claudemeter"
 path = "src/main.rs"
 
+[features]
+default = []
+# One-click self-update: downloads the new release and swaps the running .exe.
+# Off in shipped builds — "process downloads an executable and replaces itself"
+# is the strongest remaining trigger for Defender's ML heuristics, and gating it
+# behind a feature keeps that code (and its strings) out of the binary entirely
+# rather than merely unreachable. The update *check* and its notification stay
+# on; clicking the balloon opens the release page in the browser.
+self-update = []
+
 [dependencies]
 tokio = { version = "1", features = ["rt", "macros", "time", "sync", "net", "io-util"] }
 reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }

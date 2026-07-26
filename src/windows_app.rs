@@ -23,7 +23,9 @@ use windows::Win32::Graphics::Dwm::DwmSetWindowAttribute;
 use windows::Win32::Graphics::Gdi::ClientToScreen;
 use windows::Win32::Graphics::Gdi::{BeginPaint, EndPaint, PAINTSTRUCT};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
-use windows::Win32::System::Threading::{CreateMutexW, ReleaseMutex};
+use windows::Win32::System::Threading::CreateMutexW;
+#[cfg(feature = "self-update")]
+use windows::Win32::System::Threading::ReleaseMutex;
 use windows::Win32::UI::Controls::WM_MOUSELEAVE;
 use windows::Win32::UI::Input::KeyboardAndMouse::{TrackMouseEvent, TME_LEAVE, TRACKMOUSEEVENT};
 use windows::Win32::UI::WindowsAndMessaging::LWA_ALPHA;
@@ -479,6 +481,7 @@ unsafe fn run_message_loop(exe_dir: std::path::PathBuf, config_mgr: ConfigManage
 
     // If an update was swapped in during this session, hand over to it:
     // release the single-instance mutex first so the new process can start.
+    #[cfg(feature = "self-update")]
     if updater::update_installed() {
         release_single_instance();
         updater::relaunch_updated();
@@ -534,35 +537,44 @@ unsafe extern "system" fn main_wnd_proc(
                     show_context_menu(hwnd);
                 }
                 NIN_BALLOONUSERCLICK => {
-                    // User clicked the balloon body — open update URL if one is pending.
+                    // User clicked the balloon body — act on the pending update if any.
                     if let Some(state) = APP_STATE.as_mut() {
                         if let Some(update) = state.pending_update.take() {
-                            let hwnd_raw = hwnd.0 as usize;
-                            std::thread::spawn(move || {
-                                let runtime = tokio::runtime::Builder::new_current_thread()
-                                    .enable_all()
-                                    .build();
-                                let Ok(runtime) = runtime else { return };
-                                if let Err(error) =
-                                    runtime.block_on(updater::download_and_install(&update))
-                                {
-                                    log::warn!("Update installation failed: {error}");
-                                    let message = Box::new(error);
+                            #[cfg(feature = "self-update")]
+                            {
+                                let hwnd_raw = hwnd.0 as usize;
+                                std::thread::spawn(move || {
+                                    let runtime = tokio::runtime::Builder::new_current_thread()
+                                        .enable_all()
+                                        .build();
+                                    let Ok(runtime) = runtime else { return };
+                                    if let Err(error) =
+                                        runtime.block_on(updater::download_and_install(&update))
+                                    {
+                                        log::warn!("Update installation failed: {error}");
+                                        let message = Box::new(error);
+                                        let _ = PostMessageW(
+                                            HWND(hwnd_raw as *mut _),
+                                            WM_UPDATE_FAILED,
+                                            WPARAM(Box::into_raw(message) as usize),
+                                            LPARAM(0),
+                                        );
+                                        return;
+                                    }
                                     let _ = PostMessageW(
                                         HWND(hwnd_raw as *mut _),
-                                        WM_UPDATE_FAILED,
-                                        WPARAM(Box::into_raw(message) as usize),
+                                        WM_UPDATE_INSTALL_READY,
+                                        WPARAM(0),
                                         LPARAM(0),
                                     );
-                                    return;
-                                }
-                                let _ = PostMessageW(
-                                    HWND(hwnd_raw as *mut _),
-                                    WM_UPDATE_INSTALL_READY,
-                                    WPARAM(0),
-                                    LPARAM(0),
-                                );
-                            });
+                                });
+                            }
+                            // Shipped builds do not download or replace themselves; send the
+                            // user to the release page and let them pick up the new exe.
+                            #[cfg(not(feature = "self-update"))]
+                            {
+                                let _ = open::that(&update.html_url);
+                            }
                         }
                     }
                 }
@@ -2751,6 +2763,9 @@ fn ensure_single_instance() -> bool {
 
 /// Release the single-instance mutex so a relaunched instance can start
 /// while this process is still shutting down.
+/// Only the self-update handover needs to drop the mutex before exit; normal
+/// shutdown lets the OS release it.
+#[cfg(feature = "self-update")]
 unsafe fn release_single_instance() {
     if let Some(handle) = INSTANCE_MUTEX.take() {
         let _ = ReleaseMutex(handle);

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **One-click self-update is no longer in shipped builds** — downloading a release and overwriting
+  the running `.exe` is the strongest remaining trigger for Defender's machine-learning heuristics
+  (`Trojan:Win32/Sabsik.FL.A!ml` and friends), so it now sits behind a `self-update` Cargo feature
+  that is off by default. Gating it at compile time rather than at runtime keeps the download and
+  file-swap code, and its strings, out of the binary entirely. The update check and its tray
+  balloon are unchanged; clicking the balloon opens the release page instead of installing.
+
 
 
 

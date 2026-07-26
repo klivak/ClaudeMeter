@@ -8,7 +8,11 @@ const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub struct UpdateInfo {
     pub tag: String,
     pub html_url: String,
+    /// Only needed to download the release; without `self-update` the user is
+    /// sent to `html_url` instead.
+    #[cfg(feature = "self-update")]
     pub asset_url: String,
+    #[cfg(feature = "self-update")]
     pub checksum_url: String,
 }
 
@@ -30,26 +34,35 @@ pub async fn check_for_update() -> Option<UpdateInfo> {
     let json: serde_json::Value = resp.json().await.ok()?;
     let tag = json.get("tag_name")?.as_str()?;
     let html_url = json.get("html_url")?.as_str()?;
-    let assets = json.get("assets")?.as_array()?;
-    let asset = assets.iter().find(|asset| {
-        asset.get("name").and_then(|name| name.as_str()) == Some("claudemeter.exe")
-    })?;
-    let asset_url = asset.get("browser_download_url")?.as_str()?;
-    let checksum_url = assets
-        .iter()
-        .find(|asset| {
-            asset.get("name").and_then(|name| name.as_str()) == Some("claudemeter.exe.sha256")
-        })
-        .and_then(|asset| asset.get("browser_download_url"))
-        .and_then(|url| url.as_str())
-        .map(str::to_string)?;
+    // Asset URLs are only resolved when the build can actually install them —
+    // otherwise a release whose assets are named differently would silently
+    // suppress the notification.
+    #[cfg(feature = "self-update")]
+    let (asset_url, checksum_url) = {
+        let assets = json.get("assets")?.as_array()?;
+        let asset = assets.iter().find(|asset| {
+            asset.get("name").and_then(|name| name.as_str()) == Some("claudemeter.exe")
+        })?;
+        let asset_url = asset.get("browser_download_url")?.as_str()?.to_string();
+        let checksum_url = assets
+            .iter()
+            .find(|asset| {
+                asset.get("name").and_then(|name| name.as_str()) == Some("claudemeter.exe.sha256")
+            })
+            .and_then(|asset| asset.get("browser_download_url"))
+            .and_then(|url| url.as_str())
+            .map(str::to_string)?;
+        (asset_url, checksum_url)
+    };
 
     let remote_ver = tag.trim_start_matches('v');
     if is_newer(remote_ver, CURRENT_VERSION) {
         Some(UpdateInfo {
             tag: tag.to_string(),
             html_url: html_url.to_string(),
-            asset_url: asset_url.to_string(),
+            #[cfg(feature = "self-update")]
+            asset_url,
+            #[cfg(feature = "self-update")]
             checksum_url,
         })
     } else {
@@ -60,6 +73,7 @@ pub async fn check_for_update() -> Option<UpdateInfo> {
 /// Original path of the running executable after a successful in-place swap.
 /// Set by [`download_and_install`]; consumed by [`relaunch_updated`] at shutdown.
 /// Captured *before* the swap because `current_exe()` follows the renamed file.
+#[cfg(feature = "self-update")]
 static UPDATED_EXE_PATH: std::sync::Mutex<Option<std::path::PathBuf>> = std::sync::Mutex::new(None);
 
 /// Download an update, verify its checksum, and swap it into place natively.
@@ -71,6 +85,11 @@ static UPDATED_EXE_PATH: std::sync::Mutex<Option<std::path::PathBuf>> = std::syn
 /// [`relaunch_updated`]. (Deliberately no PowerShell here — a hidden
 /// script replacing its parent exe is a classic malware pattern and was
 /// tripping antivirus heuristics.)
+///
+/// Compiled out unless the `self-update` feature is on: even without PowerShell,
+/// downloading an executable and overwriting yourself is what Defender's ML
+/// models score highest. Shipped builds send the user to the release page.
+#[cfg(feature = "self-update")]
 pub async fn download_and_install(update: &UpdateInfo) -> Result<(), String> {
     let client = reqwest::Client::builder()
         .use_rustls_tls()
@@ -121,6 +140,7 @@ pub async fn download_and_install(update: &UpdateInfo) -> Result<(), String> {
 /// Move the running exe aside and put the verified download in its place.
 /// Rolls the rename back if the second step fails, so the app keeps updating
 /// and relaunching from its original path.
+#[cfg(feature = "self-update")]
 fn swap_executable(
     current_exe: &std::path::Path,
     download_path: &std::path::Path,
@@ -138,12 +158,14 @@ fn swap_executable(
 }
 
 /// True when an update has been swapped in and a relaunch is pending.
+#[cfg(feature = "self-update")]
 pub fn update_installed() -> bool {
     UPDATED_EXE_PATH.lock().unwrap().is_some()
 }
 
 /// Start the freshly installed executable. Call only after the single-instance
 /// mutex has been released, right before process exit.
+#[cfg(feature = "self-update")]
 pub fn relaunch_updated() {
     let Some(exe) = UPDATED_EXE_PATH.lock().unwrap().take() else {
         return;
@@ -163,6 +185,7 @@ pub fn cleanup_stale_update_files() {
     }
 }
 
+#[cfg(feature = "self-update")]
 fn parse_checksum(content: &str) -> Result<String, String> {
     let value = content
         .split_whitespace()
@@ -215,6 +238,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "self-update")]
     fn test_parse_checksum() {
         let hash = "A".repeat(64);
         assert_eq!(
@@ -227,6 +251,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "self-update")]
     fn test_swap_executable_replaces_and_backs_up() {
         let dir = std::env::temp_dir().join(format!("claudemeter-swap-ok-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
@@ -248,6 +273,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "self-update")]
     fn test_swap_executable_rolls_back_when_download_missing() {
         let dir = std::env::temp_dir().join(format!("claudemeter-swap-rb-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();

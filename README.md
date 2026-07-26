@@ -212,7 +212,7 @@ OpenAI does not provide a public API for checking Codex subscription usage. Inst
 - **Show model limits** — toggle in Settings to show per-model weekly quotas (Opus, Sonnet, Fable, …) in the dashboard (on by default)
 - **Usage & status icon buttons** — each section header shows compact "open usage" and "service status" icon buttons; toggle them with the "Usage link icons" setting
 - **Notification toggles** — Settings exposes "Show startup notification" (silence the "Running in tray" balloon on launch) and "Show login expiry warning" (silence the `claude login` reminder)
-- **One-click updates** — clicking the "Update available" tray balloon downloads the verified Windows release, checks its SHA-256 checksum, and installs it safely after ClaudeMeter exits
+- **Update notification** — clicking the "Update available" tray balloon opens the release page in your browser (ClaudeMeter does not download or replace its own `.exe` — see [Antivirus false positives](#-antivirus-false-positives--verifying-your-download))
 - **Actionable error recovery** — expired or missing Claude credentials offer a one-click `claude login` copy action, while transient errors can be retried directly from the dashboard
 
 ### 🎨 Themes
@@ -295,10 +295,11 @@ OpenAI does not provide a public API for checking Codex subscription usage. Inst
 - **Colorblind patterns** — progress bars show pattern overlays: dots (green), diagonal stripes (yellow), cross-hatch (red)
 - **Disabled by default** — enable in Settings → "Accessibility patterns"
 
-### 🔄 Auto-Update
+### 🔄 Update Check
 
 - **Checks GitHub Releases** on startup for newer versions
 - **Balloon notification** — shows a tray balloon if a new version is available
+- **Click to open the release page** — you download the new `.exe` yourself. ClaudeMeter never downloads or overwrites its own executable: that pattern is the strongest trigger for antivirus machine-learning heuristics, so the self-installing updater is compiled out of shipped builds (it lives behind the `self-update` Cargo feature if you want to build it in yourself)
 - **Enabled by default** — toggle in Settings → "Check for updates"
 
 ### 🔔 Smart Notifications
@@ -390,7 +391,7 @@ OpenAI does not provide a public API for checking Codex subscription usage. Inst
 | `show_chatgpt_section` | `false` | — | Show the Codex usage panel (legacy config key retained for compatibility) |
 | `autostart` | `false` | — | Start with Windows or macOS LaunchAgent |
 | `show_widget` | `false` | — | Show floating mini-widget |
-| `check_updates` | `true` | — | Check for updates on startup and offer verified one-click installation |
+| `check_updates` | `true` | — | Check GitHub Releases on startup and notify when a newer version exists |
 | `tray_icon_style` | `"number"` | number/ring/bar/pie | Tray icon style: number (%), ring (circular), bar (vertical), pie (multi-metric) |
 | `accessibility_patterns` | `false` | — | Colorblind overlay patterns on progress bars |
 | `dashboard_layout` | `"standard"` | minimal/standard/detailed | Dashboard layout mode |
@@ -492,18 +493,20 @@ classifiers associate with malware:
 - Reads the Windows Credential Manager (to find your existing Claude Code OAuth token)
 - Makes HTTPS requests (to `api.anthropic.com` — nowhere else)
 - Writes a registry auto-start entry (only if you enable "Start with Windows")
-- Can download and replace its own `.exe` (the one-click updater, with SHA-256 verification)
-
 Each action is a documented feature with open source behind it, but the combination matches a
 "trojan-like" profile for heuristics.
 
-The strongest single trigger — spawning a hidden PowerShell script — has already been removed:
-notifications are native `Shell_NotifyIcon` balloons, and the updater swaps the exe in-process
-rather than leaving a script behind to replace its parent. On Windows the app now starts no
-external process at all, except relaunching itself after an update. The remaining items are
-inherent to what the tool does, so **code signing is the actual fix** and is being evaluated;
-until then, verify your download as below and report the detection to Microsoft (step 4), which
-usually clears it within a few days.
+Two of the loudest triggers have already been removed:
+
+- **Spawning a hidden PowerShell script** — notifications are native `Shell_NotifyIcon` balloons
+  instead. On Windows the app starts no external process at all.
+- **Downloading an executable and overwriting itself** — the self-installing updater is compiled
+  out of shipped builds (it sits behind the `self-update` Cargo feature). The update *check* still
+  runs; clicking the balloon just opens the release page.
+
+What remains is inherent to what the tool does, so **code signing is the actual fix** and is being
+evaluated. Until then, verify your download as below and report the detection to Microsoft
+(step 4) — that usually clears it within a few days, for everyone rather than just your machine.
 
 ### Verify your download (10 seconds)
 
