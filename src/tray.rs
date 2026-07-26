@@ -3,17 +3,17 @@ use crate::ui::colors::ColorRef;
 use windows::Win32::Foundation::{HWND, RECT};
 use windows::Win32::Graphics::Gdi::{
     CreateCompatibleDC, CreateDIBSection, CreateFontW, DeleteDC, DeleteObject, DrawTextW,
-    SelectObject, SetBkMode, SetTextColor, BITMAPINFO, BITMAPINFOHEADER, BI_RGB,
-    CLIP_DEFAULT_PRECIS, DEFAULT_CHARSET, DEFAULT_PITCH, DIB_RGB_COLORS, DT_CENTER, DT_SINGLELINE,
-    DT_VCENTER, FF_DONTCARE, FW_BOLD, OUT_DEFAULT_PRECIS, PROOF_QUALITY, TRANSPARENT,
+    SelectObject, SetBkMode, SetTextColor, ANTIALIASED_QUALITY, BITMAPINFO, BITMAPINFOHEADER,
+    BI_RGB, CLIP_DEFAULT_PRECIS, DEFAULT_CHARSET, DEFAULT_PITCH, DIB_RGB_COLORS, DT_CENTER,
+    DT_SINGLELINE, DT_VCENTER, FF_DONTCARE, FW_BOLD, OUT_DEFAULT_PRECIS, TRANSPARENT,
 };
 use windows::Win32::UI::Shell::{
     Shell_NotifyIconW, NIF_ICON, NIF_INFO, NIF_MESSAGE, NIF_TIP, NIIF_INFO, NIM_ADD, NIM_DELETE,
     NIM_MODIFY, NOTIFYICONDATAW,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    CreateIconIndirect, DestroyIcon, LoadIconW, LoadImageW, HICON, ICONINFO, IDI_APPLICATION,
-    IMAGE_ICON, LR_DEFAULTSIZE, LR_SHARED, WM_USER,
+    CreateIconIndirect, DestroyIcon, GetSystemMetrics, LoadIconW, LoadImageW, HICON, ICONINFO,
+    IDI_APPLICATION, IMAGE_ICON, LR_DEFAULTSIZE, LR_SHARED, SM_CXSMICON, WM_USER,
 };
 
 // Tray callback message
@@ -102,9 +102,73 @@ fn load_icon_from_resource(resource_id: u16, size: i32) -> Result<HICON, String>
     }
 }
 
-/// Create a 16x16 icon with text rendered on a colored background.
-fn create_text_icon(text: &str, font_size: i32, color: ColorRef, text_color: u32) -> Option<HICON> {
-    const SIZE: i32 = 16;
+/// Size to author the tray bitmap at.
+///
+/// The shell asks for `SM_CXSMICON` pixels; drawing a fixed 16x16 image and
+/// letting it be upscaled is what makes the icon look soft on a scaled display,
+/// so render at the size actually being asked for.
+fn tray_icon_size() -> i32 {
+    let size = unsafe { GetSystemMetrics(SM_CXSMICON) };
+    if size <= 0 {
+        16
+    } else {
+        size.clamp(16, 64)
+    }
+}
+
+/// Supersampled coverage (0-255) of a rounded rectangle at one pixel.
+///
+/// Sampling 4x4 per pixel matters at 16x16: a hard in/out test leaves visibly
+/// stair-stepped corners at that size.
+fn rounded_alpha(col: i32, row: i32, w: i32, h: i32, radius: f32) -> u32 {
+    const SS: i32 = 4;
+    let (wf, hf) = (w as f32, h as f32);
+    let radius = radius.min(wf / 2.0).min(hf / 2.0);
+    let mut inside = 0;
+    for sy in 0..SS {
+        for sx in 0..SS {
+            let px = col as f32 + (sx as f32 + 0.5) / SS as f32;
+            let py = row as f32 + (sy as f32 + 0.5) / SS as f32;
+            // Nearest point of the inner (un-rounded) rect; zero distance means
+            // the sample is in the straight-edged part and always inside.
+            let qx = px.clamp(radius, wf - radius);
+            let qy = py.clamp(radius, hf - radius);
+            let dx = px - qx;
+            let dy = py - qy;
+            if dx * dx + dy * dy <= radius * radius {
+                inside += 1;
+            }
+        }
+    }
+    (255 * inside / (SS * SS)) as u32
+}
+
+/// Round off the corners of a filled square icon by rewriting its alpha channel.
+fn apply_rounded_corners(pixels: &mut [u32], size: i32) {
+    let radius = size as f32 * 0.22;
+    for row in 0..size {
+        for col in 0..size {
+            let idx = (row * size + col) as usize;
+            let a = rounded_alpha(col, row, size, size, radius);
+            pixels[idx] = if a == 0 {
+                0
+            } else {
+                (pixels[idx] & 0x00FF_FFFF) | (a << 24)
+            };
+        }
+    }
+}
+
+fn create_text_icon(
+    text: &str,
+    font_size: i32,
+    size: i32,
+    color: ColorRef,
+    text_color: u32,
+) -> Option<HICON> {
+    let size = size.max(8);
+    #[allow(non_snake_case)]
+    let SIZE: i32 = size;
 
     unsafe {
         let dc = CreateCompatibleDC(None);
@@ -172,7 +236,9 @@ fn create_text_icon(text: &str, font_size: i32, color: ColorRef, text_color: u32
             DEFAULT_CHARSET.0 as u32,
             OUT_DEFAULT_PRECIS.0 as u32,
             CLIP_DEFAULT_PRECIS.0 as u32,
-            PROOF_QUALITY.0 as u32,
+            // Grayscale AA, not ClearType: subpixel rendering leaves coloured
+            // fringes on an icon that carries its own alpha channel.
+            ANTIALIASED_QUALITY.0 as u32,
             (DEFAULT_PITCH.0 | FF_DONTCARE.0) as u32,
             windows::core::PCWSTR(face_name.as_ptr()),
         );
@@ -201,6 +267,10 @@ fn create_text_icon(text: &str, font_size: i32, color: ColorRef, text_color: u32
                 *px |= 0xFF000000; // set alpha to 255
             }
         }
+
+        // Soften the block into a rounded square — done last so it trims both
+        // the fill and any text that reaches into a corner.
+        apply_rounded_corners(pixels, SIZE);
 
         SelectObject(dc, old_font);
         SelectObject(dc, old_bm);
@@ -250,8 +320,9 @@ fn create_text_icon(text: &str, font_size: i32, color: ColorRef, text_color: u32
 
 /// Create a 16x16 icon with a circular progress ring.
 /// Ring fills clockwise from 12 o'clock based on percentage.
-fn create_ring_icon(pct: f64, color: ColorRef) -> Option<HICON> {
-    const SIZE: i32 = 16;
+fn create_ring_icon(pct: f64, size: i32, color: ColorRef) -> Option<HICON> {
+    #[allow(non_snake_case)]
+    let SIZE: i32 = size.max(8);
 
     unsafe {
         let dc = CreateCompatibleDC(None);
@@ -295,34 +366,73 @@ fn create_ring_icon(pct: f64, color: ColorRef) -> Option<HICON> {
         // Track color (semi-transparent gray)
         let track_pixel = 0x80505050;
 
-        let cx = 7.5_f64;
-        let cy = 7.5_f64;
-        let outer_r = 7.0_f64;
-        let inner_r = 4.0_f64;
+        // Geometry is proportional so the ring keeps its weight at any DPI.
+        let scale = SIZE as f64 / 16.0;
+        let cx = (SIZE as f64 - 1.0) / 2.0;
+        let cy = cx;
+        let outer_r = 7.0 * scale;
+        let inner_r = 4.0 * scale;
         let fill_angle = (pct / 100.0) * 360.0;
 
+        // Supersample so the ring's curves and the fill boundary don't
+        // stair-step — at 16px a hard in/out test is very visible.
+        const SS: i32 = 4;
+        let samples = (SS * SS) as f64;
         for row in 0..SIZE {
             for col in 0..SIZE {
-                let dx = col as f64 - cx;
-                let dy = row as f64 - cy;
-                let dist = (dx * dx + dy * dy).sqrt();
-
-                if dist >= inner_r && dist <= outer_r {
-                    // In the ring area — check angle
-                    // atan2: 0 = right, PI/2 = down; we want 0 = top, clockwise
-                    let mut angle = (dx.atan2(-dy)).to_degrees();
-                    if angle < 0.0 {
-                        angle += 360.0;
+                let mut fill_hits = 0.0_f64;
+                let mut track_hits = 0.0_f64;
+                for sy in 0..SS {
+                    for sx in 0..SS {
+                        let px = col as f64 + (sx as f64 + 0.5) / SS as f64;
+                        let py = row as f64 + (sy as f64 + 0.5) / SS as f64;
+                        let dx = px - cx;
+                        let dy = py - cy;
+                        let dist = (dx * dx + dy * dy).sqrt();
+                        if dist < inner_r || dist > outer_r {
+                            continue;
+                        }
+                        // atan2: 0 = right, PI/2 = down; we want 0 = top, clockwise
+                        let mut angle = (dx.atan2(-dy)).to_degrees();
+                        if angle < 0.0 {
+                            angle += 360.0;
+                        }
+                        if angle <= fill_angle {
+                            fill_hits += 1.0;
+                        } else {
+                            track_hits += 1.0;
+                        }
                     }
-
-                    if angle <= fill_angle {
-                        pixels[(row * SIZE + col) as usize] = ring_pixel;
-                    } else {
-                        pixels[(row * SIZE + col) as usize] = track_pixel;
-                    }
-                } else {
-                    pixels[(row * SIZE + col) as usize] = bg_pixel;
                 }
+
+                let idx = (row * SIZE + col) as usize;
+                if fill_hits == 0.0 && track_hits == 0.0 {
+                    pixels[idx] = bg_pixel;
+                    continue;
+                }
+
+                // Blend the ring and track colours by how much of the pixel each
+                // covers, then scale alpha by the total coverage.
+                let unpack = |p: u32| {
+                    (
+                        ((p >> 16) & 0xFF) as f64,
+                        ((p >> 8) & 0xFF) as f64,
+                        (p & 0xFF) as f64,
+                        ((p >> 24) & 0xFF) as f64,
+                    )
+                };
+                let (fr, fg, fb, fa) = unpack(ring_pixel);
+                let (tr, tg, tb, ta) = unpack(track_pixel);
+                let weight = fill_hits + track_hits;
+                let r = (fr * fill_hits + tr * track_hits) / weight;
+                let g = (fg * fill_hits + tg * track_hits) / weight;
+                let b = (fb * fill_hits + tb * track_hits) / weight;
+                let a = (fa * fill_hits + ta * track_hits) / weight * (weight / samples);
+
+                pixels[idx] = ((a.round() as u32) << 24)
+                    | ((r.round() as u32) << 16)
+                    | ((g.round() as u32) << 8)
+                    | (b.round() as u32);
             }
         }
 
@@ -367,8 +477,9 @@ fn create_ring_icon(pct: f64, color: ColorRef) -> Option<HICON> {
 }
 
 /// Create a 16x16 icon with a vertical progress bar that fills upward.
-fn create_bar_icon(pct: f64, color: ColorRef) -> Option<HICON> {
-    const SIZE: i32 = 16;
+fn create_bar_icon(pct: f64, size: i32, color: ColorRef) -> Option<HICON> {
+    #[allow(non_snake_case)]
+    let SIZE: i32 = size.max(8);
 
     unsafe {
         let dc = CreateCompatibleDC(None);
@@ -412,13 +523,16 @@ fn create_bar_icon(pct: f64, color: ColorRef) -> Option<HICON> {
         // Track color (semi-transparent gray)
         let track_pixel = 0x80505050;
 
-        // Bar area: x=2..14 (12px wide), y=1..15 (14px tall)
-        let bar_left = 2;
-        let bar_right = 14;
-        let bar_top = 1;
-        let bar_bottom = 15;
+        // Bar area keeps the original 16px proportions (2..14 x 1..15) at any DPI.
+        let scale = SIZE as f64 / 16.0;
+        let bar_left = (2.0 * scale).round() as i32;
+        let bar_right = SIZE - bar_left;
+        let bar_top = (1.0 * scale).round() as i32;
+        let bar_bottom = SIZE - bar_top;
         let bar_height = (bar_bottom - bar_top) as f64;
         let fill_height = ((pct / 100.0) * bar_height).round() as i32;
+        let bar_w = bar_right - bar_left;
+        let bar_h = bar_bottom - bar_top;
 
         for row in 0..SIZE {
             for col in 0..SIZE {
@@ -434,6 +548,22 @@ fn create_bar_icon(pct: f64, color: ColorRef) -> Option<HICON> {
                 } else {
                     pixels[idx] = bg_pixel;
                 }
+            }
+        }
+
+        // Round the bar's own corners, matching the rounded track in the dashboard.
+        let radius = bar_w.min(bar_h) as f32 * 0.28;
+        for row in bar_top..bar_bottom {
+            for col in bar_left..bar_right {
+                let idx = (row * SIZE + col) as usize;
+                let cover = rounded_alpha(col - bar_left, row - bar_top, bar_w, bar_h, radius);
+                let base_a = (pixels[idx] >> 24) & 0xFF;
+                let new_a = base_a * cover / 255;
+                pixels[idx] = if new_a == 0 {
+                    0
+                } else {
+                    (pixels[idx] & 0x00FF_FFFF) | (new_a << 24)
+                };
             }
         }
 
@@ -478,8 +608,9 @@ fn create_bar_icon(pct: f64, color: ColorRef) -> Option<HICON> {
 }
 
 /// Create a 16x16 icon with a pie chart showing metrics as proportional sectors.
-fn create_pie_icon(metrics: &[(f64, u32)]) -> Option<HICON> {
-    const SIZE: i32 = 16;
+fn create_pie_icon(metrics: &[(f64, u32)], size: i32) -> Option<HICON> {
+    #[allow(non_snake_case)]
+    let SIZE: i32 = size.max(8);
 
     unsafe {
         let dc = CreateCompatibleDC(None);
@@ -516,44 +647,70 @@ fn create_pie_icon(metrics: &[(f64, u32)]) -> Option<HICON> {
         // Track color (semi-transparent gray)
         let track_pixel = 0x80505050;
 
-        let cx = 7.5_f64;
-        let cy = 7.5_f64;
-        let radius = 6.5_f64;
+        let cx = (SIZE as f64 - 1.0) / 2.0;
+        let cy = cx;
+        let radius = 6.5 * (SIZE as f64 / 16.0);
 
         let total: f64 = metrics.iter().map(|(u, _)| u).sum::<f64>().max(0.001);
 
+        // Pick the sector colour at the sample point; supersampling then gives
+        // the disc a smooth rim instead of a stepped one.
+        let sector_pixel = |angle: f64| -> u32 {
+            let mut sector_start = 0.0_f64;
+            for (util, color_rgb) in metrics {
+                let sector_angle = (util / total) * 360.0;
+                if angle >= sector_start && angle < sector_start + sector_angle {
+                    // color_rgb is 0x00RRGGBB
+                    let r = (color_rgb >> 16) & 0xFF;
+                    let g = (color_rgb >> 8) & 0xFF;
+                    let b = color_rgb & 0xFF;
+                    return 0xFF000000 | (r << 16) | (g << 8) | b;
+                }
+                sector_start += sector_angle;
+            }
+            track_pixel
+        };
+
+        const SS: i32 = 4;
+        let samples = (SS * SS) as f64;
         for row in 0..SIZE {
             for col in 0..SIZE {
-                let dx = col as f64 - cx;
-                let dy = row as f64 - cy;
-                let dist = (dx * dx + dy * dy).sqrt();
                 let idx = (row * SIZE + col) as usize;
+                let (mut acc_r, mut acc_g, mut acc_b, mut acc_a) = (0.0, 0.0, 0.0, 0.0);
+                let mut hits = 0.0_f64;
 
-                if dist <= radius {
-                    let mut angle = dx.atan2(-dy).to_degrees();
-                    if angle < 0.0 {
-                        angle += 360.0;
-                    }
-
-                    let mut sector_start = 0.0_f64;
-                    let mut chosen_pixel = track_pixel;
-                    for (util, color_rgb) in metrics {
-                        let sector_angle = (util / total) * 360.0;
-                        if angle >= sector_start && angle < sector_start + sector_angle {
-                            // color_rgb is 0x00RRGGBB
-                            let r = (color_rgb >> 16) & 0xFF;
-                            let g = (color_rgb >> 8) & 0xFF;
-                            let b = color_rgb & 0xFF;
-                            chosen_pixel = 0xFF000000 | (r << 16) | (g << 8) | b;
-                            break;
+                for sy in 0..SS {
+                    for sx in 0..SS {
+                        let px = col as f64 + (sx as f64 + 0.5) / SS as f64;
+                        let py = row as f64 + (sy as f64 + 0.5) / SS as f64;
+                        let dx = px - cx;
+                        let dy = py - cy;
+                        if (dx * dx + dy * dy).sqrt() > radius {
+                            continue;
                         }
-                        sector_start += sector_angle;
+                        let mut angle = dx.atan2(-dy).to_degrees();
+                        if angle < 0.0 {
+                            angle += 360.0;
+                        }
+                        let p = sector_pixel(angle);
+                        acc_r += ((p >> 16) & 0xFF) as f64;
+                        acc_g += ((p >> 8) & 0xFF) as f64;
+                        acc_b += (p & 0xFF) as f64;
+                        acc_a += ((p >> 24) & 0xFF) as f64;
+                        hits += 1.0;
                     }
-
-                    pixels[idx] = chosen_pixel;
-                } else {
-                    pixels[idx] = bg_pixel;
                 }
+
+                if hits == 0.0 {
+                    pixels[idx] = bg_pixel;
+                    continue;
+                }
+
+                let r = (acc_r / hits).round() as u32;
+                let g = (acc_g / hits).round() as u32;
+                let b = (acc_b / hits).round() as u32;
+                let a = ((acc_a / hits) * (hits / samples)).round() as u32;
+                pixels[idx] = (a << 24) | (r << 16) | (g << 8) | b;
             }
         }
 
@@ -682,9 +839,10 @@ impl TrayIcon {
             let color_ref = color.to_colorref();
             let text_cr = color.text_colorref();
             let pct = session_util.unwrap_or(max_util.unwrap_or(0.0));
+            let icon_px = tray_icon_size();
             let dyn_icon = match icon_style {
-                "ring" => create_ring_icon(pct, color_ref),
-                "bar" => create_bar_icon(pct, color_ref),
+                "ring" => create_ring_icon(pct, icon_px, color_ref),
+                "bar" => create_bar_icon(pct, icon_px, color_ref),
                 "pie" => {
                     if let Some(u) = usage.as_ref() {
                         let pie_metrics: Vec<(f64, u32)> = u
@@ -695,9 +853,9 @@ impl TrayIcon {
                             .map(|(i, (_, m))| (m.utilization, PIE_PALETTE[i % PIE_PALETTE.len()]))
                             .collect();
                         if pie_metrics.is_empty() {
-                            create_ring_icon(0.0, color_ref)
+                            create_ring_icon(0.0, icon_px, color_ref)
                         } else {
-                            create_pie_icon(&pie_metrics)
+                            create_pie_icon(&pie_metrics, icon_px)
                         }
                     } else {
                         None
@@ -712,10 +870,10 @@ impl TrayIcon {
                         } else {
                             format!("{}", value)
                         };
-                        let font_size = if value >= 10 { 9 } else { 11 };
-                        create_text_icon(&text, font_size, color_ref, text_cr)
+                        let base = if value >= 10 { 9 } else { 11 };
+                        create_text_icon(&text, base * icon_px / 16, icon_px, color_ref, text_cr)
                     } else {
-                        create_text_icon("...", 8, color_ref, text_cr)
+                        create_text_icon("...", 8 * icon_px / 16, icon_px, color_ref, text_cr)
                     }
                 }
             };

@@ -31,7 +31,7 @@ See your 5-hour session, weekly limits, Sonnet & Opus quotas — without opening
 
 ### 🎬 See it in action — 56 seconds
 
-<video src="https://klivak.github.io/claude-meter/promo/claudemeter-promo.mp4" poster="https://klivak.github.io/claude-meter/promo/promo-poster.png" width="720" controls muted playsinline></video>
+https://github.com/user-attachments/assets/6961e5ca-47b8-4395-bb64-b1949adead98
 
 <sub><a href="https://klivak.github.io/claude-meter/promo/claudemeter-promo.mp4">▶ Watch the promo video</a> — if the player above doesn't render in your Markdown viewer</sub>
 
