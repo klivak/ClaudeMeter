@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.9.1] - 2026-07-27
+
 ### Changed
 
 - **One-click self-update is no longer in shipped builds** — downloading a release and overwriting
@@ -16,8 +18,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   file-swap code, and its strings, out of the binary entirely. The update check and its tray
   balloon are unchanged; clicking the balloon opens the release page instead of installing.
 
+  This reduces the heuristic surface; it does not guarantee a clean verdict, since the binary is
+  still unsigned. Report a detection to Microsoft (see the README) to get it cleared for everyone.
 
+### Fixed
 
+- **Documentation described behaviour the app no longer has** — the antivirus section still listed
+  "launches PowerShell to show toast notifications" as a heuristic trigger. Notifications have been
+  native `Shell_NotifyIcon` balloons since 5.5.1; on Windows the app now starts no external process
+  at all.
 
 ## [5.9.0] - 2026-07-26
 
