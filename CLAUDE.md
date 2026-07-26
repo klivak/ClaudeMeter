@@ -50,7 +50,7 @@ cargo audit
 - `src/db.rs` — SQLite history (rusqlite with bundled feature)
 - `src/tray.rs` — System tray icon, tooltip, context menu (Win32 API)
 - `src/popup.rs` — Dashboard popup window (Win32 API, GDI)
-- `src/notifications.rs` — Windows toast notifications (PowerShell-based)
+- `src/notifications.rs` — threshold tracking for alerts (which metric/threshold pairs already fired)
 - `src/autostart.rs` — Registry-based auto-start
 - `src/theme.rs` — Dark/Light/Auto theme detection from Windows registry
 - `src/i18n/` — Localization: en, uk, es, de, fr, pt, ja, ko, zh, it (HashMap-based, compiled in)
@@ -67,7 +67,10 @@ cargo audit
 4. **Single .exe** — No DLLs, no config files required (config auto-created on first run).
 5. **Async with tokio** — Minimal features: rt, macros, time, sync, net, io-util.
 6. **Future-proof API parsing** — Unknown API fields with valid `{utilization, resets_at}` structure are auto-displayed.
-7. **PowerShell notifications** — Toast notifications via PowerShell to avoid winrt-notification dependency.
+7. **No child processes on Windows** — notifications are native `Shell_NotifyIcon` balloons and the
+   updater swaps the exe in-process. Spawning PowerShell was removed because a hidden script
+   replacing its parent exe is a classic malware pattern and tripped antivirus heuristics. Do not
+   reintroduce `Command::new` on the Windows path without a very good reason.
 
 ## Conventions
 

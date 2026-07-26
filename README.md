@@ -492,12 +492,18 @@ classifiers associate with malware:
 - Reads the Windows Credential Manager (to find your existing Claude Code OAuth token)
 - Makes HTTPS requests (to `api.anthropic.com` — nowhere else)
 - Writes a registry auto-start entry (only if you enable "Start with Windows")
-- Launches PowerShell (to show toast notifications)
 - Can download and replace its own `.exe` (the one-click updater, with SHA-256 verification)
 
 Each action is a documented feature with open source behind it, but the combination matches a
-"trojan-like" profile for heuristics. Code signing would largely fix this and is being evaluated;
-until then, verify your download as below.
+"trojan-like" profile for heuristics.
+
+The strongest single trigger — spawning a hidden PowerShell script — has already been removed:
+notifications are native `Shell_NotifyIcon` balloons, and the updater swaps the exe in-process
+rather than leaving a script behind to replace its parent. On Windows the app now starts no
+external process at all, except relaunching itself after an update. The remaining items are
+inherent to what the tool does, so **code signing is the actual fix** and is being evaluated;
+until then, verify your download as below and report the detection to Microsoft (step 4), which
+usually clears it within a few days.
 
 ### Verify your download (10 seconds)
 
