@@ -13,3 +13,6 @@ config.json
 *~
 Thumbs.db
 Desktop.ini
+
+# Promo video project (Remotion): node_modules-sized assets, not part of the app
+/marketing/
