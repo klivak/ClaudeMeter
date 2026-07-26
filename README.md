@@ -164,8 +164,9 @@ OpenAI does not provide a public API for checking Codex subscription usage. Inst
 
 ### System Tray
 
-- **🔢 Dynamic % icon** — shows actual utilization number (e.g. "42") with color-coded background
+- **🔢 Dynamic % icon** — shows actual utilization number (e.g. "42") on a rounded, color-coded background
 - **⭕ Icon styles** — choose between Number (default), Ring (circular progress), Bar (vertical fill), or Pie (multi-metric pie chart) in Settings
+- **🔍 Drawn at your DPI** — the icon is rendered at the size the shell asks for (20px at 125%, 24px at 150%) with anti-aliased edges, instead of upscaling a 16px bitmap
 - **🟢🟡🔴 Color coding** — green (<50%), yellow (50-79%), red (>=80%), gray (no data) with transparent icon backgrounds
 - **⚪ Gray when cached** — if the token expired or no live poll has succeeded, the icon turns gray so a stale percentage is never shown as if it were current
 - **💬 Rich tooltip** — hover to see all metrics, reset times, and plan info; cached data adds a line explaining why (e.g. *"Cached — token expired, run: claude login"*)

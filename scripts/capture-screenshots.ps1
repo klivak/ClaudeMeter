@@ -15,8 +15,15 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$Exe = "$PSScriptRoot\..\target\release\claudemeter.exe",
-    [string]$OutDir = "$PSScriptRoot\..\screenshots",
+    # Resolved against the repo root in the body; $PSScriptRoot is not reliably
+    # populated inside param() defaults when invoked via `powershell -File`.
+    [string]$Exe,
+    [string]$OutDir,
+    # Subset to re-take, e.g. -Only sunset,midnight. Restarting the app five
+    # times in a row can trip a transient API error, and the footer then renders
+    # the stale-data warning instead of a timestamp; re-run those themes alone.
+    [ValidateSet('dark', 'light', 'sunset', 'midnight', 'settings')]
+    [string[]]$Only,
     # Seconds to wait after launch before capturing. The first usage poll has to
     # land, otherwise the popup renders a shorter "no data yet" layout and the
     # footer shows the stale-data warning instead of a timestamp.
@@ -68,10 +75,16 @@ public class ShotCap {
 [ShotCap]::SetProcessDPIAware() | Out-Null
 Add-Type -AssemblyName System.Drawing
 
+$root = Split-Path -Parent $PSScriptRoot
+if (-not $Exe) { $Exe = Join-Path $root 'target\release\claudemeter.exe' }
+if (-not $OutDir) { $OutDir = Join-Path $root 'screenshots' }
+
 $exePath = (Resolve-Path $Exe).Path
 $cfg = Join-Path (Split-Path $exePath) 'config.json'
 $outDir = (Resolve-Path $OutDir).Path
-if (-not (Test-Path $cfg)) { throw "config.json not found next to the exe — run the app once first." }
+# Keep this file pure ASCII: Windows PowerShell reads a BOM-less .ps1 as cp1252,
+# where a UTF-8 em dash decodes into a smart quote and breaks string parsing.
+if (-not (Test-Path $cfg)) { throw "config.json not found next to the exe - run the app once first." }
 
 # Windows PowerShell's -Encoding utf8 writes a BOM, which serde_json rejects;
 # the app then silently falls back to defaults. Write plain UTF-8.
@@ -136,6 +149,7 @@ try {
     )
 
     foreach ($s in $shots) {
+        if ($Only -and $Only -notcontains $s.theme) { continue }
         $j = Get-Content $cfg -Raw | ConvertFrom-Json
         $j.theme = $s.theme
         $j.accessibility_patterns = $false   # shipped default; keeps the bars clean
@@ -144,12 +158,14 @@ try {
         Capture $s.file
     }
 
-    $j = Get-Content $cfg -Raw | ConvertFrom-Json
-    $j.theme = 'light'
-    $j.accessibility_patterns = $false
-    Write-Json $cfg $j
-    Restart-App
-    Capture 'settings.png' -Settings
+    if (-not $Only -or $Only -contains 'settings') {
+        $j = Get-Content $cfg -Raw | ConvertFrom-Json
+        $j.theme = 'light'
+        $j.accessibility_patterns = $false
+        Write-Json $cfg $j
+        Restart-App
+        Capture 'settings.png' -Settings
+    }
 }
 finally {
     Copy-Item "$cfg.shotbak" $cfg -Force

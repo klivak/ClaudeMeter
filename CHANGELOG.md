@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [5.9.0] - 2026-07-26
+
+### Changed
+
+- **Sharper tray icon** — the icon was always drawn at 16x16 and left for the shell to upscale, which is why it looked soft on a scaled display; it is now rendered at the size the shell actually asks for (`SM_CXSMICON`), so 20px at 125% and 24px at 150% are drawn natively. All four styles (Number, Ring, Bar, Pie) scale their geometry with it.
+- **Rounded, anti-aliased tray icon** — the Number and Bar styles are rounded squares instead of hard blocks, and the Ring and Pie edges are supersampled, so the curves no longer stair-step at 16px.
+
+### Fixed
+
+- **Settings panel painted its footer over the legend** — the panel draws 19 rows but the window was sized for 18, so the last ~34px had nowhere to go: the "No data" entry of the tray-colour legend was cut off and the version footer was drawn on top of it. The drawn height and the window height now come from one `SETTINGS_ROW_COUNT` constant, so adding a row cannot desynchronise them again.
+- **Coloured fringes on the tray number** — the percentage was rendered with ClearType, whose subpixel output leaves cyan/yellow artefacts on an icon that carries its own alpha channel. It now uses grayscale anti-aliasing.
+- **`((cached))` in the stale-data footer** — the warning wrapped a value that already carried its own parentheses.
+
+### Added
+
+- **Promo video in the README** — a 56-second walkthrough of the tray icon, dashboard, themes, notifications and Codex panel, with a 9:16 Shorts cut alongside it. The Remotion project that generates both is in `marketing/promo-video/`; every app screen in it is a vector recreation rather than an upscaled screenshot, so it stays sharp at 4K.
+- **`scripts/capture-screenshots.ps1`** — regenerates the README screenshots by driving the real app (sets a theme, restarts, opens the popup, captures the exact window rect) instead of hand-cropping, and restores the caller's config afterwards. The shipped screenshots were re-taken with it at native DPI.
+
 ## [5.8.1] - 2026-07-26
 
 ### Fixed
