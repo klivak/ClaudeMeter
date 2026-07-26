@@ -478,10 +478,11 @@ ClaudeMeter uses `accessToken` to fetch your usage data and `subscriptionType` t
 ## 🛡 Antivirus False Positives & Verifying Your Download
 
 Occasionally Windows Defender (or another antivirus) may quarantine `claudemeter.exe` with a
-machine-learning verdict such as `Trojan:Win32/Bearfoos.B!ml`. **This is a false positive.** The
-`!ml` suffix means the verdict comes from a machine-learning heuristic, not from an actual malware
-signature match — and heuristic models change with definition updates, which is why a binary that
-ran fine for days can suddenly get flagged.
+machine-learning verdict such as `Trojan:Win32/Bearfoos.B!ml` or `Trojan:Win32/Sabsik.FL.A!ml`.
+**This is a false positive.** The `!ml` suffix means the verdict comes from a machine-learning
+heuristic, not from an actual malware signature match — and heuristic models change with definition
+updates, which is why a binary that ran fine for days can suddenly get flagged, and why the family
+name in the alert changes between releases even though the code did not.
 
 ### Why it happens
 
