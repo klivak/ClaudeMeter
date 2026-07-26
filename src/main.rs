@@ -11,6 +11,9 @@ mod providers;
 
 #[cfg(windows)]
 mod autostart;
+// Shared with the macOS menu bar agent, which only consumes the translation
+// tables — the formatting helpers the Windows UI uses are unused there.
+#[cfg_attr(not(windows), allow(dead_code))]
 mod i18n;
 #[cfg(windows)]
 mod notifications;

@@ -535,6 +535,7 @@ pub fn format_reset_target(resets_at: &str) -> Option<String> {
 
 /// Detect Windows 12h vs 24h clock from registry (Control Panel\International\iTime).
 /// Returns true for 24h format. Defaults to 24h if registry read fails.
+#[cfg(windows)]
 pub fn is_system_24h() -> bool {
     use windows::core::PCWSTR;
     use windows::Win32::System::Registry::{
@@ -583,6 +584,13 @@ pub fn is_system_24h() -> bool {
             true
         }
     }
+}
+
+/// Non-Windows platforms have no such registry setting; the menu bar renders
+/// reset times in 24h form.
+#[cfg(not(windows))]
+pub fn is_system_24h() -> bool {
+    true
 }
 
 #[cfg(test)]

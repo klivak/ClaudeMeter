@@ -82,6 +82,13 @@ cargo audit
   `scripts/i18n_fill.json` + `python scripts/i18n_fill.py` append new translations in bulk.
   The `test_all_locales_have_full_key_coverage` test in `src/i18n/mod.rs` enforces this — it
   fails the build if any locale is missing a key.
+- **Cross-platform gating:** These modules compile on **both** Windows and macOS: `config`, `credentials`,
+  `db`, `errors`, `i18n`, `pace`, `providers`, `theme`. Every use of the `windows` crate inside them must sit
+  behind `#[cfg(windows)]`, with a `#[cfg(not(windows))]` counterpart when the function is called from shared
+  code. The Windows-only modules (`ui`, `tray`, `popup`, `widget`, `windows_app`, `autostart`, `updater`,
+  `notifications`) have no such restriction. A local `cargo build` cannot catch a violation — the macOS target
+  needs a C cross-compiler for bundled SQLite — so the macOS CI job is the check. Before un-gating a module
+  (removing its `#[cfg(windows)]` in `main.rs`), grep it for `windows::` first.
 - **Theme:** All colors must come from `colors.rs` theme palette. Never hardcode color values in rendering code.
 - **Memory:** Keep allocations minimal. No caching of large data structures. Target: under 10 MB RSS.
 - **Naming:** snake_case for files/functions, PascalCase for types/structs, SCREAMING_SNAKE for constants.

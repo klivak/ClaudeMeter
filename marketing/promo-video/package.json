@@ -1,0 +1,25 @@
+{
+  "name": "claudemeter-promo-video",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "studio": "remotion studio",
+    "render": "remotion render PromoEN out/claudemeter-promo-1080p.mp4 --codec=h264 --crf=16",
+    "render:4k": "remotion render PromoEN out/claudemeter-promo-4k.mp4 --codec=h264 --crf=16 --scale=2",
+    "render:shorts": "remotion render ShortsEN out/claudemeter-shorts-1080x1920.mp4 --codec=h264 --crf=16",
+    "render:shorts:4k": "remotion render ShortsEN out/claudemeter-shorts-2160x3840.mp4 --codec=h264 --crf=16 --scale=2",
+    "render:all": "npm run render:4k && npm run render:shorts:4k && npm run still:thumb",
+    "still:thumb": "remotion still ThumbnailA out/thumbnail-a.png && remotion still ThumbnailB out/thumbnail-b.png && remotion still ThumbnailC out/thumbnail-c.png"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.402",
+    "@remotion/google-fonts": "4.0.402",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "remotion": "4.0.402"
+  },
+  "devDependencies": {
+    "@types/react": "19.0.0",
+    "typescript": "5.8.3"
+  }
+}

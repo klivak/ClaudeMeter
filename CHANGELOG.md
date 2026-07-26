@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 
+
+## [5.8.1] - 2026-07-26
+
+### Fixed
+
+- **macOS build broken in 5.8.0** — sharing the `i18n` module with the macOS agent also pulled in `is_system_24h()`, which reads the Windows registry, so the macOS target failed to compile and 5.8.0 shipped without its macOS bundle. The registry lookup is now `#[cfg(windows)]` with a 24h-clock fallback elsewhere, matching how `theme::is_system_light_theme()` already handles this.
+
 ## [5.8.0] - 2026-07-26
 
 ### Added
